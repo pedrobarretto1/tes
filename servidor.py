@@ -48,6 +48,7 @@ def setup():
         sql(db,'CREATE TABLE IF NOT EXISTS cosmetics (player_id TEXT PRIMARY KEY, avatar TEXT NOT NULL DEFAULT \'crown\', title TEXT NOT NULL DEFAULT \'visitor\', frame TEXT NOT NULL DEFAULT \'wood\', streak INTEGER NOT NULL DEFAULT 0, best_streak INTEGER NOT NULL DEFAULT 0, completed INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE TABLE IF NOT EXISTS achievements (player_id TEXT NOT NULL, code TEXT NOT NULL, unlocked_at DOUBLE PRECISION NOT NULL, PRIMARY KEY(player_id,code))')
         sql(db,'CREATE TABLE IF NOT EXISTS wallets (player_id TEXT PRIMARY KEY, coins INTEGER NOT NULL DEFAULT 0, theme TEXT NOT NULL DEFAULT \'classic\')')
+        sql(db,'CREATE TABLE IF NOT EXISTS piece_styles (player_id TEXT PRIMARY KEY, skin TEXT NOT NULL DEFAULT \'skin-classic\')')
         sql(db,'CREATE TABLE IF NOT EXISTS purchases (player_id TEXT NOT NULL, item TEXT NOT NULL, PRIMARY KEY(player_id,item))')
         sql(db,'CREATE TABLE IF NOT EXISTS puzzle_solves (player_id TEXT NOT NULL, puzzle_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY(player_id,puzzle_id))')
         sql(db,'CREATE TABLE IF NOT EXISTS event_champions (event_id TEXT PRIMARY KEY, player_id TEXT NOT NULL, name TEXT NOT NULL, played_at TEXT NOT NULL)')
@@ -446,7 +447,9 @@ PUZZLES=[
  dict(id='majority',name='A lei da maioria',level='Intermediário',pieces={42:1,33:-1,35:-1,19:-1},goal='Encontre a sequência que captura mais pedras.',reward=30),
  dict(id='crown',name='A coroação',level='Iniciante',pieces={17:1,10:-1},goal='Capture e transforme a pedra em dama.',reward=20),
  dict(id='triple',name='Três em linha',level='Avançado',pieces={56:1,49:-1,35:-1,21:-1},goal='Capture três pedras em um único lance.',reward=40)]
-THEMES={'classic':0,'imperial':100,'marble':150,'emerald':120}
+THEMES={'classic':0,'imperial':100,'marble':150,'emerald':120,'midnight':160,'sakura':140,'ocean':130,'desert':110,'obsidian':180,'parchment':90,'cherry':125,'frost':150}
+SKINS={'skin-classic':0,'skin-ivory':60,'skin-gilded':100,'skin-jade':110,'skin-crystal':130,'skin-metal':90,'skin-porcelain':85,'skin-ruby':120,'skin-neon':150,'skin-royal':160}
+SHOP_ITEMS={**THEMES,**SKINS}
 def puzzle_board(p):
     b=[0]*64
     for i,v in p['pieces'].items():b[i]=v
@@ -456,7 +459,9 @@ def wallet_add(db,pid,amount):
 def wallet_state(db,pid):
     sql(db,'INSERT INTO wallets(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
     coins,theme=sql(db,'SELECT coins,theme FROM wallets WHERE player_id=?',(pid,)).fetchone()
-    return dict(coins=coins,theme=theme,owned=['classic']+[x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()])
+    sql(db,'INSERT INTO piece_styles(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
+    skin=sql(db,'SELECT skin FROM piece_styles WHERE player_id=?',(pid,)).fetchone()[0]
+    return dict(coins=coins,theme=theme,skin=skin,owned=['classic','skin-classic']+[x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()])
 def school_action(path,d,pid,now):
     day=time.strftime('%Y-%m-%d',time.gmtime());daily=PUZZLES[int(time.time()//86400)%len(PUZZLES)]['id']
     with database() as db:
@@ -471,14 +476,15 @@ def school_action(path,d,pid,now):
             return 200,dict(reward=reward,**wallet_state(db,pid))
         if path.endswith('/buy') or path.endswith('/equip'):
             item=d.get('item')
-            if not isinstance(item,str) or item not in THEMES:return 400,{'error':'Tema inexistente.'}
+            if not isinstance(item,str) or item not in SHOP_ITEMS:return 400,{'error':'Item inexistente.'}
             w=wallet_state(db,pid)
             if item not in w['owned']:
                 if path.endswith('/equip'):return 403,{'error':'Tema ainda bloqueado.'}
-                if w['coins']<THEMES[item]:return 400,{'error':'Moedas insuficientes.'}
-                sql(db,'UPDATE wallets SET coins=coins-? WHERE player_id=?',(THEMES[item],pid))
+                if w['coins']<SHOP_ITEMS[item]:return 400,{'error':'Moedas insuficientes.'}
+                sql(db,'UPDATE wallets SET coins=coins-? WHERE player_id=?',(SHOP_ITEMS[item],pid))
                 sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?)',(pid,item))
-            sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(item,pid))
+            if item in SKINS:sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(item,pid))
+            else:sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(item,pid))
             return 200,wallet_state(db,pid)
         solved=[x[0] for x in sql(db,'SELECT puzzle_id FROM puzzle_solves WHERE player_id=?',(pid,)).fetchall()]
         return 200,dict(puzzles=[dict(id=p['id'],name=p['name'],level=p['level'],goal=p['goal'],reward=p['reward'],board=puzzle_board(p)) for p in PUZZLES],daily=daily,solved=solved,**wallet_state(db,pid))
