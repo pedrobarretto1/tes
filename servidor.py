@@ -4,6 +4,8 @@ import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys
 from contextlib import contextmanager
 
 ROOMS = {}
+PRESENCE = {}
+INVITES = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
@@ -31,6 +33,8 @@ def setup():
     with database() as db:
         sql(db,'CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, name TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 1000, wins INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE TABLE IF NOT EXISTS results (id TEXT PRIMARY KEY)')
+        sql(db,'CREATE TABLE IF NOT EXISTS friendships (sender TEXT NOT NULL, receiver TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY(sender,receiver))')
+        sql(db,'CREATE TABLE IF NOT EXISTS match_history (match_id TEXT NOT NULL, player_id TEXT NOT NULL, opponent TEXT NOT NULL, outcome TEXT NOT NULL, delta INTEGER NOT NULL, played_at TEXT NOT NULL, PRIMARY KEY(match_id,player_id))')
 def profile(d):
     name=' '.join(str(d.get('name','')).split())[:24]
     token=str(d.get('profileToken',''))
@@ -42,13 +46,16 @@ def profile(d):
 def finish(r,w,resigned=False):
     if r.get('winner') is not None: return
     p=r['profiles']
-    if len(p)==2 and p[1] and p[-1] and p[1]!=p[-1]:
+    if r.get('ranked',True) and len(p)==2 and p[1] and p[-1] and p[1]!=p[-1]:
         with database() as db:
             inserted=sql(db,'INSERT INTO results(id) VALUES(?) ON CONFLICT(id) DO NOTHING',(r['match'],)).rowcount
             if inserted:
                 for side in (1,-1):
                     delta=5 if w==0 else 25 if w==side else (-20 if resigned else -15)
                     sql(db,'UPDATE players SET points=CASE WHEN points+? < 0 THEN 0 ELSE points+? END,wins=wins+?,losses=losses+?,draws=draws+? WHERE id=?',(delta,delta,int(w==side),int(w==-side),int(w==0),p[side]))
+                    opponent=sql(db,'SELECT name FROM players WHERE id=?',(p[-side],)).fetchone()[0]
+                    outcome='draw' if w==0 else 'win' if w==side else 'resign' if resigned else 'loss'
+                    sql(db,'INSERT INTO match_history(match_id,player_id,opponent,outcome,delta,played_at) VALUES(?,?,?,?,?,?)',(r['match'],p[side],opponent,outcome,delta,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())))
     r['winner']=w
 def initial():
     return [(-1 if i//8<3 else 1 if i//8>4 else 0) if (i//8+i%8)%2 else 0 for i in range(64)]
@@ -124,6 +131,91 @@ def process(r,side,msg):
     if t=='rematch-ok' and r['sequence']==0: return True
     return False
 
+def identity(d):
+    token=str(d.get('profileToken',''))
+    return hashlib.sha256(token.encode()).hexdigest() if 32<=len(token)<=128 else None
+def active_room(pid,now):
+    return any(not r['closed'] and pid in r['profiles'].values() and now-max(r['seen'].values())<100 for r in ROOMS.values())
+def social_state(pid,now):
+    for k,v in list(PRESENCE.items()):
+        if now-v>25: del PRESENCE[k]
+    for k,v in list(INVITES.items()):
+        if now-v['time']>120: del INVITES[k]
+    with database() as db:
+        me=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
+        if not me: return None
+        rows=sql(db,'SELECT sender,receiver,state FROM friendships WHERE sender=? OR receiver=?',(pid,pid)).fetchall()
+        rel={b if a==pid else a:('friend' if st=='accepted' else 'outgoing' if a==pid else 'incoming') for a,b,st in rows}
+        people=[]
+        for other in sorted(set(PRESENCE)|set(rel)):
+            if other==pid: continue
+            p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(other,)).fetchone()
+            if not p: continue
+            people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,busy=active_room(other,now),relation=rel.get(other,'none')))
+        challenges=[]; session=None
+        for key,v in INVITES.items():
+            if pid not in (v['sender'],v['receiver']): continue
+            other=v['receiver'] if pid==v['sender'] else v['sender']
+            if v['state']=='pending' and now-v['time']<60:
+                p=sql(db,'SELECT name FROM players WHERE id=?',(other,)).fetchone()
+                challenges.append(dict(id=key,name=p[0] if p else 'Jogador',incoming=pid==v['receiver'],ranked=v['ranked'],rule=v['rule']))
+            elif v['state']=='accepted' and now-v['time']<100:
+                r=ROOMS.get(v['code'])
+                if r and not r['closed']:
+                    side=1 if pid==v['sender'] else -1
+                    session=dict(code=v['code'],side=side,token=r['tokens'][side],host=side==1,ranked=r['ranked'],rule=r['rule'])
+        hist=sql(db,'SELECT opponent,outcome,delta,played_at FROM match_history WHERE player_id=? ORDER BY played_at DESC,match_id DESC LIMIT 20',(pid,)).fetchall()
+    people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
+    return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at'),x)) for x in hist])
+def social_action(path,d,now):
+    if path=='/api/social/register':
+        pid=profile(d)
+    else: pid=identity(d)
+    if not pid: return 400,{'error':'Informe seu nome e perfil.'}
+    with database() as db:
+        if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone(): return 403,{'error':'Perfil não encontrado. Abra o cadastro.'}
+    PRESENCE[pid]=now
+    if path in ('/api/social/register','/api/social/state'):
+        return 200,social_state(pid,now)
+    target=str(d.get('target',''))
+    if path.startswith('/api/social/friend/'):
+        if target==pid: return 400,{'error':'Escolha outro jogador.'}
+        with database() as db:
+            if not sql(db,'SELECT id FROM players WHERE id=?',(target,)).fetchone(): return 404,{'error':'Jogador não encontrado.'}
+            row=sql(db,'SELECT sender,receiver,state FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,target,target,pid)).fetchone()
+            action=path.rsplit('/',1)[-1]
+            if action=='request':
+                if not row: sql(db,'INSERT INTO friendships(sender,receiver,state) VALUES(?,?,?)',(pid,target,'pending'))
+                elif row[0]==target and row[2]=='pending': sql(db,'UPDATE friendships SET state=? WHERE sender=? AND receiver=?',('accepted',target,pid))
+            elif action=='accept':
+                if not row or row[0]!=target or row[2]!='pending': return 409,{'error':'Pedido indisponível.'}
+                sql(db,'UPDATE friendships SET state=? WHERE sender=? AND receiver=?',('accepted',target,pid))
+            elif action=='remove':
+                sql(db,'DELETE FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,target,target,pid))
+            else: return 400,{'error':'Ação inválida.'}
+        return 200,social_state(pid,now)
+    if path=='/api/social/challenge':
+        if target==pid or target not in PRESENCE or now-PRESENCE[target]>25: return 409,{'error':'Jogador não está online.'}
+        if active_room(pid,now) or active_room(target,now): return 409,{'error':'Um jogador está em outra sala.'}
+        if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
+        key=secrets.token_urlsafe(16); rule=d.get('rule','free')
+        if rule not in ('free','official'): return 400,{'error':'Regra inválida.'}
+        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False,rule=rule)
+        return 200,social_state(pid,now)
+    if path=='/api/social/challenge/respond':
+        v=INVITES.get(str(d.get('invite','')))
+        if not v or v['receiver']!=pid or v['state']!='pending' or now-v['time']>=60: return 409,{'error':'Convite expirado.'}
+        if d.get('accept') is not True: v['state']='declined';return 200,social_state(pid,now)
+        if active_room(pid,now) or active_room(v['sender'],now): return 409,{'error':'Um jogador está em outra sala.'}
+        if now-PRESENCE.get(v['sender'],-1000)>25: return 409,{'error':'Adversário desconectado.'}
+        if len(ROOMS)>=1000: return 503,{'error':'Servidor cheio.'}
+        code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+        while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+        r=dict(last=now,host=1,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={1:v['sender'],-1:pid},rule=v['rule'],ranked=v['ranked'])
+        reset_match(r);ROOMS[code]=r;v.update(state='accepted',code=code,time=now)
+        return 200,social_state(pid,now)
+    return 404,{'error':'Ação inexistente.'}
+
 class Handler(BaseHTTPRequestHandler):
     def reply(self, status, data, kind='application/json; charset=utf-8'):
         body = json.dumps(data, ensure_ascii=False).encode() if isinstance(data, dict) else data
@@ -140,6 +232,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css'):
+            file=self.path.split('?')[0][1:]
+            self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path == '/api/health': self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL)})
         elif self.path == '/api/ranking':
             try:
@@ -165,6 +260,11 @@ class Handler(BaseHTTPRequestHandler):
                 rank=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND (wins>? OR (wins=? AND (name<? OR (name=? AND id<?)))))',(p[1],p[1],p[2],p[2],p[0],p[0],pid)).fetchone()[0]+1
             return self.reply(200,dict(zip(('name','points','wins','losses','draws'),p),found=True,rank=rank))
         with LOCK:
+            if path.startswith('/api/social/'):
+                try: status,result=social_action(path,d,now);return self.reply(status,result)
+                except Exception as exc:
+                    print('Social error:',type(exc).__name__,str(exc),flush=True)
+                    return self.reply(503,{'error':'Clube indisponível. Tente novamente.'})
             for k,r in list(ROOMS.items()):
                 if now-r['last']>TTL: del ROOMS[k]
             if path=='/api/create':
@@ -176,9 +276,9 @@ class Handler(BaseHTTPRequestHandler):
                 pid=profile(d)
                 rule=d.get('rule','free')
                 if rule not in ('free','official'): return self.reply(400,{'error':'Regra inválida.'})
-                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule}
+                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False}
                 reset_match(ROOMS[code])
-                return self.reply(200,{'code':code,'token':token,'connected':False})
+                return self.reply(200,{'code':code,'token':token,'connected':False,'ranked':ROOMS[code]['ranked']})
             code=str(d.get('code','')).upper(); r=ROOMS.get(code)
             if not r or r['closed']: return self.reply(404,{'error':'Sala inexistente ou encerrada.'})
             side=d.get('side'); r['last']=now
@@ -189,7 +289,7 @@ class Handler(BaseHTTPRequestHandler):
                 if pid and pid==r['profiles'].get(r['host']): return self.reply(409,{'error':'Use outro perfil ou navegador para o adversário.'})
                 r['profiles'][side]=pid
                 token=secrets.token_urlsafe(24); r['tokens'][side]=token; r['seen'][side]=now
-                return self.reply(200,{'code':code,'token':token,'connected':True})
+                return self.reply(200,{'code':code,'token':token,'connected':True,'ranked':r.get('ranked',True)})
             if side not in (1,-1) or not secrets.compare_digest(r['tokens'].get(side,'!'),str(d.get('token',''))): return self.reply(403,{'error':'Sessão inválida.'})
             r['seen'][side]=now
             if path=='/api/leave':
