@@ -213,52 +213,55 @@ def result_for(r,seat):
     return dict(r['result'],side=game_side(r,seat)) if r.get('result') else None
 def initial():
     return [(-1 if i//8<3 else 1 if i//8>4 else 0) if (i//8+i%8)%2 else 0 for i in range(64)]
-RULES=('free','official','english','mandatory','giveaway','kings')
+RULES=('free','official','english','mandatory','giveaway','kings','international','canadian')
 def valid_rule(rule):
     return isinstance(rule,str) and (rule in RULES or (re.fullmatch(r'custom-[01]{4}',rule) and not (rule[7]=='0' and rule[8]=='1')))
 def rule_flags(rule):
     if rule.startswith('custom-'):return tuple(x=='1' for x in rule[7:])
-    return (rule!='free',rule in ('official','giveaway'),rule!='english',rule!='english')
+    return (rule!='free',rule in ('official','giveaway','international','canadian'),rule!='english',rule!='english')
+def board_size(rule):return 10 if rule=='international' else 12 if rule=='canadian' else 8
 def initial_for(rule):
-    return [p*2 for p in initial()] if rule=='kings' else initial()
+    n=board_size(rule);rows=n//2-1
+    return [(-1 if i//n<rows else 1 if i//n>=n-rows else 0)*(2 if rule=='kings' else 1) if (i//n+i%n)%2 else 0 for i in range(n*n)]
 DIR=((1,1),(1,-1),(-1,1),(-1,-1))
 def inside(r,c): return 0<=r<8 and 0<=c<8
 def legal(b,s,rule):
+    n=int(len(b)**.5); inside=lambda r,c:0<=r<n and 0<=c<n
     caps=[]; quiet=[]; mandatory,majority,long_king,backward=rule_flags(rule); short=not long_king
     for i,p in enumerate(b):
         if not p or p*s<=0: continue
         def walk(board,at,path,cap):
             steps=[]
             for dr,dc in DIR:
-                r,c=at//8+dr,at%8+dc
+                r,c=at//n+dr,at%n+dc
                 if not backward and abs(p)==1 and dr!=-s: continue
                 if abs(p)==1 or short:
                     rr,cc=r+dr,c+dc
                     if inside(r,c) and inside(rr,cc):
-                        v,t=r*8+c,rr*8+cc
+                        v,t=r*n+c,rr*n+cc
                         if board[v]*p<0 and v not in cap and not board[t]: steps.append((t,v))
                 else:
-                    while inside(r,c) and not board[r*8+c]: r+=dr; c+=dc
+                    while inside(r,c) and not board[r*n+c]: r+=dr; c+=dc
                     if not inside(r,c): continue
-                    v=r*8+c
+                    v=r*n+c
                     if board[v]*p>=0 or v in cap: continue
                     r+=dr; c+=dc
-                    while inside(r,c) and not board[r*8+c]:
-                        steps.append((r*8+c,v)); r+=dr; c+=dc
+                    while inside(r,c) and not board[r*n+c]:
+                        steps.append((r*n+c,v)); r+=dr; c+=dc
             if not steps:
                 if cap: caps.append({'from':i,'path':path,'cap':cap})
                 return
             for t,v in steps:
                 x=board.copy(); x[at]=0; x[t]=p
                 if rule=='english': x[v]=0
-                if rule=='english' and abs(p)==1 and t//8==(0 if s==1 else 7): caps.append({'from':i,'path':path+[t],'cap':cap+[v]})
+                if rule=='english' and abs(p)==1 and t//n==(0 if s==1 else n-1): caps.append({'from':i,'path':path+[t],'cap':cap+[v]})
                 else: walk(x,t,path+[t],cap+[v])
         walk(b,i,[],[])
         for dr,dc in DIR:
             if abs(p)==1 and dr!=-s: continue
-            r,c=i//8+dr,i%8+dc
-            while inside(r,c) and not b[r*8+c]:
-                quiet.append({'from':i,'path':[r*8+c],'cap':[]})
+            r,c=i//n+dr,i%n+dc
+            while inside(r,c) and not b[r*n+c]:
+                quiet.append({'from':i,'path':[r*n+c],'cap':[]})
                 if abs(p)==1 or short: break
                 r+=dr; c+=dc
     if not mandatory: return caps+quiet
@@ -318,7 +321,7 @@ def process(r,seat,msg):
         if m not in legal(r['board'],side,r['rule']): return False
         b=r['board']; p=b[m['from']]; to=m['path'][-1]; b[m['from']]=0
         for v in m['cap']: b[v]=0
-        b[to]=p*2 if abs(p)==1 and to//8==(0 if side==1 else 7) else p
+        n=board_size(r['rule']);b[to]=p*2 if abs(p)==1 and to//n==(0 if side==1 else n-1) else p
         r['moves'].append(dict(side=side,**m,promotion=abs(p)==1 and abs(b[to])==2))
         r['draw_offer']=None
         r['quiet']=r['quiet']+1 if not m['cap'] and abs(p)==2 else 0
@@ -513,7 +516,7 @@ def social_action(path,d,now):
         rule=d.get('rule','free')
         if not valid_rule(rule):return 400,{'error':'Regra inválida.'}
         with database() as db: points=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()[0]
-        MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule!='kings',minutes=clock_value(d),points=points,start=now,seen=now)
+        MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),minutes=clock_value(d),points=points,start=now,seen=now)
         matchmake(pid,now);return 200,social_state(pid,now)
     if path=='/api/social/matchmaking/cancel':
         MATCH_QUEUE.pop(pid,None);return 200,social_state(pid,now)
@@ -562,7 +565,7 @@ def social_action(path,d,now):
         if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
         key=secrets.token_urlsafe(16); rule=d.get('rule','free')
         if not valid_rule(rule): return 400,{'error':'Regra inválida.'}
-        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule!='kings',rule=rule,minutes=clock_value(d))
+        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),rule=rule,minutes=clock_value(d))
         return 200,social_state(pid,now)
     if path=='/api/social/challenge/respond':
         v=INVITES.get(str(d.get('invite','')))
@@ -643,7 +646,7 @@ class Handler(BaseHTTPRequestHandler):
                 if d.get('ranked') is not False and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 rule=d.get('rule','free')
                 if not valid_rule(rule): return self.reply(400,{'error':'Regra inválida.'})
-                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False and not rule.startswith('custom-') and rule!='kings','minutes':clock_value(d),'public':d.get('public') is True}
+                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),'minutes':clock_value(d),'public':d.get('public') is True}
                 reset_match(ROOMS[code]);MATCH_QUEUE.pop(pid,None)
                 return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked'],'minutes':ROOMS[code]['minutes']})
             code=str(d.get('code','')).upper(); r=ROOMS.get(code)
