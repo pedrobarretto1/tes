@@ -6,7 +6,7 @@ function button(label,fn,primary=false){let b=node('button',primary?'primary':'s
 function tier(p){return p>=2200?['Lenda das Damas','♛']:p>=1800?['Mestre','♜']:p>=1500?['Ouro','◆']:p>=1250?['Prata','◆']:p>=1000?['Bronze','◆']:['Aprendiz','♟']}
 function status(t){E('clubstatus').textContent=t}
 async function request(path,body={}){let controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{let res=await fetch('/api/social/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,profileToken:profileToken()}),signal:controller.signal});let d=await res.json();if(!res.ok){let e=Error(d.error||'Não foi possível acessar o clube.');e.status=res.status;throw e}return d}finally{clearTimeout(timer)}}
-function show(id){for(let x of ['clubwelcome','clubmenu','cluboverlay','clubnotificationoverlay','matchoverlay','replayoverlay','accountoverlay','myprofileoverlay','schooloverlay','chatoverlay'])E(x).classList.add('hidden');E(id).classList.remove('hidden')}
+function show(id){for(let x of ['clubwelcome','clubmenu','cluboverlay','clubnotificationoverlay','matchoverlay','replayoverlay','accountoverlay','myprofileoverlay','schooloverlay','chatoverlay','themefxoverlay','audiooverlay'])E(x).classList.add('hidden');E(id).classList.remove('hidden')}
 function close(id){E(id).classList.add('hidden')}
 function enterMode(m){close('clubmenu');close('cluboverlay');if(m!=='online'&&mode===m&&!conn&&!peer)reset();setMode(m);if(m!=='online')startFocus();else{setFocus(false);E('board').scrollIntoView({behavior:'smooth',block:'nearest'})}}
 function profileUI(me){let [t,icon]=tier(me.points);E('clubnavprofile').textContent=me.name+' · '+t+' · '+formatPH(me.points)+' PH';E('clubmedal').textContent=icon;E('clubmedal').style.color=me.points>=1500?'#eec86d':me.points>=1250?'#d1d5dc':'#c18a55';E('clubname').textContent=me.name;E('clubstats').textContent=t+' · '+formatPH(me.points)+' PH · '+me.wins+' V / '+me.losses+' D / '+me.draws+' E';E('menuprofile').textContent=me.name+' · '+t+' · '+formatPH(me.points)+' PH'}
@@ -63,18 +63,15 @@ E('clubsearchform').onsubmit=e=>{e.preventDefault();selectedProfile=null;searchQ
 E('clubnotify').onclick=openNotices;E('clubnotificationclose').onclick=()=>close('clubnotificationoverlay');E('clubnotificationread').onclick=markNotices;E('clubnotificationrequests').onclick=()=>openClub('requests');
 E('welcomeform').onsubmit=e=>{e.preventDefault();register(E('welcomename').value)};
 E('clubnavopen').onclick=()=>openClub();E('clubnavprofile').onclick=openMyProfile;E('clubnavmenu').onclick=()=>show('clubmenu');E('clubmenux').onclick=()=>close('clubmenu');E('clubclose').onclick=()=>close('cluboverlay');E('clubtoastopen').onclick=()=>openClub();E('clubeditname').onclick=()=>{E('welcomename').value=localName();show('clubwelcome')};E('clubtabs').onclick=e=>{let b=e.target.closest('[data-tab]');if(b)openClub(b.dataset.tab)};E('menuonline').onclick=()=>openClub();E('menucode').onclick=()=>enterMode('online');E('menuai').onclick=()=>enterMode('ai');E('menulocal').onclick=()=>enterMode('local');E('menurank').onclick=()=>{close('clubmenu');openRanking()};E('clubrefresh').onclick=poll;E('playername').addEventListener('change',()=>{if(!peer&&!conn&&cleanName(E('playername').value))register(E('playername').value)});
-E('clubsound').textContent=S.muted?'Som: desligado':'Som: ligado';E('clubsound').onclick=()=>{S.muted=!S.muted;localStorage.setItem('damas-sound',S.muted?'off':'on');E('clubsound').textContent=S.muted?'Som: desligado':'Som: ligado';if(!S.muted)playSound('move')};
-function unlockAudio(){try{if(!audio)audio=new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume()}catch(e){}}
-document.addEventListener('pointerdown',unlockAudio,{once:true});
-function playSound(kind){if(S.muted||!audio||audio.state!=='running')return;let t=audio.currentTime;let notes=kind==='king'?[392,523,659]:kind==='capture'?[220,125]:[190];notes.forEach((f,i)=>{let osc=audio.createOscillator(),g=audio.createGain();osc.type=kind==='king'?'sine':'triangle';osc.frequency.setValueAtTime(f,t+i*.065);osc.frequency.exponentialRampToValueAtTime(f*.65,t+i*.065+.11);g.gain.setValueAtTime(.065,t+i*.065);g.gain.exponentialRampToValueAtTime(.001,t+i*.065+.14);osc.connect(g);g.connect(audio.destination);osc.start(t+i*.065);osc.stop(t+i*.065+.15)})}
+function playSound(kind){window.damasAudio?.effect(kind)}
 let moveEffect=null;
 window.clubFXDestination=null;
 window.cancelClubMoveFX=()=>{let fx=moveEffect;if(!fx)return;moveEffect=null;fx.cancelled=true;for(let animation of fx.animations)animation.cancel();fx.layer.remove();E('board').classList.remove('board-fx-active');window.clubFXDestination=null;E('board').querySelectorAll('.fx-hidden').forEach(p=>p.classList.remove('fx-hidden'))};
 window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   window.cancelClubMoveFX();
   let board=E('board'),frame=board.parentElement,to=m.path.at(-1),dest=board.querySelector('[data-square="'+to+'"]'),piece=dest?.querySelector('.piece'),source=board.querySelector('[data-square="'+m.from+'"]');
-  if(!old||!piece||!source||!frame)return;
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches||!piece.animate){playSound(promoted?'king':m.cap.length?'capture':'move');return}
+  if(!old||!piece||!source||!frame){playSound(m.cap.length?'capture':'move');if(promoted)playSound('king');return}
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches||!piece.animate){playSound(m.cap.length?'capture':'move');if(promoted)playSound('king');return}
   let layer=node('div','board-fx-layer');layer.setAttribute('aria-hidden','true');document.body.append(layer);board.classList.add('board-fx-active');
   let fx={layer,animations:[],cancelled:false};moveEffect=fx;window.clubFXDestination=to;piece.classList.add('fx-hidden');
   const pos=i=>{let r=board.querySelector('[data-square="'+i+'"]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,w:r.width*.78}};
