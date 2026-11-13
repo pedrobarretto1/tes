@@ -315,6 +315,8 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
 
 if __name__=='__main__':
+    from selftest import run
+    run(sys.modules[__name__])
     setup()
     port=int(os.environ.get('PORT','8765'))
     print(f'Casa de Damas: http://localhost:{port} (Ctrl+C para encerrar)',flush=True)
