@@ -5,10 +5,10 @@ from unittest.mock import patch
 import json
 
 def run(s):
-    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS)
+    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS)
     with TemporaryDirectory() as tmp:
         try:
-            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={};s.LOGIN_LIMITS={}
+            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={};s.LOGIN_LIMITS={};s.SPECTATORS={};s.TOURNAMENTS={}
             s.setup()
             a={'name':'Teste A','profileToken':'a'*64};b={'name':'Teste B','profileToken':'b'*64}
             def call(path,who,**kw):
@@ -199,6 +199,69 @@ def run(s):
                     assert s.process(room,1,{'type':'move','sequence':1,'before':s.boardkey(room),'move':m})
                     assert room['winner']==-1 and room['result']['reason']=='giveaway'
                 room['closed']=True
+            # School, rewards, custom and larger boards.
+            for rule,n,count in [('international',10,20),('canadian',12,30),('kings',8,12),('custom-1010',8,12)]:
+                board=s.initial_for(rule)
+                assert len(board)==n*n and sum(p>0 for p in board)==count
+                assert s.legal(board,1,rule)
+                host=http('/api/create',dict(a,rule=rule,ranked=True,minutes=1,public=True))
+                guest=http('/api/join',dict(b,code=host['code']))
+                room=s.ROOMS[host['code']]
+                assert not room['ranked'] and room['minutes']==1 and len(room['board'])==n*n
+                aa={k:host[k] for k in ('code','side','token')};bb={k:guest[k] for k in ('code','side','token')}
+                seat=aa if aa['side']==1 else bb
+                m=s.legal(room['board'],1,rule)[0]
+                http('/api/send',dict(seat,message=json.dumps({'type':'move','sequence':1,'before':s.boardkey(room),'move':m})))
+                assert len(http('/api/poll',aa)['snapshot']['board'])==n*n
+                http('/api/send',dict(aa,message=json.dumps({'type':'chat','text':'Boa partida!'})))
+                assert http('/api/poll',bb)['snapshot']['chat'][0]['text']=='Boa partida!'
+                watch=call('live/watch',c,code=host['code'])
+                assert len(watch['board'])==n*n and 'token' not in watch and 'chat' not in watch
+                room['closed']=True
+            assert not s.valid_rule('custom-0111')
+            for p in s.PUZZLES:
+                moves=s.legal(s.puzzle_board(p),1,'official')
+                assert moves and all(m['cap'] for m in moves)
+                reward=call('school/solve',a,puzzle=p['id'],move=moves[0])
+                assert reward['reward']>=p['reward']
+                assert call('school/solve',a,puzzle=p['id'],move=moves[0])['reward']==0
+            wallet=call('school/state',a)
+            assert len(wallet['solved'])==5 and wallet['coins']>=100
+            bought=call('school/buy',a,item='imperial')
+            assert bought['theme']=='imperial' and 'imperial' in bought['owned'] and bought['coins']==wallet['coins']-100
+            assert call('school/equip',a,item='classic')['theme']=='classic'
+            # 8-player cup: simulate seven confirmed wins, verify champion once.
+            now=s.time.monotonic()
+            competitors=[{'name':'Copa '+str(i),'profileToken':('cup'+str(i))*16} for i in range(8)]
+            def event(route,who,**kw):
+                status,d=s.social_action('/api/social/'+route,dict(who,**kw),now)
+                assert status==200,(route,status,d)
+                return d
+            for who in competitors:event('register',who)
+            created=event('events/create',competitors[0],kind='cup')
+            eid=created['events'][-1]['id']
+            for who in competitors[1:]:event('events/join',who,event=eid)
+            e=s.TOURNAMENTS[eid];assert e['status']=='playing' and len(e['pairs'])==4
+            for expected in (4,2,1):
+                assert len(e['pairs'])==expected
+                for pair in e['pairs']:
+                    room=s.ROOMS[pair['code']]
+                    s.finish(room,1)
+                s.event_tick(e,now)
+            assert e['status']=='finished' and e['champion'] in e['players']
+            with s.database() as db:
+                assert s.sql(db,'SELECT COUNT(*) FROM event_champions WHERE event_id=?',(eid,)).fetchone()[0]==1
+                assert s.wallet_state(db,e['champion'])['coins']==100
+            # King of the table: winner remains, loser joins the end of queue.
+            created=event('events/create',competitors[0],kind='king')
+            kid=created['events'][-1]['id']
+            event('events/join',competitors[1],event=kid);event('events/join',competitors[2],event=kid)
+            event('events/start',competitors[0],event=kid)
+            e=s.TOURNAMENTS[kid];room=s.ROOMS[e['pairs'][0]['code']]
+            s.finish(room,1);s.event_tick(e,now)
+            assert e['round']==2 and e['king']==e['pairs'][0]['a'] and len(e['queue'])==1
+            event('events/stop',competitors[0],event=kid)
+            assert e['status']=='cancelled'
             # A guest keeps their identifier, points, history and friends after linking.
             call('friend/request',a,target=bid);call('friend/accept',b,target=aid)
             previous=call('state',a)
@@ -230,6 +293,6 @@ def run(s):
             assert progress['bestStreak']>=5 and 'streak5' in progress['achievements'] and 'triple_king' in progress['achievements']
             call('account/logout',other_device)
             assert s.identity(other_device) is None and s.identity(auth)==aid
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
-            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS=old
+            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS=old
