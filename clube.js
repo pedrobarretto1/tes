@@ -53,32 +53,32 @@ document.addEventListener('pointerdown',unlockAudio,{once:true});
 function playSound(kind){if(S.muted||!audio||audio.state!=='running')return;let t=audio.currentTime;let notes=kind==='king'?[392,523,659]:kind==='capture'?[220,125]:[190];notes.forEach((f,i)=>{let osc=audio.createOscillator(),g=audio.createGain();osc.type=kind==='king'?'sine':'triangle';osc.frequency.setValueAtTime(f,t+i*.065);osc.frequency.exponentialRampToValueAtTime(f*.65,t+i*.065+.11);g.gain.setValueAtTime(.065,t+i*.065);g.gain.exponentialRampToValueAtTime(.001,t+i*.065+.14);osc.connect(g);g.connect(audio.destination);osc.start(t+i*.065);osc.stop(t+i*.065+.15)})}
 let moveEffect=null;
 window.clubFXDestination=null;
-window.cancelClubMoveFX=()=>{let fx=moveEffect;if(!fx)return;moveEffect=null;fx.cancelled=true;for(let animation of fx.animations)animation.cancel();fx.layer.remove();window.clubFXDestination=null;E('board').querySelectorAll('.fx-hidden').forEach(p=>p.classList.remove('fx-hidden'))};
+window.cancelClubMoveFX=()=>{let fx=moveEffect;if(!fx)return;moveEffect=null;fx.cancelled=true;for(let animation of fx.animations)animation.cancel();fx.layer.remove();E('board').classList.remove('board-fx-active');window.clubFXDestination=null;E('board').querySelectorAll('.fx-hidden').forEach(p=>p.classList.remove('fx-hidden'))};
 window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   window.cancelClubMoveFX();
   let board=E('board'),frame=board.parentElement,to=m.path.at(-1),dest=board.querySelector('[data-square="'+to+'"]'),piece=dest?.querySelector('.piece'),source=board.querySelector('[data-square="'+m.from+'"]');
   if(!old||!piece||!source||!frame)return;
   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!piece.animate){playSound(promoted?'king':m.cap.length?'capture':'move');return}
-  let layer=node('div','board-fx-layer');layer.setAttribute('aria-hidden','true');frame.append(layer);
+  let layer=node('div','board-fx-layer');layer.setAttribute('aria-hidden','true');document.body.append(layer);board.classList.add('board-fx-active');
   let fx={layer,animations:[],cancelled:false};moveEffect=fx;window.clubFXDestination=to;piece.classList.add('fx-hidden');
-  const rect=frame.getBoundingClientRect();
-  const pos=i=>{let r=board.querySelector('[data-square="'+i+'"]').getBoundingClientRect();return {x:r.left-rect.left-frame.clientLeft+r.width/2,y:r.top-rect.top-frame.clientTop+r.height/2,w:r.width*.78}};
-  function place(p,i){let r=pos(i);p.style.left=r.x+'px';p.style.top=r.y+'px';p.style.width=r.w+'px'}
+  const pos=i=>{let r=board.querySelector('[data-square="'+i+'"]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,w:r.width*.78}};
+  function place(p,i){let r=pos(i);p.style.left=r.x+'px';p.style.top=r.y+'px';p.style.width=r.w+'px';p.style.height=r.w+'px'}
   function disc(value,cls){return node('span','piece fx-disc '+cls+' '+(value>0?'white':'black')+(Math.abs(value)===2?' king':''))}
   const ghost=disc(old,'fx-moving');place(ghost,m.from);layer.append(ghost);
   const taken=new Map();for(let i of m.cap){if(!oldBoard[i])continue;let victim=disc(oldBoard[i],'fx-victim');place(victim,i);layer.append(victim);taken.set(i,victim)}
   async function animate(el,frames,options){let anim=el.animate(frames,options);fx.animations.push(anim);try{await anim.finished}catch(e){}}
   try{
     let previous=m.from;
-    for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=Math.min(620,270+distance*55);let captured=taken.get(m.cap[k]);
-      let frames=[{transform:'translate(-50%,-50%) translate(0px,0px) scale(1)',offset:0},{transform:'translate(-50%,-50%) translate('+dx*.45+'px,'+dy*.45+'px) scale(1.07)',offset:.45},{transform:'translate(-50%,-50%) translate('+dx+'px,'+dy+'px) scale(1)',offset:1}];
-      await animate(ghost,frames,{duration,easing:'cubic-bezier(.22,.72,.27,1)',fill:'forwards'});if(fx.cancelled)return;
+    for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=Math.min(1200,540+distance*130);let captured=taken.get(m.cap[k]);
+      let frames=[{left:from.x+'px',top:from.y+'px',transform:'translate(-50%,-50%) scale(1)',offset:0},{left:(from.x+dx*.5)+'px',top:(from.y+dy*.5)+'px',transform:'translate(-50%,-50%) scale(1.06)',offset:.5},{left:end.x+'px',top:end.y+'px',transform:'translate(-50%,-50%) scale(1)',offset:1}];
+      await animate(ghost,frames,{duration,easing:'cubic-bezier(.35,.08,.65,.92)',fill:'forwards'});if(fx.cancelled)return;
       place(ghost,target);ghost.getAnimations().forEach(a=>a.cancel());
-      if(captured){playSound('capture');await animate(captured,[{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) translateY(12px) rotate(22deg) scale(.45)',opacity:0}],{duration:170,easing:'ease-in',fill:'forwards'});captured.remove()}else playSound('move');previous=target;
+      if(captured){playSound('capture');await animate(captured,[{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) translateY(12px) rotate(22deg) scale(.45)',opacity:0}],{duration:240,easing:'ease-in',fill:'forwards'});captured.remove()}else playSound('move');previous=target;
     }
-    if(promoted&&!fx.cancelled){ghost.classList.add('king');playSound('king');let ring=node('span','fx-promotion');place(ring,to);layer.append(ring);await Promise.all([animate(ghost,[{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.2)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:330,easing:'ease-out'}),animate(ring,[{transform:'translate(-50%,-50%) scale(.6)',opacity:1},{transform:'translate(-50%,-50%) scale(1.5)',opacity:0}],{duration:400,fill:'forwards'})])}
+    if(promoted&&!fx.cancelled){ghost.classList.add('king');playSound('king');let ring=node('span','fx-promotion');place(ring,to);layer.append(ring);await Promise.all([animate(ghost,[{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.2)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:420,easing:'ease-out'}),animate(ring,[{transform:'translate(-50%,-50%) scale(.6)',opacity:1},{transform:'translate(-50%,-50%) scale(1.5)',opacity:0}],{duration:480,fill:'forwards'})])}
   }finally{if(moveEffect===fx)window.cancelClubMoveFX()}
 };
+window.addEventListener('resize',()=>window.cancelClubMoveFX());window.addEventListener('scroll',()=>window.cancelClubMoveFX(),{passive:true});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){close('cluboverlay');close('clubmenu');close('clubnotificationoverlay');close('matchoverlay');close('replayoverlay')}});
 let saved=localStorage.getItem('damas-name');if(cleanName(saved)){E('welcomename').value=saved;register(saved);show('clubmenu')}else show('clubwelcome');window.clubRefreshNow=poll;setInterval(poll,3000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});window.addEventListener('focus',poll);
 })();
