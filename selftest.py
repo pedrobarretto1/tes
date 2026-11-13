@@ -140,7 +140,8 @@ def run(s):
             s.MATCH_QUEUE.clear()
             queued=call('matchmaking/start',a,rule='free',ranked=True,minutes=5)
             assert queued['matchmaking'] and not queued['session']
-            found=call('matchmaking/start',b,rule='free',ranked=True,minutes=5)
+            status,found=s.social_action('/api/social/matchmaking/start',dict(b,rule='free',ranked=True,minutes=5),1011)
+            assert status==200
             other=call('state',a)['session'];match=found['session']
             assert other['code']==match['code'] and other['side']==-match['side']
             room=s.ROOMS[match['code']]
