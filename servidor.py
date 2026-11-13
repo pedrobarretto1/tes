@@ -34,7 +34,7 @@ def setup():
         sql(db,'CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, name TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 1000, wins INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE TABLE IF NOT EXISTS results (id TEXT PRIMARY KEY)')
         sql(db,'CREATE TABLE IF NOT EXISTS friendships (sender TEXT NOT NULL, receiver TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY(sender,receiver))')
-        sql(db,'CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, recipient TEXT NOT NULL, actor TEXT NOT NULL, kind TEXT NOT NULL, created_at REAL NOT NULL, seen INTEGER NOT NULL DEFAULT 0)')
+        sql(db,'CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, recipient TEXT NOT NULL, actor TEXT NOT NULL, kind TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL, seen INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications(recipient,created_at)')
         sql(db,'CREATE TABLE IF NOT EXISTS match_history (match_id TEXT NOT NULL, player_id TEXT NOT NULL, opponent TEXT NOT NULL, outcome TEXT NOT NULL, delta INTEGER NOT NULL, played_at TEXT NOT NULL, PRIMARY KEY(match_id,player_id))')
 def profile(d):
@@ -224,6 +224,9 @@ def social_action(path,d,now):
     if path=='/api/social/notifications/read':
         with database() as db:
             ids=d.get('ids',[])
+            if d.get('all') is True:
+                sql(db,'UPDATE notifications SET seen=1 WHERE recipient=?',(pid,))
+                ids=[]
             if not isinstance(ids,list): return 400,{'error':'Notificações inválidas.'}
             for nid in ids[:50]:
                 if isinstance(nid,str): sql(db,'UPDATE notifications SET seen=1 WHERE recipient=? AND id=?',(pid,nid))
