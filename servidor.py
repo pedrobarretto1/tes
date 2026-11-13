@@ -6,6 +6,7 @@ from contextlib import contextmanager
 ROOMS = {}
 PRESENCE = {}
 INVITES = {}
+MATCH_QUEUE = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
@@ -37,6 +38,7 @@ def setup():
         sql(db,'CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, recipient TEXT NOT NULL, actor TEXT NOT NULL, kind TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL, seen INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications(recipient,created_at)')
         sql(db,'CREATE TABLE IF NOT EXISTS match_history (match_id TEXT NOT NULL, player_id TEXT NOT NULL, opponent TEXT NOT NULL, outcome TEXT NOT NULL, delta INTEGER NOT NULL, played_at TEXT NOT NULL, PRIMARY KEY(match_id,player_id))')
+        sql(db,'CREATE TABLE IF NOT EXISTS replays (match_id TEXT PRIMARY KEY, player_a TEXT NOT NULL, player_b TEXT NOT NULL, payload TEXT NOT NULL)')
 def profile(d):
     name=' '.join(str(d.get('name','')).split())[:24]
     token=str(d.get('profileToken',''))
@@ -47,7 +49,7 @@ def profile(d):
     return pid
 def game_side(r,seat):
     return r.get('colors',{}).get(seat,seat)
-def finish(r,w,resigned=False):
+def finish(r,w,resigned=False,reason=None):
     if r.get('winner') is not None: return
     p=r['profiles']
     ranked=bool(r.get('ranked',True) and len(p)==2 and p[1] and p[-1] and p[1]!=p[-1])
@@ -73,7 +75,11 @@ def finish(r,w,resigned=False):
                 row=sql(db,'SELECT name,points FROM players WHERE id=?',(pid,)).fetchone() if pid else None
                 if row: names[str(game_side(r,seat))]=row[0]
     r['winner']=w
-    r['result']=dict(match=r['match'],winner=w,reason='resign' if resigned else 'normal',ranked=ranked,names=names,deltas=deltas,points=points,board=r['board'][:],turn=r['turn'],sequence=r['sequence'])
+    reason=reason or ('resign' if resigned else 'normal')
+    r['result']=dict(match=r['match'],winner=w,reason=reason,ranked=ranked,names=names,deltas=deltas,points=points,board=r['board'][:],turn=r['turn'],sequence=r['sequence'],duration=max(0,int(time.monotonic()-r.get('started',time.monotonic()))),moves=r.get('moves',[])[:],stats=match_stats(r))
+    if len(p)==2 and p.get(1) and p.get(-1):
+        with database() as db:
+            sql(db,'INSERT INTO replays(match_id,player_a,player_b,payload) VALUES(?,?,?,?) ON CONFLICT(match_id) DO NOTHING',(r['match'],p[1],p[-1],json.dumps(r['result'])))
 def result_for(r,seat):
     return dict(r['result'],side=game_side(r,seat)) if r.get('result') else None
 def initial():
@@ -118,13 +124,40 @@ def legal(b,s,rule):
     if rule=='free': return caps+quiet
     return [m for m in caps if len(m['cap'])==max(len(x['cap']) for x in caps)] if caps else quiet
 def boardkey(r): return r['rule']+'/'+','.join(map(str,r['board']))+'/'+str(r['turn'])
+def match_stats(r):
+    stats={'1':{'captures':0,'promotions':0},'-1':{'captures':0,'promotions':0}}
+    for m in r.get('moves',[]):
+        a=stats[str(m['side'])];a['captures']+=len(m['cap']);a['promotions']+=int(m['promotion'])
+    return stats
+def clock_value(d):
+    v=d.get('minutes',0)
+    return v if type(v) is int and v in (0,3,5,10) else 0
 def reset_match(r):
-    r.update(board=initial(),turn=1,sequence=0,winner=None,result=None,quiet=0,match=secrets.token_hex(16),rematch=set())
+    now=time.monotonic()
+    seconds=r.get('minutes',0)*60
+    r.update(board=initial(),turn=1,sequence=0,winner=None,result=None,quiet=0,match=secrets.token_hex(16),rematch=set(),moves=[],draw_offer=None,remaining={1:seconds,-1:seconds},clock_at=None,started=now)
+
     r['repeats']={boardkey(r):1}
+def tick_clock(r,now):
+    if r['winner'] is not None or not r.get('minutes') or len(r['tokens'])!=2: return
+    if r.get('clock_at') is None:
+        r['clock_at']=now;r['started']=now;return
+    turn=r['turn'];r['remaining'][turn]=max(0,r['remaining'][turn]-max(0,now-r['clock_at']));r['clock_at']=now
+    if r['remaining'][turn]<=0: finish(r,-turn,reason='timeout')
+def room_snapshot(r,seat,now):
+    with database() as db:
+        names={str(game_side(r,s)):row[0] for s,pid in r['profiles'].items() if pid for row in [sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()] if row}
+    return dict(match=r['match'],side=game_side(r,seat),board=r['board'],turn=r['turn'],sequence=r['sequence'],rule=r['rule'],names=names,moves=r.get('moves',[]),quiet=r['quiet'],repeats=r['repeats'],minutes=r.get('minutes',0),remaining=r['remaining'],drawOffer=r.get('draw_offer'),stats=match_stats(r),opponentOffline=now-r['seen'].get(-seat,now)>10,grace=max(0,90-int(now-r['seen'].get(-seat,now))),connected=len(r['tokens'])==2)
 def process(r,seat,msg):
     side=game_side(r,seat)
     t=msg.get('type')
     if t=='hello': return True
+    if t=='draw-offer' and r['winner'] is None and r.get('draw_offer') is None:
+        r['draw_offer']=side;return True
+    if t in ('draw-accept','draw-decline') and r['winner'] is None and r.get('draw_offer')==-side:
+        r['draw_offer']=None
+        if t=='draw-accept': finish(r,0,reason='agreement')
+        return True
     if t=='resign':
         if r['winner'] is not None: return False
         finish(r,-side,True); return True
@@ -135,6 +168,8 @@ def process(r,seat,msg):
         b=r['board']; p=b[m['from']]; to=m['path'][-1]; b[m['from']]=0
         for v in m['cap']: b[v]=0
         b[to]=p*2 if abs(p)==1 and to//8==(0 if side==1 else 7) else p
+        r['moves'].append(dict(side=side,**m,promotion=abs(p)==1 and abs(b[to])==2))
+        r['draw_offer']=None
         r['quiet']=r['quiet']+1 if not m['cap'] and abs(p)==2 else 0
         r['turn']=-side; r['sequence']+=1
         k=boardkey(r); r['repeats'][k]=r['repeats'].get(k,0)+1
@@ -160,6 +195,28 @@ def identity(d):
     return hashlib.sha256(token.encode()).hexdigest() if 32<=len(token)<=128 else None
 def active_room(pid,now):
     return any(not r['closed'] and pid in r['profiles'].values() and now-max(r['seen'].values())<100 for r in ROOMS.values())
+def session_for(pid,now):
+    for code,r in ROOMS.items():
+        if r['closed'] or len(r['tokens'])!=2 or r['winner'] is not None: continue
+        for seat,player in r['profiles'].items():
+            if player==pid and now-r['seen'].get(seat,now)<90:
+                return dict(code=code,side=game_side(r,seat),seat=seat,token=r['tokens'][seat],host=seat==r['host'],ranked=r['ranked'],rule=r['rule'],minutes=r.get('minutes',0),resume=True)
+    return None
+def matchmake(pid,now):
+    q=MATCH_QUEUE.get(pid)
+    if not q:return
+    for other,o in list(MATCH_QUEUE.items()):
+        if now-o['seen']>25 or active_room(other,now): MATCH_QUEUE.pop(other,None);continue
+        if other==pid or (q['rule'],q['ranked'],q['minutes'])!=(o['rule'],o['ranked'],o['minutes']):continue
+        window=200+int(max(now-q['start'],now-o['start'])//10)*100
+        if abs(q['points']-o['points'])>window:continue
+        if len(ROOMS)>=1000:return
+        code=secrets.token_hex(4).upper().replace('0','A').replace('1','B')
+        while code in ROOMS:code=secrets.token_hex(4).upper().replace('0','A').replace('1','B')
+        side=secrets.choice((1,-1))
+        r=dict(last=now,host=side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={side:pid,-side:other},rule=q['rule'],ranked=q['ranked'],minutes=q['minutes'])
+        reset_match(r);ROOMS[code]=r
+        MATCH_QUEUE.pop(pid,None);MATCH_QUEUE.pop(other,None);return
 def notify(db,recipient,actor,kind):
     sql(db,'INSERT INTO notifications(id,recipient,actor,kind,created_at,seen) VALUES(?,?,?,?,?,0)',(secrets.token_hex(16),recipient,actor,kind,time.time()))
 def social_state(pid,now):
@@ -167,6 +224,8 @@ def social_state(pid,now):
         if now-v>25: del PRESENCE[k]
     for k,v in list(INVITES.items()):
         if now-v['time']>120: del INVITES[k]
+    if pid in MATCH_QUEUE:
+        MATCH_QUEUE[pid]['seen']=now;matchmake(pid,now)
     with database() as db:
         me=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
         if not me: return None
@@ -178,23 +237,23 @@ def social_state(pid,now):
             p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(other,)).fetchone()
             if not p: continue
             people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,busy=active_room(other,now),relation=rel.get(other,'none')))
-        challenges=[]; session=None
+        challenges=[]; session=session_for(pid,now)
         for key,v in INVITES.items():
             if pid not in (v['sender'],v['receiver']): continue
             other=v['receiver'] if pid==v['sender'] else v['sender']
             if v['state']=='pending' and now-v['time']<60:
                 p=sql(db,'SELECT name FROM players WHERE id=?',(other,)).fetchone()
-                challenges.append(dict(id=key,name=p[0] if p else 'Jogador',incoming=pid==v['receiver'],ranked=v['ranked'],rule=v['rule']))
+                challenges.append(dict(id=key,name=p[0] if p else 'Jogador',incoming=pid==v['receiver'],ranked=v['ranked'],rule=v['rule'],minutes=v.get('minutes',0)))
             elif v['state']=='accepted' and now-v['time']<100:
                 r=ROOMS.get(v['code'])
-                if r and not r['closed']:
+                if r and not r['closed'] and r['winner'] is None and not session:
                     side=r['host'] if pid==v['sender'] else -r['host']
-                    session=dict(code=v['code'],side=side,token=r['tokens'][side],host=side==r['host'],ranked=r['ranked'],rule=r['rule'])
-        hist=sql(db,'SELECT opponent,outcome,delta,played_at FROM match_history WHERE player_id=? ORDER BY played_at DESC,match_id DESC LIMIT 20',(pid,)).fetchall()
+                    session=dict(code=v['code'],side=game_side(r,side),seat=side,token=r['tokens'][side],host=side==r['host'],ranked=r['ranked'],rule=r['rule'],minutes=r.get('minutes',0),resume=True)
+        hist=sql(db,'SELECT opponent,outcome,delta,played_at,match_id FROM match_history WHERE player_id=? ORDER BY played_at DESC,match_id DESC LIMIT 20',(pid,)).fetchall()
         notices=sql(db,'SELECT n.id,n.kind,n.actor,p.name,n.created_at,n.seen FROM notifications n JOIN players p ON p.id=n.actor WHERE n.recipient=? ORDER BY n.created_at DESC,n.id DESC LIMIT 50',(pid,)).fetchall()
         unread=sql(db,'SELECT COUNT(*) FROM notifications WHERE recipient=? AND seen=0',(pid,)).fetchone()[0]
     people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
-    return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread)
+    return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at','match_id'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread,matchmaking=pid in MATCH_QUEUE)
 def search_key(value):
     return ''.join(c for c in unicodedata.normalize('NFKD',str(value).casefold()) if not unicodedata.combining(c))
 def public_player(db,pid,row,now):
@@ -235,6 +294,19 @@ def social_action(path,d,now):
         return social_lookup(path,d,pid,now)
     if path in ('/api/social/register','/api/social/state'):
         return 200,social_state(pid,now)
+    if path=='/api/social/matchmaking/start':
+        if active_room(pid,now):return 409,{'error':'Saia da sala atual antes de buscar partida.'}
+        rule=d.get('rule','free')
+        if rule not in ('free','official'):return 400,{'error':'Regra inválida.'}
+        with database() as db: points=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()[0]
+        MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False,minutes=clock_value(d),points=points,start=now,seen=now)
+        matchmake(pid,now);return 200,social_state(pid,now)
+    if path=='/api/social/matchmaking/cancel':
+        MATCH_QUEUE.pop(pid,None);return 200,social_state(pid,now)
+    if path=='/api/social/replay':
+        with database() as db:
+            row=sql(db,'SELECT payload FROM replays WHERE match_id=? AND (player_a=? OR player_b=?)',(str(d.get('match','')),pid,pid)).fetchone()
+        return (200,{'replay':json.loads(row[0])}) if row else (404,{'error':'Replay não disponível para esta partida.'})
     if path=='/api/social/notifications/read':
         with database() as db:
             ids=d.get('ids',[])
@@ -276,7 +348,7 @@ def social_action(path,d,now):
         if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
         key=secrets.token_urlsafe(16); rule=d.get('rule','free')
         if rule not in ('free','official'): return 400,{'error':'Regra inválida.'}
-        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False,rule=rule)
+        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False,rule=rule,minutes=clock_value(d))
         return 200,social_state(pid,now)
     if path=='/api/social/challenge/respond':
         v=INVITES.get(str(d.get('invite','')))
@@ -291,8 +363,8 @@ def social_action(path,d,now):
         code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
         while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
         host_side=secrets.choice((1,-1))
-        r=dict(last=now,host=host_side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={host_side:v['sender'],-host_side:pid},rule=v['rule'],ranked=v['ranked'])
-        reset_match(r);ROOMS[code]=r;v.update(state='accepted',code=code,time=now)
+        r=dict(last=now,host=host_side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={host_side:v['sender'],-host_side:pid},rule=v['rule'],ranked=v['ranked'],minutes=v.get('minutes',0))
+        reset_match(r);ROOMS[code]=r;MATCH_QUEUE.pop(pid,None);MATCH_QUEUE.pop(v['sender'],None);v.update(state='accepted',code=code,time=now)
         return 200,social_state(pid,now)
     return 404,{'error':'Ação inexistente.'}
 
@@ -356,9 +428,9 @@ class Handler(BaseHTTPRequestHandler):
                 if d.get('ranked') is not False and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 rule=d.get('rule','free')
                 if rule not in ('free','official'): return self.reply(400,{'error':'Regra inválida.'})
-                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False}
-                reset_match(ROOMS[code])
-                return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked']})
+                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False,'minutes':clock_value(d)}
+                reset_match(ROOMS[code]);MATCH_QUEUE.pop(pid,None)
+                return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked'],'minutes':ROOMS[code]['minutes']})
             code=str(d.get('code','')).upper(); r=ROOMS.get(code)
             if not r: return self.reply(404,{'error':'Sala inexistente ou encerrada.'})
             side=d.get('side'); r['last']=now
@@ -370,10 +442,11 @@ class Handler(BaseHTTPRequestHandler):
                 if r.get('ranked',True) and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 if pid and pid==r['profiles'].get(r['host']): return self.reply(409,{'error':'Use outro perfil ou navegador para o adversário.'})
                 r['profiles'][side]=pid
-                token=secrets.token_urlsafe(24); r['tokens'][side]=token; r['seen'][side]=now
-                return self.reply(200,{'code':code,'token':token,'connected':True,'side':side,'ranked':r.get('ranked',True)})
+                token=secrets.token_urlsafe(24); r['tokens'][side]=token; r['seen'][side]=now;MATCH_QUEUE.pop(pid,None)
+                return self.reply(200,{'code':code,'token':token,'connected':True,'side':side,'ranked':r.get('ranked',True),'minutes':r.get('minutes',0)})
             if side not in (1,-1) or not secrets.compare_digest(r['tokens'].get(side,'!'),str(d.get('token',''))): return self.reply(403,{'error':'Sessão inválida.'})
             r['seen'][side]=now
+            if not r['closed']: tick_clock(r,now)
             if path=='/api/resign':
                 if len(r['tokens'])!=2: return self.reply(409,{'error':'Aguarde o adversário.'})
                 if r['winner'] is None:
@@ -389,7 +462,7 @@ class Handler(BaseHTTPRequestHandler):
                     if r['winner'] is None: finish(r,game_side(r,side),True)
                     r['closed']=True
                 messages=r['queues'][side][:]; r['queues'][side].clear()
-                return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages,'result':result_for(r,side),'closed':r['closed']})
+                return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages,'result':result_for(r,side),'closed':r['closed'],'snapshot':room_snapshot(r,side,now)})
             if r['closed']: return self.reply(409,{'error':'Sala encerrada.'})
             if path=='/api/send':
                 if len(r['tokens'])!=2: return self.reply(409,{'error':'Aguarde o adversário.'})
