@@ -43,6 +43,8 @@ def profile(d):
     with database() as db:
         sql(db,'INSERT INTO players(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',(pid,name))
     return pid
+def game_side(r,seat):
+    return r.get('colors',{}).get(seat,seat)
 def finish(r,w,resigned=False):
     if r.get('winner') is not None: return
     p=r['profiles']
@@ -50,12 +52,13 @@ def finish(r,w,resigned=False):
         with database() as db:
             inserted=sql(db,'INSERT INTO results(id) VALUES(?) ON CONFLICT(id) DO NOTHING',(r['match'],)).rowcount
             if inserted:
-                for side in (1,-1):
+                for seat in (1,-1):
+                    side=game_side(r,seat)
                     delta=5 if w==0 else 25 if w==side else (-20 if resigned else -15)
-                    sql(db,'UPDATE players SET points=CASE WHEN points+? < 0 THEN 0 ELSE points+? END,wins=wins+?,losses=losses+?,draws=draws+? WHERE id=?',(delta,delta,int(w==side),int(w==-side),int(w==0),p[side]))
-                    opponent=sql(db,'SELECT name FROM players WHERE id=?',(p[-side],)).fetchone()[0]
+                    sql(db,'UPDATE players SET points=CASE WHEN points+? < 0 THEN 0 ELSE points+? END,wins=wins+?,losses=losses+?,draws=draws+? WHERE id=?',(delta,delta,int(w==side),int(w==-side),int(w==0),p[seat]))
+                    opponent=sql(db,'SELECT name FROM players WHERE id=?',(p[-seat],)).fetchone()[0]
                     outcome='draw' if w==0 else 'win' if w==side else 'resign' if resigned else 'loss'
-                    sql(db,'INSERT INTO match_history(match_id,player_id,opponent,outcome,delta,played_at) VALUES(?,?,?,?,?,?)',(r['match'],p[side],opponent,outcome,delta,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())))
+                    sql(db,'INSERT INTO match_history(match_id,player_id,opponent,outcome,delta,played_at) VALUES(?,?,?,?,?,?)',(r['match'],p[seat],opponent,outcome,delta,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())))
     r['winner']=w
 def initial():
     return [(-1 if i//8<3 else 1 if i//8>4 else 0) if (i//8+i%8)%2 else 0 for i in range(64)]
@@ -102,7 +105,8 @@ def boardkey(r): return r['rule']+'/'+','.join(map(str,r['board']))+'/'+str(r['t
 def reset_match(r):
     r.update(board=initial(),turn=1,sequence=0,winner=None,quiet=0,match=secrets.token_hex(16),rematch=set())
     r['repeats']={boardkey(r):1}
-def process(r,side,msg):
+def process(r,seat,msg):
+    side=game_side(r,seat)
     t=msg.get('type')
     if t=='hello': return True
     if t=='resign':
@@ -122,9 +126,13 @@ def process(r,side,msg):
         elif r['quiet']>=40 or r['repeats'][k]>=3: finish(r,0)
         return True
     if t=='rematch' and r['winner'] is not None:
-        r['rematch'].add(side); return True
-    if t=='rematch-ok' and r['winner'] is not None and -side in r['rematch']:
-        reset_match(r); return True
+        r['rematch'].add(seat); return True
+    if t=='rematch-ok' and r['winner'] is not None and -seat in r['rematch']:
+        swap=secrets.choice((False,True))
+        if swap: r['colors']={1:-game_side(r,1),-1:-game_side(r,-1)}
+        reset_match(r)
+        r['rematch_event']=json.dumps({'type':'rematch-start','swap':swap})
+        return True
     if t=='rematch-no' and r['winner'] is not None:
         r['rematch'].clear(); return True
     # simultaneous rematch acknowledgements are harmless
@@ -323,11 +331,11 @@ class Handler(BaseHTTPRequestHandler):
             if side not in (1,-1) or not secrets.compare_digest(r['tokens'].get(side,'!'),str(d.get('token',''))): return self.reply(403,{'error':'Sessão inválida.'})
             r['seen'][side]=now
             if path=='/api/leave':
-                if len(r['tokens'])==2 and r['winner'] is None: finish(r,-side,True)
+                if len(r['tokens'])==2 and r['winner'] is None: finish(r,-game_side(r,side),True)
                 r['closed']=True; return self.reply(200,{'ok':True})
             if path=='/api/poll':
                 if -side in r['seen'] and now-r['seen'][-side]>90:
-                    if r['winner'] is None: finish(r,side,True)
+                    if r['winner'] is None: finish(r,game_side(r,side),True)
                     r['closed']=True; return self.reply(410,{'error':'Adversário desconectado.'})
                 messages=r['queues'][side][:]; r['queues'][side].clear()
                 return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages})
@@ -340,7 +348,12 @@ class Handler(BaseHTTPRequestHandler):
                     msg=json.loads(m)
                     if not isinstance(msg,dict) or not process(r,side,msg): return self.reply(409,{'error':'Jogada ou ação inválida.'})
                 except (ValueError,TypeError,KeyError,IndexError): return self.reply(400,{'error':'Mensagem inválida.'})
-                r['queues'][-side].append(m); return self.reply(200,{'ok':True})
+                if msg.get('type')=='rematch-ok':
+                    event=r.pop('rematch_event',None)
+                    if event:
+                        for q in r['queues'].values(): q.append(event)
+                else: r['queues'][-side].append(m)
+                return self.reply(200,{'ok':True})
             return self.reply(404,{'error':'Rota inexistente.'})
     def log_message(self, fmt, *args): pass
 
