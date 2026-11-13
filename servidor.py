@@ -34,6 +34,8 @@ def setup():
         sql(db,'CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, name TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 1000, wins INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE TABLE IF NOT EXISTS results (id TEXT PRIMARY KEY)')
         sql(db,'CREATE TABLE IF NOT EXISTS friendships (sender TEXT NOT NULL, receiver TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY(sender,receiver))')
+        sql(db,'CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, recipient TEXT NOT NULL, actor TEXT NOT NULL, kind TEXT NOT NULL, created_at REAL NOT NULL, seen INTEGER NOT NULL DEFAULT 0)')
+        sql(db,'CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications(recipient,created_at)')
         sql(db,'CREATE TABLE IF NOT EXISTS match_history (match_id TEXT NOT NULL, player_id TEXT NOT NULL, opponent TEXT NOT NULL, outcome TEXT NOT NULL, delta INTEGER NOT NULL, played_at TEXT NOT NULL, PRIMARY KEY(match_id,player_id))')
 def profile(d):
     name=' '.join(str(d.get('name','')).split())[:24]
@@ -144,6 +146,8 @@ def identity(d):
     return hashlib.sha256(token.encode()).hexdigest() if 32<=len(token)<=128 else None
 def active_room(pid,now):
     return any(not r['closed'] and pid in r['profiles'].values() and now-max(r['seen'].values())<100 for r in ROOMS.values())
+def notify(db,recipient,actor,kind):
+    sql(db,'INSERT INTO notifications(id,recipient,actor,kind,created_at,seen) VALUES(?,?,?,?,?,0)',(secrets.token_hex(16),recipient,actor,kind,time.time()))
 def social_state(pid,now):
     for k,v in list(PRESENCE.items()):
         if now-v>25: del PRESENCE[k]
@@ -173,8 +177,10 @@ def social_state(pid,now):
                     side=r['host'] if pid==v['sender'] else -r['host']
                     session=dict(code=v['code'],side=side,token=r['tokens'][side],host=side==r['host'],ranked=r['ranked'],rule=r['rule'])
         hist=sql(db,'SELECT opponent,outcome,delta,played_at FROM match_history WHERE player_id=? ORDER BY played_at DESC,match_id DESC LIMIT 20',(pid,)).fetchall()
+        notices=sql(db,'SELECT n.id,n.kind,n.actor,p.name,n.created_at,n.seen FROM notifications n JOIN players p ON p.id=n.actor WHERE n.recipient=? ORDER BY n.created_at DESC,n.id DESC LIMIT 50',(pid,)).fetchall()
+        unread=sql(db,'SELECT COUNT(*) FROM notifications WHERE recipient=? AND seen=0',(pid,)).fetchone()[0]
     people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
-    return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at'),x)) for x in hist])
+    return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread)
 def search_key(value):
     return ''.join(c for c in unicodedata.normalize('NFKD',str(value).casefold()) if not unicodedata.combining(c))
 def public_player(db,pid,row,now):
@@ -215,6 +221,13 @@ def social_action(path,d,now):
         return social_lookup(path,d,pid,now)
     if path in ('/api/social/register','/api/social/state'):
         return 200,social_state(pid,now)
+    if path=='/api/social/notifications/read':
+        with database() as db:
+            ids=d.get('ids',[])
+            if not isinstance(ids,list): return 400,{'error':'Notificações inválidas.'}
+            for nid in ids[:50]:
+                if isinstance(nid,str): sql(db,'UPDATE notifications SET seen=1 WHERE recipient=? AND id=?',(pid,nid))
+        return 200,social_state(pid,now)
     target=str(d.get('target',''))
     if path.startswith('/api/social/friend/'):
         if target==pid: return 400,{'error':'Escolha outro jogador.'}
@@ -223,12 +236,20 @@ def social_action(path,d,now):
             row=sql(db,'SELECT sender,receiver,state FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,target,target,pid)).fetchone()
             action=path.rsplit('/',1)[-1]
             if action=='request':
-                if not row: sql(db,'INSERT INTO friendships(sender,receiver,state) VALUES(?,?,?)',(pid,target,'pending'))
-                elif row[0]==target and row[2]=='pending': sql(db,'UPDATE friendships SET state=? WHERE sender=? AND receiver=?',('accepted',target,pid))
+                if not row:
+                    sql(db,'INSERT INTO friendships(sender,receiver,state) VALUES(?,?,?)',(pid,target,'pending'))
+                    notify(db,target,pid,'friend_request')
+                elif row[0]==target and row[2]=='pending':
+                    sql(db,'UPDATE friendships SET state=? WHERE sender=? AND receiver=?',('accepted',target,pid))
+                    notify(db,target,pid,'friend_accepted')
             elif action=='accept':
                 if not row or row[0]!=target or row[2]!='pending': return 409,{'error':'Pedido indisponível.'}
                 sql(db,'UPDATE friendships SET state=? WHERE sender=? AND receiver=?',('accepted',target,pid))
-            elif action=='remove':
+                notify(db,target,pid,'friend_accepted')
+            elif action in ('remove','decline'):
+                if action=='decline' and (not row or row[0]!=target or row[2]!='pending'): return 409,{'error':'Pedido indisponível.'}
+                if row and row[2]=='pending' and row[0]==target: notify(db,target,pid,'friend_declined')
+                elif row and row[2]=='accepted': notify(db,target,pid,'friend_removed')
                 sql(db,'DELETE FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,target,target,pid))
             else: return 400,{'error':'Ação inválida.'}
         return 200,social_state(pid,now)
@@ -243,7 +264,10 @@ def social_action(path,d,now):
     if path=='/api/social/challenge/respond':
         v=INVITES.get(str(d.get('invite','')))
         if not v or v['receiver']!=pid or v['state']!='pending' or now-v['time']>=60: return 409,{'error':'Convite expirado.'}
-        if d.get('accept') is not True: v['state']='declined';return 200,social_state(pid,now)
+        if d.get('accept') is not True:
+            v['state']='declined'
+            with database() as db: notify(db,v['sender'],pid,'challenge_declined')
+            return 200,social_state(pid,now)
         if active_room(pid,now) or active_room(v['sender'],now): return 409,{'error':'Um jogador está em outra sala.'}
         if now-PRESENCE.get(v['sender'],-1000)>25: return 409,{'error':'Adversário desconectado.'}
         if len(ROOMS)>=1000: return 503,{'error':'Servidor cheio.'}
