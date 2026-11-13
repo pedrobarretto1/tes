@@ -8,6 +8,8 @@ PRESENCE = {}
 INVITES = {}
 MATCH_QUEUE = {}
 LOGIN_LIMITS = {}
+SPECTATORS = {}
+TOURNAMENTS = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
@@ -45,6 +47,9 @@ def setup():
         sql(db,'CREATE INDEX IF NOT EXISTS account_sessions_player_idx ON account_sessions(player_id)')
         sql(db,'CREATE TABLE IF NOT EXISTS cosmetics (player_id TEXT PRIMARY KEY, avatar TEXT NOT NULL DEFAULT \'crown\', title TEXT NOT NULL DEFAULT \'visitor\', frame TEXT NOT NULL DEFAULT \'wood\', streak INTEGER NOT NULL DEFAULT 0, best_streak INTEGER NOT NULL DEFAULT 0, completed INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE TABLE IF NOT EXISTS achievements (player_id TEXT NOT NULL, code TEXT NOT NULL, unlocked_at DOUBLE PRECISION NOT NULL, PRIMARY KEY(player_id,code))')
+        sql(db,'CREATE TABLE IF NOT EXISTS wallets (player_id TEXT PRIMARY KEY, coins INTEGER NOT NULL DEFAULT 0, theme TEXT NOT NULL DEFAULT \'classic\')')
+        sql(db,'CREATE TABLE IF NOT EXISTS purchases (player_id TEXT NOT NULL, item TEXT NOT NULL, PRIMARY KEY(player_id,item))')
+        sql(db,'CREATE TABLE IF NOT EXISTS puzzle_solves (player_id TEXT NOT NULL, puzzle_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY(player_id,puzzle_id))')
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 def identity(d):
@@ -192,6 +197,7 @@ def finish(r,w,resigned=False,reason=None):
                     outcome='draw' if w==0 else 'win' if w==side else 'resign' if resigned else 'loss'
                     sql(db,'INSERT INTO match_history(match_id,player_id,opponent,outcome,delta,played_at) VALUES(?,?,?,?,?,?)',(r['match'],p[seat],opponent,outcome,delta,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())))
                     award_progress(db,p[seat],outcome,match_stats(r)[str(side)]['promotions'])
+                    if outcome!='resign' and r['sequence']>=8: wallet_add(db,p[seat],15 if outcome=='win' else 8)
     if not names:
         with database() as db:
             for seat,pid in p.items():
@@ -207,18 +213,25 @@ def result_for(r,seat):
     return dict(r['result'],side=game_side(r,seat)) if r.get('result') else None
 def initial():
     return [(-1 if i//8<3 else 1 if i//8>4 else 0) if (i//8+i%8)%2 else 0 for i in range(64)]
-RULES=('free','official','english','mandatory','giveaway')
+RULES=('free','official','english','mandatory','giveaway','kings')
+def valid_rule(rule):
+    return isinstance(rule,str) and (rule in RULES or (re.fullmatch(r'custom-[01]{4}',rule) and not (rule[7]=='0' and rule[8]=='1')))
+def rule_flags(rule):
+    if rule.startswith('custom-'):return tuple(x=='1' for x in rule[7:])
+    return (rule!='free',rule in ('official','giveaway'),rule!='english',rule!='english')
+def initial_for(rule):
+    return [p*2 for p in initial()] if rule=='kings' else initial()
 DIR=((1,1),(1,-1),(-1,1),(-1,-1))
 def inside(r,c): return 0<=r<8 and 0<=c<8
 def legal(b,s,rule):
-    caps=[]; quiet=[]; short=rule=='english'
+    caps=[]; quiet=[]; mandatory,majority,long_king,backward=rule_flags(rule); short=not long_king
     for i,p in enumerate(b):
         if not p or p*s<=0: continue
         def walk(board,at,path,cap):
             steps=[]
             for dr,dc in DIR:
                 r,c=at//8+dr,at%8+dc
-                if short and abs(p)==1 and dr!=-s: continue
+                if not backward and abs(p)==1 and dr!=-s: continue
                 if abs(p)==1 or short:
                     rr,cc=r+dr,c+dc
                     if inside(r,c) and inside(rr,cc):
@@ -237,8 +250,8 @@ def legal(b,s,rule):
                 return
             for t,v in steps:
                 x=board.copy(); x[at]=0; x[t]=p
-                if short: x[v]=0
-                if short and abs(p)==1 and t//8==(0 if s==1 else 7): caps.append({'from':i,'path':path+[t],'cap':cap+[v]})
+                if rule=='english': x[v]=0
+                if rule=='english' and abs(p)==1 and t//8==(0 if s==1 else 7): caps.append({'from':i,'path':path+[t],'cap':cap+[v]})
                 else: walk(x,t,path+[t],cap+[v])
         walk(b,i,[],[])
         for dr,dc in DIR:
@@ -248,8 +261,8 @@ def legal(b,s,rule):
                 quiet.append({'from':i,'path':[r*8+c],'cap':[]})
                 if abs(p)==1 or short: break
                 r+=dr; c+=dc
-    if rule=='free': return caps+quiet
-    if rule in ('english','mandatory'): return caps or quiet
+    if not mandatory: return caps+quiet
+    if not majority: return caps or quiet
     return [m for m in caps if len(m['cap'])==max(len(x['cap']) for x in caps)] if caps else quiet
 def boardkey(r): return r['rule']+'/'+','.join(map(str,r['board']))+'/'+str(r['turn'])
 def match_stats(r):
@@ -259,11 +272,11 @@ def match_stats(r):
     return stats
 def clock_value(d):
     v=d.get('minutes',0)
-    return v if type(v) is int and v in (0,3,5,10) else 0
+    return v if type(v) is int and v in (0,1,3,5,10) else 0
 def reset_match(r):
     now=time.monotonic()
     seconds=r.get('minutes',0)*60
-    r.update(board=initial(),turn=1,sequence=0,winner=None,result=None,quiet=0,match=secrets.token_hex(16),rematch=set(),moves=[],draw_offer=None,remaining={1:seconds,-1:seconds},clock_at=None,started=now)
+    r.update(board=initial_for(r['rule']),turn=1,sequence=0,winner=None,result=None,quiet=0,match=secrets.token_hex(16),rematch=set(),moves=[],chat=[],chat_seen={},draw_offer=None,remaining={1:seconds,-1:seconds},clock_at=None,started=now)
 
     r['repeats']={boardkey(r):1}
 def tick_clock(r,now):
@@ -281,11 +294,15 @@ def room_snapshot(r,seat,now):
                     row=sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()
                     if row: cached[seat]=row[0]
     names={str(game_side(r,seat)):name for seat,name in cached.items()}
-    return dict(match=r['match'],side=game_side(r,seat),board=r['board'],turn=r['turn'],sequence=r['sequence'],rule=r['rule'],names=names,moves=r.get('moves',[]),quiet=r['quiet'],repeats=r['repeats'],minutes=r.get('minutes',0),remaining=r['remaining'],drawOffer=r.get('draw_offer'),stats=match_stats(r),opponentOffline=now-r['seen'].get(-seat,now)>10,grace=max(0,90-int(now-r['seen'].get(-seat,now))),connected=len(r['tokens'])==2)
+    return dict(match=r['match'],side=game_side(r,seat),board=r['board'],turn=r['turn'],sequence=r['sequence'],rule=r['rule'],names=names,moves=r.get('moves',[]),quiet=r['quiet'],repeats=r['repeats'],minutes=r.get('minutes',0),remaining=r['remaining'],drawOffer=r.get('draw_offer'),chat=r.get('chat',[]),stats=match_stats(r),opponentOffline=now-r['seen'].get(-seat,now)>10,grace=max(0,90-int(now-r['seen'].get(-seat,now))),connected=len(r['tokens'])==2)
 def process(r,seat,msg):
     side=game_side(r,seat)
     t=msg.get('type')
     if t=='hello': return True
+    if t=='chat' and r['winner'] is None:
+        message=msg.get('text');now=time.monotonic()
+        if not isinstance(message,str) or not 1<=len(message.strip())<=180 or now-r['chat_seen'].get(seat,-1000)<1:return False
+        r['chat_seen'][seat]=now;r['chat'].append(dict(side=side,text=message.strip(),id=secrets.token_hex(8)));r['chat']=r['chat'][-50:];return True
     if t=='draw-offer' and r['winner'] is None and r.get('draw_offer') is None:
         r['draw_offer']=side;return True
     if t in ('draw-accept','draw-decline') and r['winner'] is None and r.get('draw_offer')==-side:
@@ -417,6 +434,64 @@ def social_lookup(path,d,pid,now):
         p.update(cosmetics_for(db,target,True))
         return 200,{'player':p}
 
+PUZZLES=[
+ dict(id='capture1',name='Primeiro salto',level='Iniciante',pieces={42:1,35:-1},goal='Capture a pedra adversária.',reward=15),
+ dict(id='double',name='Caminho duplo',level='Intermediário',pieces={42:1,35:-1,21:-1},goal='Capture duas pedras em um lance.',reward=25),
+ dict(id='majority',name='A lei da maioria',level='Intermediário',pieces={42:1,33:-1,35:-1,19:-1},goal='Encontre a sequência que captura mais pedras.',reward=30),
+ dict(id='crown',name='A coroação',level='Iniciante',pieces={17:1,10:-1},goal='Capture e transforme a pedra em dama.',reward=20),
+ dict(id='triple',name='Três em linha',level='Avançado',pieces={56:1,49:-1,35:-1,21:-1},goal='Capture três pedras em um único lance.',reward=40)]
+THEMES={'classic':0,'imperial':100,'marble':150,'emerald':120}
+def puzzle_board(p):
+    b=[0]*64
+    for i,v in p['pieces'].items():b[i]=v
+    return b
+def wallet_add(db,pid,amount):
+    sql(db,'INSERT INTO wallets(player_id,coins) VALUES(?,?) ON CONFLICT(player_id) DO UPDATE SET coins=wallets.coins+excluded.coins',(pid,amount))
+def wallet_state(db,pid):
+    sql(db,'INSERT INTO wallets(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
+    coins,theme=sql(db,'SELECT coins,theme FROM wallets WHERE player_id=?',(pid,)).fetchone()
+    return dict(coins=coins,theme=theme,owned=['classic']+[x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()])
+def school_action(path,d,pid,now):
+    day=time.strftime('%Y-%m-%d',time.gmtime());daily=PUZZLES[int(time.time()//86400)%len(PUZZLES)]['id']
+    with database() as db:
+        if path.endswith('/solve'):
+            p=next((p for p in PUZZLES if p['id']==d.get('puzzle')),None)
+            if not p:return 404,{'error':'Desafio inexistente.'}
+            m=d.get('move')
+            if m not in legal(puzzle_board(p),1,'official'):return 400,{'error':'Esse lance não resolve o desafio.'}
+            inserted=sql(db,'INSERT INTO puzzle_solves(player_id,puzzle_id,day) VALUES(?,?,?) ON CONFLICT(player_id,puzzle_id) DO NOTHING',(pid,p['id'],day)).rowcount
+            reward=p['reward']+(10 if p['id']==daily else 0) if inserted else 0
+            if reward:wallet_add(db,pid,reward)
+            return 200,dict(reward=reward,**wallet_state(db,pid))
+        if path.endswith('/buy') or path.endswith('/equip'):
+            item=d.get('item')
+            if not isinstance(item,str) or item not in THEMES:return 400,{'error':'Tema inexistente.'}
+            w=wallet_state(db,pid)
+            if item not in w['owned']:
+                if path.endswith('/equip'):return 403,{'error':'Tema ainda bloqueado.'}
+                if w['coins']<THEMES[item]:return 400,{'error':'Moedas insuficientes.'}
+                sql(db,'UPDATE wallets SET coins=coins-? WHERE player_id=?',(THEMES[item],pid))
+                sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?)',(pid,item))
+            sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(item,pid))
+            return 200,wallet_state(db,pid)
+        solved=[x[0] for x in sql(db,'SELECT puzzle_id FROM puzzle_solves WHERE player_id=?',(pid,)).fetchall()]
+        return 200,dict(puzzles=[dict(id=p['id'],name=p['name'],level=p['level'],goal=p['goal'],reward=p['reward'],board=puzzle_board(p)) for p in PUZZLES],daily=daily,solved=solved,**wallet_state(db,pid))
+def live_action(path,d,pid,now):
+    for k,v in list(SPECTATORS.items()):
+        if now-v[1]>15:SPECTATORS.pop(k,None)
+    if path.endswith('/watch'):
+        code=str(d.get('code',''));r=ROOMS.get(code)
+        if not r or not r.get('public') or len(r['tokens'])!=2:return 404,{'error':'Partida pública indisponível.'}
+        SPECTATORS[pid]=(code,now)
+        snapshot=room_snapshot(r,1,now)
+        return 200,dict(board=snapshot['board'],names=snapshot['names'],turn=snapshot['turn'],rule=r['rule'],sequence=r['sequence'],remaining=r['remaining'],minutes=r.get('minutes',0),result=r['winner'],closed=r['closed'],viewers=sum(v[0]==code for v in SPECTATORS.values()))
+    if path.endswith('/leave'):
+        SPECTATORS.pop(pid,None);return 200,{'ok':True}
+    rooms=[]
+    for code,r in ROOMS.items():
+        if r.get('public') and not r['closed'] and r['winner'] is None and len(r['tokens'])==2:
+            snap=room_snapshot(r,1,now);rooms.append(dict(code=code,names=snap['names'],rule=r['rule'],minutes=r.get('minutes',0),viewers=sum(v[0]==code for v in SPECTATORS.values())))
+    return 200,{'rooms':rooms[:50]}
 def social_action(path,d,now):
     if path.startswith('/api/social/account/'):return account_action(path,d,now)
     if path=='/api/social/register':
@@ -426,6 +501,8 @@ def social_action(path,d,now):
     with database() as db:
         if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone(): return 403,{'error':'Perfil não encontrado. Abra o cadastro.'}
     PRESENCE[pid]=now
+    if path.startswith('/api/social/school/'):return school_action(path,d,pid,now)
+    if path.startswith('/api/social/live/'):return live_action(path,d,pid,now)
     if path=='/api/social/customize':return customize(pid,d,now)
     if path in ('/api/social/search','/api/social/player'):
         return social_lookup(path,d,pid,now)
@@ -434,9 +511,9 @@ def social_action(path,d,now):
     if path=='/api/social/matchmaking/start':
         if active_room(pid,now):return 409,{'error':'Saia da sala atual antes de buscar partida.'}
         rule=d.get('rule','free')
-        if rule not in RULES:return 400,{'error':'Regra inválida.'}
+        if not valid_rule(rule):return 400,{'error':'Regra inválida.'}
         with database() as db: points=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()[0]
-        MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False,minutes=clock_value(d),points=points,start=now,seen=now)
+        MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule!='kings',minutes=clock_value(d),points=points,start=now,seen=now)
         matchmake(pid,now);return 200,social_state(pid,now)
     if path=='/api/social/matchmaking/cancel':
         MATCH_QUEUE.pop(pid,None);return 200,social_state(pid,now)
@@ -484,8 +561,8 @@ def social_action(path,d,now):
         if active_room(pid,now) or active_room(target,now): return 409,{'error':'Um jogador está em outra sala.'}
         if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
         key=secrets.token_urlsafe(16); rule=d.get('rule','free')
-        if rule not in RULES: return 400,{'error':'Regra inválida.'}
-        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False,rule=rule,minutes=clock_value(d))
+        if not valid_rule(rule): return 400,{'error':'Regra inválida.'}
+        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule!='kings',rule=rule,minutes=clock_value(d))
         return 200,social_state(pid,now)
     if path=='/api/social/challenge/respond':
         v=INVITES.get(str(d.get('invite','')))
@@ -521,7 +598,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path == '/api/health': self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL)})
@@ -565,8 +642,8 @@ class Handler(BaseHTTPRequestHandler):
                 pid=profile(d)
                 if d.get('ranked') is not False and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 rule=d.get('rule','free')
-                if rule not in RULES: return self.reply(400,{'error':'Regra inválida.'})
-                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False,'minutes':clock_value(d)}
+                if not valid_rule(rule): return self.reply(400,{'error':'Regra inválida.'})
+                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False and not rule.startswith('custom-') and rule!='kings','minutes':clock_value(d),'public':d.get('public') is True}
                 reset_match(ROOMS[code]);MATCH_QUEUE.pop(pid,None)
                 return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked'],'minutes':ROOMS[code]['minutes']})
             code=str(d.get('code','')).upper(); r=ROOMS.get(code)
@@ -615,7 +692,7 @@ class Handler(BaseHTTPRequestHandler):
                     event=r.pop('rematch_event',None)
                     if event:
                         for q in r['queues'].values(): q.append(event)
-                else: r['queues'][-side].append(m)
+                elif msg.get('type')!='chat': r['queues'][-side].append(m)
                 return self.reply(200,{'ok':True})
             return self.reply(404,{'error':'Rota inexistente.'})
     def log_message(self, fmt, *args): pass
