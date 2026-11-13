@@ -70,6 +70,7 @@ def sql(db,query,args=()):
     return db.execute(query.replace('?', '%s') if DATABASE_URL else query,args)
 def setup():
     with database() as db:
+        sql(db,'CREATE TABLE IF NOT EXISTS journey (player_id TEXT PRIMARY KEY, completed INTEGER NOT NULL DEFAULT 0, payload TEXT NOT NULL DEFAULT \'\', unlocked_at TEXT NOT NULL DEFAULT \'\')')
         sql(db,'CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, name TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 1000, wins INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE TABLE IF NOT EXISTS results (id TEXT PRIMARY KEY)')
         sql(db,'CREATE TABLE IF NOT EXISTS friendships (sender TEXT NOT NULL, receiver TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY(sender,receiver))')
@@ -112,8 +113,8 @@ def profile(d):
         else:sql(db,'INSERT INTO players(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',(pid,name))
     return pid
 AVATARS={'crown','knight','shield','oak','rook','star'}
-TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion'}
-THEMATIC_FRAMES={'halloween':'haunted-night','christmas':'winter-feast','horror':'midnight-crypt','romance':'rose-garden'}
+TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion','last_king'}
+THEMATIC_FRAMES={'halloween':'haunted-night','christmas':'winter-feast','horror':'midnight-crypt','romance':'rose-garden','last-king':'relic-throne'}
 FRAMES={'wood','bronze','silver','gold'} | set(THEMATIC_FRAMES)
 ACHIEVEMENTS={
  'first_win':('Primeiro Duelo','Vença uma partida ranqueada.','first_win'),
@@ -142,7 +143,8 @@ def cosmetics_for(db,pid,refresh=False):
         unlock(db,pid,'cup_champion');earned.append('cup_champion')
     purchased={row[0] for row in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()}
     thematic_frames=[frame for frame,board in THEMATIC_FRAMES.items() if board in purchased]
-    return dict(avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned,cups=cups,thematicFrames=thematic_frames)
+    relic=sql(db,'SELECT unlocked_at FROM journey WHERE player_id=? AND completed>=5',(pid,)).fetchone()
+    return dict(relics=[dict(id='last-king',date=relic[0])] if relic else [],avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned,cups=cups,thematicFrames=thematic_frames)
 def award_progress(db,pid,outcome,promotions):
     ensure_cosmetics(db,pid)
     sql(db,'UPDATE cosmetics SET streak=CASE WHEN ?=1 THEN streak+1 ELSE 0 END,completed=completed+? WHERE player_id=?',(int(outcome=='win'),int(outcome!='resign'),pid))
@@ -540,6 +542,7 @@ THEMATIC_COLLECTIONS={
  'romance':dict(board='rose-garden',skin='skin-rose',boardPrice=130,skinPrice=90,months=[2,6])}
 THEMATIC_ITEMS={item:spec for spec in THEMATIC_COLLECTIONS.values() for item in (spec['board'],spec['skin'])}
 THEMATIC_PRICES={spec['board']:spec['boardPrice'] for spec in THEMATIC_COLLECTIONS.values()} | {spec['skin']:spec['skinPrice'] for spec in THEMATIC_COLLECTIONS.values()}
+RELIC_ITEMS={'relic-throne','skin-relic-throne'}
 SHOP_ITEMS={**THEMES,**SKINS,**THEMATIC_PRICES}
 def seasonal_open(spec,day=None):
     day=day or time.strftime('%Y-%m-%d',time.gmtime())
@@ -589,8 +592,9 @@ def school_action(path,d,pid,now):
             return 200,wallet_state(db,pid)
         if path.endswith('/buy') or path.endswith('/equip'):
             item=d.get('item')
-            if not isinstance(item,str) or item not in SHOP_ITEMS and item not in CHAMPION_ITEMS:return 400,{'error':'Item inexistente.'}
+            if not isinstance(item,str) or item not in SHOP_ITEMS and item not in CHAMPION_ITEMS and item not in RELIC_ITEMS:return 400,{'error':'Item inexistente.'}
             w=wallet_state(db,pid)
+            if item in RELIC_ITEMS and item not in w['owned']:return 403,{'error':'Relíquia exclusiva da Jornada do Mestre.'}
             if item in CHAMPION_ITEMS and item not in w['owned']:return 403,{'error':'Exclusivo de campeões: conquiste '+str(CHAMPION_ITEMS[item])+' Copa(s) de Honra.'}
             if item not in w['owned']:
                 if item in THEMATIC_ITEMS and not seasonal_open(THEMATIC_ITEMS[item]):return 403,{'error':'Coleção sazonal indisponível.'}
@@ -702,6 +706,111 @@ def event_action(path,d,pid,now):
     for e in TOURNAMENTS.values():
         result.append(dict(id=e['id'],type=e['type'],status=e['status'],round=e['round'],host=e['host']==pid,joined=pid in e['players'],players=[names.get(x,'Jogador') for x in e['players']],pairs=[dict(a=names.get(p['a'],'Jogador'),b=names.get(p['b'],'Jogador'),winner=names.get(p['winner']) if p['winner'] else None) for p in e['pairs']],champion=names.get(e.get('champion')),king=names.get(e.get('king')),queue=[names.get(x,'Jogador') for x in e['queue']]))
     return 200,{'events':result[-30:],'champions':[dict(name=x[0],date=x[1]) for x in champs]}
+
+# Journey of the Master. All positions, legal moves, opponent turns and rewards
+# are authoritative on the server. One saved run per profile; no ranked PH.
+JOURNEY=[
+ dict(name='O Aprendiz',hall='I · A Primeira Mesa',theme='classic',depth=1,quote='Cada grande mestre começou com um primeiro salto.',description='Aprenda a capturar em sequência. Uma pequena vantagem para começar.'),
+ dict(name='O Estrategista',hall='II · O Salão Antigo',theme='imperial',depth=2,quote='A paciência vale mais que a pressa.',description='Proteja suas peças e encontre a melhor troca.'),
+ dict(name='O Guardião',hall='III · A Cripta',theme='midnight-crypt',depth=3,quote='Nem toda armadilha está à vista.',description='Damas e pedras em um final de ataque e defesa.'),
+ dict(name='O Mestre Imperial',hall='IV · O Palácio',theme='champion-legacy',depth=4,quote='O trono exige mais do que coragem.',description='Uma partida completa contra um adversário mais forte.'),
+ dict(name='O Último Rei',hall='V · O Trono',theme='relic-throne',depth=5,quote='Que a última pedra revele quem merece a coroa.',description='O duelo final. Vença para conquistar a relíquia lendária.')]
+def journey_board(chapter):
+    if chapter>=3:return initial_for('official')
+    layouts=[{42:1,44:1,46:1,35:-1,21:-1},
+             {40:1,42:1,44:1,46:1,49:1,51:1,12:-1,14:-1,17:-1,19:-1,21:-1},
+             {40:1,42:1,44:1,51:1,58:2,12:-1,14:-1,21:-1,26:-1,5:-2}]
+    b=[0]*64
+    for i,v in layouts[chapter].items():b[i]=v
+    return b
+def journey_apply(b,m):
+    x=b.copy();p=x[m['from']];to=m['path'][-1];x[m['from']]=0
+    for v in m['cap']:x[v]=0
+    x[to]=p*2 if abs(p)==1 and to//8==(0 if p>0 else 7) else p
+    return x
+def journey_ai(b,chapter):
+    moves=legal(b,-1,'official')
+    if not moves:return None
+    deadline=time.monotonic()+.12;nodes=0;best=moves[0]
+    def evaluate(x,side):
+        value=0
+        for i,p in enumerate(x):
+            if p:
+                sign=1 if p>0 else -1;r,c=divmod(i,8)
+                v=330 if abs(p)==2 else 100+5*(7-r if sign==1 else r)
+                v+=3*min(r,7-r,c,7-c)
+                if chapter==1 and abs(p)==1 and r==(7 if sign==1 else 0):v+=12
+                value+=sign*side*v
+        return value
+    def search(x,side,depth,alpha,beta,ply):
+        nonlocal nodes
+        nodes+=1
+        if nodes>6500 or time.monotonic()>deadline:raise TimeoutError
+        ms=legal(x,side,'official')
+        if not ms:return -100000+ply
+        if depth==0:return evaluate(x,side)
+        value=-1000000
+        for m in sorted(ms,key=lambda m:-len(m['cap'])):
+            value=max(value,-search(journey_apply(x,m),-side,depth-1,-beta,-alpha,ply+1))
+            alpha=max(alpha,value)
+            if alpha>=beta:break
+        return value
+    for depth in range(1,JOURNEY[chapter]['depth']+1):
+        try:
+            value=-1000000;choice=best
+            for m in moves:
+                score=-search(journey_apply(b,m),1,depth-1,-1000000,-value,1)
+                if score>value:value=score;choice=m
+            best=choice;moves=[best]+[m for m in moves if m!=best]
+        except TimeoutError:break
+    return best
+def journey_public(completed,run,unlocked):
+    return dict(completed=completed,chapters=JOURNEY,unlocked=unlocked,run=({**run,'legal':legal(run['board'],1,'official') if run['outcome'] is None else []} if run else None))
+def journey_action(path,d,pid,now):
+    action=path.rsplit('/',1)[-1]
+    with database() as db:
+        sql(db,'INSERT INTO journey(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
+        completed,payload,unlocked=sql(db,'SELECT completed,payload,unlocked_at FROM journey WHERE player_id=?',(pid,)).fetchone()
+        run=json.loads(payload) if payload else None
+        if action=='state':return 200,journey_public(completed,run,unlocked)
+        if active_room(pid,now):return 409,{'error':'Saia da sala online antes de jogar a jornada.'}
+        if action=='equip':
+            if completed<5:return 403,{'error':'Conclua a Jornada do Mestre primeiro.'}
+            w=wallet_state(db,pid)
+            sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',('relic-throne',pid))
+            sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',('skin-relic-throne',pid))
+            ensure_cosmetics(db,pid);sql(db,'UPDATE cosmetics SET title=?,frame=? WHERE player_id=?',('last_king','last-king',pid))
+            return 200,wallet_state(db,pid)
+        if action=='start':
+            chapter=d.get('chapter')
+            if type(chapter) is not int or not 0<=chapter<5 or chapter>completed:return 403,{'error':'Capítulo bloqueado.'}
+            if run and run['outcome'] is None and run['chapter']==chapter and d.get('restart') is not True:return 200,journey_public(completed,run,unlocked)
+            board=journey_board(chapter);run=dict(id=secrets.token_hex(12),chapter=chapter,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],reward=0)
+        elif action=='move':
+            if not run or run['outcome'] is not None or d.get('id')!=run['id'] or type(d.get('sequence')) is not int or d['sequence']!=run['sequence']:return 409,{'error':'Partida desatualizada. Atualize a jornada.'}
+            m=d.get('move')
+            if m not in legal(run['board'],1,'official'):return 400,{'error':'Lance inválido.'}
+            def play(m,side):
+                b=run['board'];piece=b[m['from']];run['board']=journey_apply(b,m);run['sequence']+=1
+                run['quiet']=run['quiet']+1 if not m['cap'] and abs(piece)==2 else 0
+                run['last']=[m['from']]+m['path'];k=position_key(run['board'],-side,'official');run['repeats'][k]=run['repeats'].get(k,0)+1
+                if not legal(run['board'],-side,'official'):run['outcome']='win' if side==1 else 'loss'
+                elif run['quiet']>=40 or run['repeats'][k]>=3 or run['sequence']>=500:run['outcome']='draw'
+            play(m,1)
+            if run['outcome'] is None:
+                ai=journey_ai(run['board'],run['chapter'])
+                if ai:play(ai,-1)
+                else:run['outcome']='win'
+            if run['outcome']=='win' and run['chapter']==completed:
+                completed+=1;run['reward']=25*completed;wallet_add(db,pid,run['reward'])
+                if completed==5:
+                    unlocked=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                    for item in RELIC_ITEMS:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+                    unlock(db,pid,'last_king');run['relicUnlocked']=True
+        else:return 404,{'error':'Ação desconhecida.'}
+        sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
+        return 200,journey_public(completed,run,unlocked)
+
 def social_action(path,d,now):
     if path.startswith('/api/social/account/'):return account_action(path,d,now)
     if path=='/api/social/register':
@@ -711,6 +820,7 @@ def social_action(path,d,now):
     with database() as db:
         if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone(): return 403,{'error':'Perfil não encontrado. Abra o cadastro.'}
     PRESENCE[pid]=now
+    if path.startswith('/api/social/journey/'):return journey_action(path,d,pid,now)
     if path.startswith('/api/social/school/'):return school_action(path,d,pid,now)
     if path.startswith('/api/social/live/'):return live_action(path,d,pid,now)
     if path.startswith('/api/social/events/'):return event_action(path,d,pid,now)
@@ -809,7 +919,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
