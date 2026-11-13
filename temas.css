@@ -1,0 +1,66 @@
+
+/* V4.5 — themed scenes, independent piece illustrations, mobile */
+[data-theme="haunted-night"]{--shop-light:linear-gradient(135deg,#efb16d,#bf743c);--shop-dark:linear-gradient(135deg,#554061,#2a2037);--shop-frame:linear-gradient(135deg,#673c24,#292035,#9c512a,#332238);--shop-edge:#eaa35d}
+[data-theme="winter-feast"]{--shop-light:linear-gradient(135deg,#f7e6cc,#d9bd97);--shop-dark:linear-gradient(135deg,#397b62,#184735);--shop-frame:linear-gradient(135deg,#a73846,#3e563d,#b89c58,#772a37);--shop-edge:#f5cf8e}
+[data-theme="midnight-crypt"]{--shop-light:linear-gradient(135deg,#c4a6a4,#947b83);--shop-dark:linear-gradient(135deg,#452b39,#211722);--shop-frame:linear-gradient(135deg,#5c303a,#19151c,#87505b,#2b2029);--shop-edge:#cc8992}
+[data-theme="rose-garden"]{--shop-light:linear-gradient(135deg,#f5d9da,#e3b5bf);--shop-dark:linear-gradient(135deg,#a24c6b,#653047);--shop-frame:linear-gradient(135deg,#bd8191,#673747,#e0b4a2,#71384f);--shop-edge:#f0c6c6}
+[data-skin="skin-pumpkin"]{--stone-white:radial-gradient(ellipse at 30% 22%,#ffd69b,#f18b2d,#9e401b);--stone-black:radial-gradient(ellipse at 30% 22%,#9c87b7,#514062,#292135);--stone-white-border:#ffd2a0;--stone-black-border:#cab4e0;--stone-white-ink:#75341a;--stone-black-ink:#fff3d2}
+[data-skin="skin-holly"]{--stone-white:radial-gradient(ellipse at 30% 22%,#fff,#d1edf5,#7cabbf);--stone-black:radial-gradient(ellipse at 30% 22%,#f9b0a3,#bc394b,#702735);--stone-white-border:#f6fdff;--stone-black-border:#ffc5ae;--stone-white-ink:#376882;--stone-black-ink:#ffebae}
+[data-skin="skin-haunted"]{--stone-white:radial-gradient(ellipse at 30% 22%,#e5c9c1,#b17d80,#724650);--stone-black:radial-gradient(ellipse at 30% 22%,#77667d,#3e2b41,#1d1522);--stone-white-border:#e9c0bc;--stone-black-border:#ae788b;--stone-white-ink:#652d40;--stone-black-ink:#f5c1c9}
+[data-skin="skin-rose"]{--stone-white:radial-gradient(ellipse at 30% 22%,#fff4e8,#eec8d3,#be8299);--stone-black:radial-gradient(ellipse at 30% 22%,#ee98b1,#b7446b,#692942);--stone-white-border:#ffe4e8;--stone-black-border:#f6b4c7;--stone-white-ink:#9a4164;--stone-black-ink:#ffe3e5}
+/* Symbols are drawn on the stones, not a replacement for their color or hit area. */
+[data-skin="skin-pumpkin"] .piece.white:not(.king)::after{content:"🎃"}
+[data-skin="skin-pumpkin"] .piece.black:not(.king)::after{content:"☠"}
+[data-skin="skin-holly"] .piece.white:not(.king)::after{content:"❄"}
+[data-skin="skin-holly"] .piece.black:not(.king)::after{content:"✦"}
+[data-skin="skin-haunted"] .piece.white:not(.king)::after{content:"◉"}
+[data-skin="skin-haunted"] .piece.black:not(.king)::after{content:"☾"}
+[data-skin="skin-rose"] .piece.white:not(.king)::after{content:"🌹"}
+[data-skin="skin-rose"] .piece.black:not(.king)::after{content:"♥"}
+:is([data-skin="skin-pumpkin"],[data-skin="skin-holly"],[data-skin="skin-haunted"],[data-skin="skin-rose"]) .piece:not(.king)::after{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(12px,2.8vmin,29px);line-height:1;color:inherit;text-shadow:0 1px 2px #0004}
+:is([data-skin="skin-pumpkin"],[data-skin="skin-holly"],[data-skin="skin-haunted"],[data-skin="skin-rose"]) .shop-preview .piece:not(.king)::after{font-size:clamp(11px,2.5vw,24px)}
+html[data-scene="halloween"]{--scene-bg:#261b32;--scene-glow:#a34e2a;--scene-accent:#f5ac69;--scene-dark:#372442}
+html[data-scene="christmas"]{--scene-bg:#172e28;--scene-glow:#a13b49;--scene-accent:#f6dba0;--scene-dark:#24473a}
+html[data-scene="horror"]{--scene-bg:#1e1824;--scene-glow:#782b43;--scene-accent:#dda0ac;--scene-dark:#372130}
+html[data-scene="romance"]{--scene-bg:#3e2436;--scene-glow:#ad5475;--scene-accent:#f3cad6;--scene-dark:#60384e}
+html[data-scene]:not([data-scene="classic"]):not([data-fx="off"]) body{background:radial-gradient(ellipse at 50% 15%,var(--scene-glow),var(--scene-bg) 68%);background-attachment:fixed}
+html[data-scene]:not([data-scene="classic"]):not([data-fx="off"]) .panel,html[data-scene]:not([data-scene="classic"]):not([data-fx="off"]) .player{border-color:var(--scene-accent);background:linear-gradient(145deg,var(--scene-dark),var(--scene-bg))}
+html[data-scene]:not([data-scene="classic"]):not([data-fx="off"]) .player.active{box-shadow:0 0 16px var(--scene-glow),inset 0 0 0 1px var(--scene-accent)}
+.theme-decor{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:visible}
+.theme-art{display:block;pointer-events:none}.theme-art svg{display:block;width:100%;height:100%;overflow:visible}
+.theme-corner{position:absolute;width:clamp(29px,6vw,65px);height:clamp(29px,6vw,65px);filter:drop-shadow(0 4px 5px #100b1566)}
+.corner-0{top:-12px;left:-12px}.corner-1{top:-12px;right:-12px}.corner-2{bottom:-13px;left:-12px}.corner-3{bottom:-13px;right:-12px}
+.theme-floating{position:absolute;width:clamp(25px,4vw,48px);height:clamp(25px,4vw,48px);animation:themeFloat 4s ease-in-out infinite;filter:drop-shadow(0 4px 4px #120b16aa)}
+.floating-0{top:33%;left:-37px}.floating-1{top:67%;right:-37px;animation-delay:-2s}
+.theme-mist{position:absolute;inset:-14px;z-index:-1;border-radius:18px;opacity:.5;box-shadow:0 0 35px 6px var(--scene-glow);animation:themeMist 5s ease-in-out infinite}
+@keyframes themeFloat{50%{transform:translateY(-9px) rotate(8deg)}}@keyframes themeMist{50%{opacity:.15}}
+/* Result effects use separate decorative layers, never hide score or controls. */
+.victory[data-scene] .spark{display:none}
+.victory[data-scene]>div{border-color:var(--result-edge,#ecd49b);background:radial-gradient(ellipse at top,var(--result-glow,#63394a),var(--result-dark,#211923) 70%);box-shadow:0 0 45px var(--result-glow,#63394a)}
+.victory[data-scene="halloween"],.theme-demo[data-scene="halloween"]{--result-edge:#f4b15c;--result-glow:#783d50;--result-dark:#281c36}
+.victory[data-scene="christmas"],.theme-demo[data-scene="christmas"]{--result-edge:#f6d794;--result-glow:#387c59;--result-dark:#1d392e}
+.victory[data-scene="horror"],.theme-demo[data-scene="horror"]{--result-edge:#dd929c;--result-glow:#783443;--result-dark:#241923}
+.victory[data-scene="romance"],.theme-demo[data-scene="romance"]{--result-edge:#f5bfd0;--result-glow:#a45478;--result-dark:#482638}
+.theme-result-layer{position:absolute;inset:0;pointer-events:none;z-index:-1;overflow:hidden;border-radius:inherit}
+.theme-result-crest{position:absolute;width:78px;height:78px;right:7px;top:8px;opacity:.72;animation:themeCrest .8s ease-out both}
+.theme-result-caption{font:italic 14px/1.45 Georgia;color:var(--result-edge,#f2d0ac);margin:0 0 8px!important}
+.theme-result-particle{position:absolute;width:26px;height:26px;left:var(--px);top:-35px;animation:themeRain var(--speed) var(--delay) ease-in-out both;opacity:0}
+.theme-result-layer[data-kind="defeat"] .theme-result-particle{filter:grayscale(.8);animation-name:themeFade;top:12%}
+.theme-result-layer[data-kind="resign"] .theme-result-particle{animation-name:themeLeave;top:35%;filter:saturate(.5)}
+.theme-result-layer[data-kind="defeat"] .theme-result-crest{animation:themeFade 1.6s ease-out both}
+.theme-result-layer[data-kind="resign"] .theme-result-crest{animation:themeLower 1.6s ease-in both}
+@keyframes themeRain{0%{opacity:0;transform:translate(0,-20px) rotate(-25deg)}15%{opacity:.85}85%{opacity:.7}100%{opacity:0;transform:translate(var(--drift),430px) rotate(120deg)}}
+@keyframes themeFade{0%{opacity:.85;transform:scale(1)}100%{opacity:.15;transform:translateY(45px) scale(.55)}}
+@keyframes themeLeave{0%{opacity:.75;transform:scale(1)}100%{opacity:0;transform:translate(var(--drift),90px) scale(.3)}}
+@keyframes themeCrest{0%{opacity:0;transform:scale(.3) rotate(-30deg)}100%{opacity:.72;transform:scale(1) rotate(0)}}
+@keyframes themeLower{0%{opacity:.7;transform:translateY(0)}100%{opacity:.12;transform:translateY(35px) scale(.8)}}
+.victory[data-theme-fx="light"] .theme-result-crest{animation:none}.victory[data-theme-fx="light"] .theme-result-layer{opacity:.6}
+.thematic-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.thematic-item{min-width:0;align-content:start;gap:9px}.thematic-head{display:grid;grid-template-columns:36px 1fr;align-items:center;gap:3px 8px}.thematic-symbol{grid-row:1/3;font-size:26px;text-align:center}.thematic-head strong{font:700 18px Georgia;color:#f3d5a7}.thematic-head small{color:#d4b996;font:11px Arial}.thematic-item p{margin:0;font:13px/1.5 Arial;color:#ebd0ad}.thematic-actions,.theme-demo-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.theme-demo-actions{grid-template-columns:repeat(3,minmax(0,1fr))}.theme-demo-actions button,.thematic-actions button{padding:8px 4px;font-size:11px;white-space:normal}
+.theme-demo{position:relative;isolation:isolate;overflow:hidden;min-height:78px;display:grid;place-items:center;text-align:center;padding:10px;border:1px solid #90704c;border-radius:8px;background:radial-gradient(ellipse at top,var(--result-glow,#543c29),var(--result-dark,#291e17));font:12px/1.4 Arial;color:#f1d7b8}
+.theme-demo strong{z-index:1;padding:3px;text-shadow:0 1px 5px #000}.theme-preview-crest{width:34px;height:34px}.theme-demo-particle{position:absolute;z-index:-1;left:var(--px);top:-15px;width:19px;height:19px;animation:demoFall 2.4s var(--delay) ease-in both}.theme-demo[data-kind="defeat"] .theme-demo-particle{animation-name:themeFade}.theme-demo[data-kind="resign"] .theme-demo-particle{animation-name:themeLeave}
+@keyframes demoFall{0%{opacity:0;transform:translateY(0)}25%{opacity:.8}100%{opacity:0;transform:translateY(120px) rotate(90deg)}}
+.shop-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}.themefx-card>p{font:13px/1.5 Arial;color:#e2c9a4}.themefx-card>label{display:block;margin:10px 0 5px}.themefx-card .custom-check{display:flex}.themefx-card .duel-select{width:100%}
+@media(max-width:650px){html{scroll-padding-top:8px}body{overflow-x:hidden}.shell,.match-focus .shell{width:100%;padding: max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}.layout,.match-focus .layout{min-width:0;width:100%;grid-template-columns:minmax(0,1fr)}.game,.match-focus .game{min-width:0;width:100%;max-width:620px}.boardframe,.match-focus .boardframe{padding:7px;max-width:100%;overflow:visible}.board{width:100%;touch-action:manipulation}.sq{touch-action:manipulation;-webkit-tap-highlight-color:transparent}.players{gap:6px}.player{min-width:0}.player b{overflow-wrap:anywhere}.player small{font-size:10px}.native-clock{font-variant-numeric:tabular-nums}.focus-actions-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}.focus-actions-row button{min-height:38px;flex:1 1 auto}.under{gap:7px;flex-wrap:wrap}.club-overlay,.rank-overlay,.victory{padding: max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));overflow-y:auto;overscroll-behavior:contain}.club-card,.rank-board,.victory>div{max-width:100%;max-height:calc(100dvh - 20px);overflow-y:auto}.club-card{padding:15px}.club-card input,.club-card select{font-size:16px}.club-card button{min-height:36px}.club-menu-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.club-menu-grid button{min-width:0;white-space:normal}.club-menu-grid .wide{grid-column:1/-1}.shop-tabs button{font-size:11px;min-height:40px}.thematic-grid{grid-template-columns:1fr}.theme-corner{width:28px;height:28px}.corner-0{top:-5px;left:-5px}.corner-1{top:-5px;right:-5px}.corner-2{bottom:-5px;left:-5px}.corner-3{bottom:-5px;right:-5px}.theme-floating{display:none}.theme-mist{inset:-3px;box-shadow:0 0 15px 2px var(--scene-glow)}.theme-result-crest{width:50px;height:50px}.victory>div{padding:22px 15px}.victory h2{font-size:26px}.victory .crown{width:75px;height:75px;font-size:44px}.victory #victorydetail{min-height:0}.shop-combo{min-width:0}.shop-preview-large{max-width:100%}}
+@media(max-width:370px){.club-card{padding:11px}.shop-tabs button{font-size:10px;padding:7px 3px}.player .disc{width:22px;height:22px}.native-clock{font-size:18px}.player-meter .count{font-size:9px}.theme-corner{width:23px;height:23px}.focus-actions-row button{font-size:10px;padding:7px}.thematic-head strong{font-size:16px}}
+@media(orientation:landscape) and (max-height:540px){.match-focus .game{width:min(100%,max(270px,calc(100dvh - 160px)))}.theme-corner{width:25px;height:25px}.theme-floating{display:none}}
+@media(prefers-reduced-motion:reduce){.theme-art,.theme-mist,.theme-result-particle,.theme-demo-particle{animation:none!important}.theme-result-particle,.theme-demo-particle{display:none}}
