@@ -366,6 +366,37 @@ def run(s):
             assert e['round']==2 and e['king']==e['pairs'][0]['a'] and len(e['queue'])==1
             event('events/stop',competitors[0],event=kid)
             assert e['status']=='cancelled'
+            # Campaign: real legal moves, server AI, sequential progression and one-time relic.
+            hero={'name':'Herói da Jornada','profileToken':'journey-test-'+'x'*48}
+            call('register',hero);hero_id=s.identity(hero)
+            assert call('journey/state',hero)['completed']==0
+            status,_=s.social_action('/api/social/journey/start',dict(hero,chapter=4),1000);assert status==403
+            status,_=s.social_action('/api/social/journey/equip',hero,1000);assert status==403
+            status,_=s.social_action('/api/social/school/buy',dict(hero,item='relic-throne'),1000);assert status==403
+            start=call('journey/start',hero,chapter=0)['run']
+            assert start['sequence']==0 and len(start['legal'])>0
+            status,_=s.social_action('/api/social/journey/move',dict(hero,id=start['id'],sequence=0,move={'from':0,'path':[1],'cap':[]}),1000);assert status==400
+            result=call('journey/move',hero,id=start['id'],sequence=0,move=start['legal'][0])
+            assert result['completed']==1 and result['run']['outcome']=='win' and result['run']['reward']==25
+            status,_=s.social_action('/api/social/journey/move',dict(hero,id=start['id'],sequence=0,move=start['legal'][0]),1000);assert status==409
+            assert call('school/state',hero)['coins']==25
+            second=call('journey/start',hero,chapter=1)['run']
+            reply=call('journey/move',hero,id=second['id'],sequence=0,move=second['legal'][0])['run']
+            assert reply['sequence']==2 and call('journey/state',hero)['run']['board']==reply['board']
+            assert call('journey/start',hero,chapter=1)['run']['id']==reply['id']
+            # Test fixture only: simulate a late-game position in the final chapter.
+            final_board=[0]*64;final_board[42]=1;final_board[35]=-1
+            final_run=dict(id='test-final',chapter=4,board=final_board,sequence=20,quiet=0,repeats={s.position_key(final_board,1,'official'):1},outcome=None,last=[],reward=0)
+            with s.database() as db:s.sql(db,'UPDATE journey SET completed=4,payload=? WHERE player_id=?',(json.dumps(final_run),hero_id))
+            final=call('journey/move',hero,id='test-final',sequence=20,move=s.legal(final_board,1,'official')[0])
+            assert final['completed']==5 and final['run']['relicUnlocked'] and final['unlocked']
+            wallet=call('school/state',hero);assert {'relic-throne','skin-relic-throne'}<=set(wallet['owned'])
+            equipped=call('journey/equip',hero);assert equipped['theme']=='relic-throne' and equipped['skin']=='skin-relic-throne'
+            public=call('player',a,target=hero_id)['player'];assert public['title']=='last_king' and public['frame']=='last-king' and public['relics'][0]['id']=='last-king'
+            assert call('school/equip',hero,item='classic')['skin']=='skin-relic-throne'
+            assert call('school/equip',hero,item='relic-throne')['theme']=='relic-throne'
+            assert call('school/state',hero)['coins']==wallet['coins']
+            assert call('state',hero)['me']['points']==1000
             # A guest keeps their identifier, points, history and friends after linking.
             call('friend/request',a,target=bid);call('friend/accept',b,target=aid)
             previous=call('state',a)
@@ -397,6 +428,6 @@ def run(s):
             assert progress['bestStreak']>=5 and 'streak5' in progress['achievements'] and 'triple_king' in progress['achievements']
             call('account/logout',other_device)
             assert s.identity(other_device) is None and s.identity(auth)==aid
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, champion rewards, thematic bundles, seasonal access, profile frames, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, champion rewards, thematic bundles, seasonal access, profile frames, tournament, king table, campaign and relic, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS=old
