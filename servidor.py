@@ -1,6 +1,6 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys
+import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata
 from contextlib import contextmanager
 
 ROOMS = {}
@@ -167,6 +167,34 @@ def social_state(pid,now):
         hist=sql(db,'SELECT opponent,outcome,delta,played_at FROM match_history WHERE player_id=? ORDER BY played_at DESC,match_id DESC LIMIT 20',(pid,)).fetchall()
     people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
     return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at'),x)) for x in hist])
+def search_key(value):
+    return ''.join(c for c in unicodedata.normalize('NFKD',str(value).casefold()) if not unicodedata.combining(c))
+def public_player(db,pid,row,now):
+    other,n,points,wins,losses,draws=row
+    rel=sql(db,'SELECT sender,receiver,state FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,other,other,pid)).fetchone()
+    relation='none' if not rel else 'friend' if rel[2]=='accepted' else 'outgoing' if rel[0]==pid else 'incoming'
+    online=now-PRESENCE.get(other,-1000)<=25
+    return dict(id=other,name=n,points=points,wins=wins,losses=losses,draws=draws,relation=relation,online=online,busy=online and active_room(other,now))
+def social_lookup(path,d,pid,now):
+    with database() as db:
+        if path=='/api/social/search':
+            q=search_key(' '.join(str(d.get('query','')).split())[:24])
+            if not q: return 200,{'players':[]}
+            # Unicode and accent-insensitive search on both SQLite and PostgreSQL.
+            matches=[]
+            for row in sql(db,'SELECT id,name,points,wins,losses,draws FROM players WHERE id<>?',(pid,)):
+                key=search_key(row[1])
+                if q in key: matches.append((not key.startswith(q),key,-row[2],row[0],row))
+            matches.sort(key=lambda x:x[:4])
+            return 200,{'players':[public_player(db,pid,x[4],now) for x in matches[:50]],'total':len(matches)}
+        target=str(d.get('target',''))
+        row=sql(db,'SELECT id,name,points,wins,losses,draws FROM players WHERE id=?',(target,)).fetchone()
+        if not row: return 404,{'error':'Jogador não encontrado.'}
+        player=public_player(db,pid,row,now)
+        p=player
+        p['rank']=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND (wins>? OR (wins=? AND (name<? OR (name=? AND id<?)))))',(p['points'],p['points'],p['wins'],p['wins'],p['name'],p['name'],p['id'])).fetchone()[0]+1
+        return 200,{'player':p}
+
 def social_action(path,d,now):
     if path=='/api/social/register':
         pid=profile(d)
@@ -175,6 +203,8 @@ def social_action(path,d,now):
     with database() as db:
         if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone(): return 403,{'error':'Perfil não encontrado. Abra o cadastro.'}
     PRESENCE[pid]=now
+    if path in ('/api/social/search','/api/social/player'):
+        return social_lookup(path,d,pid,now)
     if path in ('/api/social/register','/api/social/state'):
         return 200,social_state(pid,now)
     target=str(d.get('target',''))
