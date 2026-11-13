@@ -1,12 +1,13 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata
+import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata, re
 from contextlib import contextmanager
 
 ROOMS = {}
 PRESENCE = {}
 INVITES = {}
 MATCH_QUEUE = {}
+LOGIN_LIMITS = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
@@ -39,14 +40,135 @@ def setup():
         sql(db,'CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications(recipient,created_at)')
         sql(db,'CREATE TABLE IF NOT EXISTS match_history (match_id TEXT NOT NULL, player_id TEXT NOT NULL, opponent TEXT NOT NULL, outcome TEXT NOT NULL, delta INTEGER NOT NULL, played_at TEXT NOT NULL, PRIMARY KEY(match_id,player_id))')
         sql(db,'CREATE TABLE IF NOT EXISTS replays (match_id TEXT PRIMARY KEY, player_a TEXT NOT NULL, player_b TEXT NOT NULL, payload TEXT NOT NULL)')
+        sql(db,'CREATE TABLE IF NOT EXISTS accounts (player_id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, password_hash TEXT NOT NULL)')
+        sql(db,'CREATE TABLE IF NOT EXISTS account_sessions (token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, expires DOUBLE PRECISION NOT NULL)')
+        sql(db,'CREATE INDEX IF NOT EXISTS account_sessions_player_idx ON account_sessions(player_id)')
+        sql(db,'CREATE TABLE IF NOT EXISTS cosmetics (player_id TEXT PRIMARY KEY, avatar TEXT NOT NULL DEFAULT \'crown\', title TEXT NOT NULL DEFAULT \'visitor\', frame TEXT NOT NULL DEFAULT \'wood\', streak INTEGER NOT NULL DEFAULT 0, best_streak INTEGER NOT NULL DEFAULT 0, completed INTEGER NOT NULL DEFAULT 0)')
+        sql(db,'CREATE TABLE IF NOT EXISTS achievements (player_id TEXT NOT NULL, code TEXT NOT NULL, unlocked_at DOUBLE PRECISION NOT NULL, PRIMARY KEY(player_id,code))')
+def token_hash(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+def identity(d):
+    token=str(d.get('profileToken',''))
+    if not 32<=len(token)<=128:return None
+    digest=token_hash(token)
+    with database() as db:
+        if token.startswith('acc_'):
+            row=sql(db,'SELECT player_id FROM account_sessions WHERE token_hash=? AND expires>?',(digest,time.time())).fetchone()
+            return row[0] if row else None
+        if sql(db,'SELECT player_id FROM accounts WHERE player_id=?',(digest,)).fetchone():return None
+    return digest
 def profile(d):
     name=' '.join(str(d.get('name','')).split())[:24]
     token=str(d.get('profileToken',''))
     if not name or not 32<=len(token)<=128: return None
-    pid=hashlib.sha256(token.encode()).hexdigest()
+    pid=identity(d)
+    if not pid:return None
     with database() as db:
-        sql(db,'INSERT INTO players(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',(pid,name))
+        if token.startswith('acc_'):
+            if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone():return None
+        else:sql(db,'INSERT INTO players(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',(pid,name))
     return pid
+AVATARS={'crown','knight','shield','oak','rook','star'}
+TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king'}
+FRAMES={'wood','bronze','silver','gold'}
+ACHIEVEMENTS={
+ 'first_win':('Primeiro Duelo','Vença uma partida ranqueada.','first_win'),
+ 'ten_wins':('Guardião do Tabuleiro','Vença dez partidas ranqueadas.','ten_wins'),
+ 'streak5':('Invencível','Vença cinco partidas ranqueadas consecutivas.','streak5'),
+ 'honor20':('Até o Último Lance','Complete vinte partidas ranqueadas sem desistir.','honor20'),
+ 'friends5':('Companheiros de Honra','Tenha cinco amizades aceitas.','friends5'),
+ 'triple_king':('Rei do Tabuleiro','Promova três pedras em uma partida ranqueada.','triple_king')}
+def ensure_cosmetics(db,pid):
+    sql(db,'INSERT INTO cosmetics(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
+def unlock(db,pid,code):
+    sql(db,'INSERT INTO achievements(player_id,code,unlocked_at) VALUES(?,?,?) ON CONFLICT(player_id,code) DO NOTHING',(pid,code,time.time()))
+def cosmetics_for(db,pid,refresh=False):
+    ensure_cosmetics(db,pid)
+    if refresh:
+        p=sql(db,'SELECT wins,points FROM players WHERE id=?',(pid,)).fetchone()
+        if p:
+            if p[0]>=1:unlock(db,pid,'first_win')
+            if p[0]>=10:unlock(db,pid,'ten_wins')
+        friends=sql(db,"SELECT COUNT(*) FROM friendships WHERE state='accepted' AND (sender=? OR receiver=?)",(pid,pid)).fetchone()[0]
+        if friends>=5:unlock(db,pid,'friends5')
+    x=sql(db,'SELECT avatar,title,frame,streak,best_streak,completed FROM cosmetics WHERE player_id=?',(pid,)).fetchone()
+    earned=[row[0] for row in sql(db,'SELECT code FROM achievements WHERE player_id=? ORDER BY code',(pid,)).fetchall()]
+    return dict(avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned)
+def award_progress(db,pid,outcome,promotions):
+    ensure_cosmetics(db,pid)
+    sql(db,'UPDATE cosmetics SET streak=CASE WHEN ?=1 THEN streak+1 ELSE 0 END,completed=completed+? WHERE player_id=?',(int(outcome=='win'),int(outcome!='resign'),pid))
+    sql(db,'UPDATE cosmetics SET best_streak=CASE WHEN streak>best_streak THEN streak ELSE best_streak END WHERE player_id=?',(pid,))
+    x=cosmetics_for(db,pid,True)
+    if x['streak']>=5:unlock(db,pid,'streak5')
+    if x['completed']>=20:unlock(db,pid,'honor20')
+    if promotions>=3:unlock(db,pid,'triple_king')
+def new_account_session(db,pid):
+    token='acc_'+secrets.token_urlsafe(32)
+    sql(db,'DELETE FROM account_sessions WHERE expires<=?',(time.time(),))
+    sql(db,'INSERT INTO account_sessions(token_hash,player_id,expires) VALUES(?,?,?)',(token_hash(token),pid,time.time()+30*86400))
+    return token
+def password_digest(password,salt):
+    return hashlib.scrypt(password.encode('utf-8'),salt=bytes.fromhex(salt),n=16384,r=8,p=1,dklen=32,maxmem=64*1024*1024).hex()
+def login_limited(key,now):
+    for k,v in list(LOGIN_LIMITS.items()):
+        if now-v[0]>300:LOGIN_LIMITS.pop(k,None)
+    if len(LOGIN_LIMITS)>=5000 and key not in LOGIN_LIMITS:return True
+    start,count=LOGIN_LIMITS.get(key,(now,0))
+    if count>=8:return True
+    LOGIN_LIMITS[key]=(start,count+1);return False
+def account_action(path,d,now):
+    action=path.rsplit('/',1)[-1]
+    if action=='logout':
+        token=str(d.get('profileToken',''));pid=identity(d)
+        if token.startswith('acc_') and pid:
+            if active_room(pid,now):return 409,{'error':'Saia da sala antes de trocar de conta.'}
+            with database() as db:sql(db,'DELETE FROM account_sessions WHERE token_hash=?',(token_hash(token),))
+            PRESENCE.pop(pid,None);MATCH_QUEUE.pop(pid,None)
+        return 200,{'ok':True}
+    username=str(d.get('username','')).strip().lower()
+    password=d.get('password','')
+    if not re.fullmatch(r'[a-z0-9_.-]{3,24}',username) or not isinstance(password,str) or not 8<=len(password)<=128 or len(password.encode('utf-8'))>512:
+        return 400,{'error':'Usuário: 3 a 24 letras/números (._-). Senha: 8 a 128 caracteres.'}
+    if action not in ('link','login'):return 404,{'error':'Ação inválida.'}
+    if login_limited(username,now):return 429,{'error':'Muitas tentativas. Tente novamente em alguns minutos.'}
+    pid=identity(d)
+    if pid and active_room(pid,now):return 409,{'error':'Saia da sala antes de trocar de conta.'}
+    if action=='link':
+        if not pid:return 403,{'error':'Entre com seu perfil primeiro.'}
+        with database() as db:
+            if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone():return 403,{'error':'Perfil não encontrado.'}
+            if sql(db,'SELECT player_id FROM accounts WHERE player_id=?',(pid,)).fetchone():return 409,{'error':'Este perfil já tem uma conta.'}
+            if sql(db,'SELECT player_id FROM accounts WHERE username=?',(username,)).fetchone():return 409,{'error':'Nome de usuário indisponível.'}
+            salt=secrets.token_hex(16);digest=password_digest(password,salt)
+            sql(db,'INSERT INTO accounts(player_id,username,salt,password_hash) VALUES(?,?,?,?)',(pid,username,salt,digest))
+            token=new_account_session(db,pid)
+    else:
+        with database() as db:
+            row=sql(db,'SELECT player_id,salt,password_hash FROM accounts WHERE username=?',(username,)).fetchone()
+            digest=password_digest(password,row[1] if row else '0'*32)
+            if not row or not secrets.compare_digest(digest,row[2]):return 401,{'error':'Usuário ou senha incorretos.'}
+            pid=row[0]
+            token=new_account_session(db,pid)
+    LOGIN_LIMITS.pop(username,None)
+    PRESENCE[pid]=now
+    return 200,dict(token=token,state=social_state(pid,now))
+def customize(pid,d,now):
+    if active_room(pid,now):return 409,{'error':'Personalize seu perfil após sair da sala.'}
+    with database() as db:
+        me=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()
+        if not me:return 404,{'error':'Perfil não encontrado.'}
+        c=cosmetics_for(db,pid,True)
+        avatar=d.get('avatar',c['avatar']);title=d.get('title',c['title']);frame=d.get('frame',c['frame'])
+        if avatar not in AVATARS or title not in TITLES or frame not in FRAMES:return 400,{'error':'Personalização inválida.'}
+        if title!='visitor' and title not in c['achievements']:return 403,{'error':'Título ainda bloqueado.'}
+        minimum={'wood':0,'bronze':1000,'silver':1250,'gold':1500}[frame]
+        if frame!=c['frame'] and me[0]<minimum:return 403,{'error':'Moldura ainda bloqueada.'}
+        name=' '.join(str(d.get('name','')).split())[:24]
+        if not name:return 400,{'error':'Informe seu nome.'}
+        sql(db,'UPDATE players SET name=? WHERE id=?',(name,pid))
+        sql(db,'UPDATE cosmetics SET avatar=?,title=?,frame=? WHERE player_id=?',(avatar,title,frame,pid))
+    return 200,social_state(pid,now)
+
 def game_side(r,seat):
     return r.get('colors',{}).get(seat,seat)
 def finish(r,w,resigned=False,reason=None):
@@ -69,6 +191,7 @@ def finish(r,w,resigned=False,reason=None):
                     opponent=sql(db,'SELECT name FROM players WHERE id=?',(p[-seat],)).fetchone()[0]
                     outcome='draw' if w==0 else 'win' if w==side else 'resign' if resigned else 'loss'
                     sql(db,'INSERT INTO match_history(match_id,player_id,opponent,outcome,delta,played_at) VALUES(?,?,?,?,?,?)',(r['match'],p[seat],opponent,outcome,delta,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())))
+                    award_progress(db,p[seat],outcome,match_stats(r)[str(side)]['promotions'])
     if not names:
         with database() as db:
             for seat,pid in p.items():
@@ -196,9 +319,6 @@ def process(r,seat,msg):
     if t=='rematch-ok' and r['sequence']==0: return True
     return False
 
-def identity(d):
-    token=str(d.get('profileToken',''))
-    return hashlib.sha256(token.encode()).hexdigest() if 32<=len(token)<=128 else None
 def active_room(pid,now):
     return any(not r['closed'] and pid in r['profiles'].values() and now-max(r['seen'].values())<100 for r in ROOMS.values())
 def session_for(pid,now):
@@ -259,8 +379,10 @@ def social_state(pid,now):
         hist=sql(db,'SELECT opponent,outcome,delta,played_at,match_id FROM match_history WHERE player_id=? ORDER BY played_at DESC,match_id DESC LIMIT 20',(pid,)).fetchall()
         notices=sql(db,'SELECT n.id,n.kind,n.actor,p.name,n.created_at,n.seen FROM notifications n JOIN players p ON p.id=n.actor WHERE n.recipient=? ORDER BY n.created_at DESC,n.id DESC LIMIT 50',(pid,)).fetchall()
         unread=sql(db,'SELECT COUNT(*) FROM notifications WHERE recipient=? AND seen=0',(pid,)).fetchone()[0]
+        cosmetics=cosmetics_for(db,pid,True)
+        account=sql(db,'SELECT username FROM accounts WHERE player_id=?',(pid,)).fetchone()
     people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
-    return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at','match_id'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread,matchmaking=pid in MATCH_QUEUE)
+    return dict(me=dict(zip(('name','points','wins','losses','draws'),me),**cosmetics,account=account[0] if account else None),persistent=bool(DATABASE_URL),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at','match_id'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread,matchmaking=pid in MATCH_QUEUE)
 def search_key(value):
     return ''.join(c for c in unicodedata.normalize('NFKD',str(value).casefold()) if not unicodedata.combining(c))
 def public_player(db,pid,row,now):
@@ -287,9 +409,11 @@ def social_lookup(path,d,pid,now):
         player=public_player(db,pid,row,now)
         p=player
         p['rank']=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND (wins>? OR (wins=? AND (name<? OR (name=? AND id<?)))))',(p['points'],p['points'],p['wins'],p['wins'],p['name'],p['name'],p['id'])).fetchone()[0]+1
+        p.update(cosmetics_for(db,target,True))
         return 200,{'player':p}
 
 def social_action(path,d,now):
+    if path.startswith('/api/social/account/'):return account_action(path,d,now)
     if path=='/api/social/register':
         pid=profile(d)
     else: pid=identity(d)
@@ -297,6 +421,7 @@ def social_action(path,d,now):
     with database() as db:
         if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone(): return 403,{'error':'Perfil não encontrado. Abra o cadastro.'}
     PRESENCE[pid]=now
+    if path=='/api/social/customize':return customize(pid,d,now)
     if path in ('/api/social/search','/api/social/player'):
         return social_lookup(path,d,pid,now)
     if path in ('/api/social/register','/api/social/state'):
@@ -412,7 +537,8 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/api/profile':
             token=str(d.get('profileToken',''))
             if not 32<=len(token)<=128: return self.reply(400,{'error':'Perfil inválido.'})
-            pid=hashlib.sha256(token.encode()).hexdigest()
+            pid=identity(d)
+            if not pid:return self.reply(200,{'found':False})
             with database() as db:
                 p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
                 if not p: return self.reply(200,{'found':False})
