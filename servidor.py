@@ -513,7 +513,12 @@ def event_tick(e,now):
         r=ROOMS.get(pair['code'])
         if not r:return
         if r['winner'] is None:
-            if now-max(r['seen'].values())>90:finish(r,game_side(r,r['host']),True)
+            if now-max(r['seen'].values())>90:
+                e['status']='cancelled'
+                for pending in e['pairs']:
+                    room=ROOMS.get(pending['code'])
+                    if room and room['winner'] is None:finish(room,0,reason='agreement');room['closed']=True
+                return
             else:continue
         if r['winner']==0:
             r['closed']=True;pair['code']=event_room(e,pair['a'],pair['b'],now);continue
@@ -540,21 +545,27 @@ def event_action(path,d,pid,now):
         kind=d.get('kind','cup')
         if kind not in ('cup','king'):return 400,{'error':'Evento inválido.'}
         if len(TOURNAMENTS)>=100:return 503,{'error':'Limite de eventos atingido.'}
-        if active_room(pid,now) or any(pid in e['players'] and e['status']!='finished' for e in TOURNAMENTS.values()):return 409,{'error':'Você já está em uma sala ou evento.'}
+        if active_room(pid,now) or any(pid in e['players'] and e['status'] not in ('finished','cancelled') for e in TOURNAMENTS.values()):return 409,{'error':'Você já está em uma sala ou evento.'}
         key=secrets.token_hex(5);TOURNAMENTS[key]=dict(id=key,type=kind,host=pid,players=[pid],status='waiting',round=1,pairs=[],history=[],queue=[],champion=None)
-    elif action in ('join','leave','start'):
+    elif action in ('join','leave','start','stop'):
         e=TOURNAMENTS.get(str(d.get('event','')))
         if not e:return 404,{'error':'Evento inexistente.'}
         if action=='join':
             if e['status']!='waiting' or len(e['players'])>=8:return 409,{'error':'Inscrições encerradas.'}
             if pid not in e['players']:
-                if active_room(pid,now) or any(pid in x['players'] and x['status']!='finished' for x in TOURNAMENTS.values()):return 409,{'error':'Você já está em uma sala ou evento.'}
+                if active_room(pid,now) or any(pid in x['players'] and x['status'] not in ('finished','cancelled') for x in TOURNAMENTS.values()):return 409,{'error':'Você já está em uma sala ou evento.'}
                 e['players'].append(pid)
         elif action=='leave':
             if e['status']!='waiting':return 409,{'error':'O evento já começou.'}
             if pid in e['players']:e['players'].remove(pid)
             if not e['players']:TOURNAMENTS.pop(e['id'],None)
             elif e['host']==pid:e['host']=e['players'][0]
+        elif action=='stop':
+            if e['host']!=pid or e['status'] not in ('waiting','playing'):return 403,{'error':'Somente o organizador pode encerrar.'}
+            e['status']='cancelled'
+            for pair in e['pairs']:
+                room=ROOMS.get(pair['code'])
+                if room and room['winner'] is None:finish(room,0,reason='agreement');room['closed']=True
         elif action=='start':
             if e['host']!=pid or e['status']!='waiting' or e['type']!='king' or len(e['players'])<2:return 409,{'error':'São necessários pelo menos dois jogadores.'}
             e['status']='playing';e['queue']=e['players'][2:];e['pairs']=[event_pair(e,*e['players'][:2],now)]
