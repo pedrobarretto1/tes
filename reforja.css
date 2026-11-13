@@ -106,3 +106,72 @@ html[data-theme="ocean"] .boardframe{border-style:double;border-width:3px}
 .shop-preview .shop-square{box-shadow:inset 0 1px 1px #fff2,inset 0 -1px 1px #0002}
 .shop-preview-large .piece{width:80%}
 @media(max-width:650px){html[data-theme] .boardframe{border-width:2px}.shop-preview{padding:4px}}
+
+/* V5.1 — readable pieces: opaque polished faces, texture only on outer rim. */
+[data-skin="skin-classic"]{--read-light:#f4dfb5;--read-light-mid:#d6ae76;--read-light-edge:#81512b;--read-dark:#4a2a1a;--read-dark-mid:#714326;--read-dark-edge:#24140d;--read-light-ink:#643b1b;--read-dark-ink:#fff1cd;}
+[data-skin="skin-ivory"]{--read-light:#fff9e8;--read-light-mid:#e4d8b5;--read-light-edge:#948364;--read-dark:#282830;--read-dark-mid:#4c4b55;--read-dark-edge:#15151c;--read-light-ink:#514431;--read-dark-ink:#fff3db;}
+[data-skin="skin-gilded"]{--read-light:#ffe3a0;--read-light-mid:#e1b33c;--read-light-edge:#8b5918;--read-dark:#282932;--read-dark-mid:#4d4c58;--read-dark-edge:#15151c;--read-light-ink:#68410e;--read-dark-ink:#ffe2a1;}
+[data-skin="skin-jade"]{--read-light:#d9f4c7;--read-light-mid:#90cda3;--read-light-edge:#3f835b;--read-dark:#704018;--read-dark-mid:#ac692d;--read-dark-edge:#3d2515;--read-light-ink:#285a39;--read-dark-ink:#ffedb7;}
+[data-skin="skin-crystal"]{--read-light:#e5f9ff;--read-light-mid:#a9d9ef;--read-light-edge:#427a9d;--read-dark:#4c2b71;--read-dark-mid:#8053ac;--read-dark-edge:#291744;--read-light-ink:#275b79;--read-dark-ink:#f6e4ff;}
+[data-skin="skin-metal"]{--read-light:#edf4fc;--read-light-mid:#a9b9cb;--read-light-edge:#53677e;--read-dark:#63391f;--read-dark-mid:#a16a43;--read-dark-edge:#352018;--read-light-ink:#374d64;--read-dark-ink:#ffe6bf;}
+[data-skin="skin-porcelain"]{--read-light:#fffdf6;--read-light-mid:#dbe9f7;--read-light-edge:#7092b7;--read-dark:#193b74;--read-dark-mid:#3866a8;--read-dark-edge:#10264e;--read-light-ink:#23548c;--read-dark-ink:#f0f6ff;}
+[data-skin="skin-ruby"]{--read-light:#fff1e4;--read-light-mid:#e6c9cf;--read-light-edge:#b38498;--read-dark:#861e43;--read-dark-mid:#bd4169;--read-dark-edge:#470d24;--read-light-ink:#8b3658;--read-dark-ink:#ffe6ef;}
+[data-skin="skin-neon"]{--read-light:#ccffff;--read-light-mid:#62dce5;--read-light-edge:#177d9a;--read-dark:#6a235f;--read-dark-mid:#ad409c;--read-dark-edge:#36142f;--read-light-ink:#14536f;--read-dark-ink:#ffe2fc;}
+[data-skin="skin-royal"]{--read-light:#ffefc0;--read-light-mid:#e4b758;--read-light-edge:#96631c;--read-dark:#48306c;--read-dark-mid:#7957a2;--read-dark-edge:#271a43;--read-light-ink:#74480e;--read-dark-ink:#f1defb;}
+[data-skin="skin-champion"]{--read-light:#fff0b8;--read-light-mid:#e9c05a;--read-light-edge:#94621f;--read-dark:#2f2930;--read-dark-mid:#514643;--read-dark-edge:#161416;--read-light-ink:#73490c;--read-dark-ink:#ffe2a2;}
+[data-skin="skin-legend"]{--read-light:#fff2dd;--read-light-mid:#e0bc96;--read-light-edge:#a67952;--read-dark:#7c2547;--read-dark-mid:#ae5573;--read-dark-edge:#411326;--read-light-ink:#7d5634;--read-dark-ink:#ffe0e4;}
+[data-skin="skin-eternal"]{--read-light:#f7fbff;--read-light-mid:#cfdfed;--read-light-edge:#8098b9;--read-dark:#233f7b;--read-dark-mid:#4d72b5;--read-dark-edge:#14264d;--read-light-ink:#445f85;--read-dark-ink:#e9f5ff;}
+[data-skin="skin-pumpkin"]{--read-light:#ffe0a1;--read-light-mid:#f5a64f;--read-light-edge:#a14a17;--read-dark:#352843;--read-dark-mid:#654c7d;--read-dark-edge:#21162d;--read-light-ink:#78350e;--read-dark-ink:#f8e8d0;}
+[data-skin="skin-holly"]{--read-light:#f2fbff;--read-light-mid:#c8e5ef;--read-light-edge:#719bb6;--read-dark:#852635;--read-dark-mid:#bd4556;--read-dark-edge:#491522;--read-light-ink:#386280;--read-dark-ink:#ffefc4;}
+[data-skin="skin-haunted"]{--read-light:#e6d1c6;--read-light-mid:#ba9295;--read-light-edge:#82545d;--read-dark:#302239;--read-dark-mid:#5b3d59;--read-dark-edge:#1c1524;--read-light-ink:#5b2d40;--read-dark-ink:#f5c8d6;}
+[data-skin="skin-rose"]{--read-light:#fff0e9;--read-light-mid:#efc2d3;--read-light-edge:#bb7d99;--read-dark:#8b2c52;--read-dark-mid:#be5279;--read-dark-edge:#4d1630;--read-light-ink:#8d3656;--read-dark-ink:#ffe4ee;}
+
+/* The two-color rim is visible on both very light and very dark squares.
+   Keep surfaces opaque; the board texture must never show through a stone. */
+html[data-skin] :is(.piece,.disc),.shop-preview[data-skin] .piece{
+  --read-face:var(--read-light);--read-mid:var(--read-light-mid);--read-edge:var(--read-light-edge);
+  --read-ink:var(--read-light-ink);--read-rim:#fff3d0;--read-outline:#392b23;
+  border:2px solid var(--read-rim);border-radius:var(--forge-piece-shape,50%);
+  background-color:var(--read-face);background-image:var(--forge-piece-texture),linear-gradient(145deg,var(--read-face),var(--read-mid) 54%,var(--read-edge));
+  background-size:100% 100%;background-blend-mode:normal;color:var(--read-ink);
+  box-shadow:0 0 0 1px var(--read-outline),0 4px 5px #0009,inset 0 1px 1px #fff8,inset 0 -3px 3px #0004;
+}
+html[data-skin] :is(.piece,.disc).black,.shop-preview[data-skin] .piece.black{
+  --read-face:var(--read-dark);--read-mid:var(--read-dark-mid);--read-edge:var(--read-dark-edge);
+  --read-ink:var(--read-dark-ink);--read-rim:#d5c6a8;--read-outline:#171219;
+  background-color:var(--read-face);background-image:var(--forge-piece-texture),linear-gradient(145deg,var(--read-mid),var(--read-face) 55%,var(--read-edge));
+  border-color:var(--read-rim);color:var(--read-ink);
+}
+html[data-skin] :is(.piece,.disc).white,.shop-preview[data-skin] .piece.white{
+  background-color:var(--read-face);background-image:var(--forge-piece-texture),linear-gradient(145deg,var(--read-face),var(--read-mid) 54%,var(--read-edge));
+  border-color:var(--read-rim);color:var(--read-ink);
+}
+/* Fully opaque center covers the texture, leaving only the engraved outer ring. */
+html[data-skin] :is(.piece,.disc)::before,.shop-preview[data-skin] .piece::before{
+  content:"";position:absolute;inset:13%;border-radius:var(--forge-piece-inner,50%);
+  background:radial-gradient(ellipse at 32% 24%,#ffffff30,transparent 55%),linear-gradient(145deg,var(--read-face),var(--read-mid));
+  border:1px solid var(--read-ink);box-shadow:inset 0 0 0 1px #ffffff24;opacity:1;z-index:1;
+}
+html[data-skin] :is(.piece,.disc).black::before,.shop-preview[data-skin] .piece.black::before{
+  background:radial-gradient(ellipse at 32% 24%,#ffffff12,transparent 55%),linear-gradient(145deg,var(--read-face),var(--read-edge));
+}
+html[data-skin] .piece.white:not(.king)::after,.shop-preview[data-skin] .piece.white:not(.king)::after{--medallion:var(--forge-emblem-white)}
+html[data-skin] .piece.black:not(.king)::after,.shop-preview[data-skin] .piece.black:not(.king)::after{--medallion:var(--forge-emblem-black)}
+html[data-skin] .piece:not(.king)::after,.shop-preview[data-skin] .piece:not(.king)::after{
+  content:"";position:absolute;inset:27%;display:block;background:var(--read-ink);
+  mask:var(--medallion) center/contain no-repeat;-webkit-mask:var(--medallion) center/contain no-repeat;mask-mode:luminance;opacity:1;z-index:2;
+}
+/* A crown is always recognizable as a king; the outer ring keeps the skin identity. */
+html[data-skin] .piece.king,.shop-preview[data-skin] .piece.king{box-shadow:0 0 0 1px var(--read-outline),0 4px 5px #000a,inset 0 0 0 2px var(--read-ink),inset 0 -3px 3px #0004}
+html[data-skin] .piece.king::before,.shop-preview[data-skin] .piece.king::before{inset:11%;border:2px solid var(--read-ink);box-shadow:inset 0 0 0 1px #fff3}
+html[data-skin] .piece.king::after,.shop-preview[data-skin] .piece.king::after{content:"";position:absolute;inset:22%;display:block;background:var(--read-ink);mask:var(--read-crown) center/contain no-repeat;-webkit-mask:var(--read-crown) center/contain no-repeat;mask-mode:luminance;opacity:1;z-index:2}
+html[data-skin] #board .sq.playable .piece{outline:2px solid #b3edb0;outline-offset:2px;box-shadow:0 0 0 1px var(--read-outline),0 4px 5px #0009,inset 0 1px 1px #fff8,inset 0 -3px 3px #0004}
+html[data-skin] #board .sq.playable.selected .piece{outline-color:#ffe09a}
+html[data-skin] #board .sq.captured .piece{opacity:.23;filter:grayscale(1)}
+html[data-skin] .board-fx-layer .fx-disc{position:absolute;transform:translate(-50%,-50%);margin:0}
+@media(max-width:650px){
+  html[data-skin] :is(.piece,.disc),.shop-preview[data-skin] .piece{border-width:1px;box-shadow:0 0 0 1px var(--read-outline),0 2px 3px #0009,inset 0 -2px 2px #0003}
+  html[data-skin] .piece.king::before,.shop-preview[data-skin] .piece.king::before{border-width:1px}
+  html[data-skin] #board .sq.playable .piece{outline-width:1px;outline-offset:1px}
+}
+:root{--read-crown:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cpath%20d%3D%22M6%2016l13%2012L32%207l13%2021%2013-12-8%2034H14zM14%2054h36v5H14z%22%20fill%3D%22white%22%2F%3E%3Ccircle%20cx%3D%226%22%20cy%3D%2212%22%20r%3D%223.5%22%20fill%3D%22white%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%225%22%20r%3D%223.5%22%20fill%3D%22white%22%2F%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2212%22%20r%3D%223.5%22%20fill%3D%22white%22%2F%3E%3C%2Fsvg%3E")}
