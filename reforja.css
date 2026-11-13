@@ -62,3 +62,14 @@ html[data-skin] #board .sq.playable .piece{outline:2px solid #a7dfab;outline-off
 html[data-skin] #board .sq.playable.selected .piece{outline-color:#f2c57c}
 html[data-skin] .board-fx-layer .fx-disc{border-radius:var(--forge-piece-shape,50%)}
 @media(max-width:650px){html[data-theme] .boardframe,html[data-theme] .match-focus .boardframe{padding:var(--forge-mobile,9px);box-shadow:0 0 0 1px #0007,0 8px 20px #0008,inset 0 0 0 2px var(--forge-deep),inset 0 0 0 3px var(--forge-edge)}.forge-corners i{width:var(--forge-mobile,9px);height:var(--forge-mobile,9px)}html[data-skin] .piece,.shop-preview .piece{border-width:1px}html[data-skin] .piece.king:before,.shop-preview .piece.king:before{border-width:1px}.shop-preview{border-width:4px}}
+
+/* Preserve transparent engraving holes and scope all preview geometry to its own skin. */
+html[data-skin] .piece.white:not(.king):after,html[data-skin] .piece.black:not(.king):after,.shop-preview[data-skin] .piece.white:not(.king):after,.shop-preview[data-skin] .piece.black:not(.king):after{content:"";mask-mode:luminance}
+html[data-skin] .piece.king:after,.shop-preview .piece.king:after{mask-mode:luminance}
+html[data-theme="classic"] .boardframe{background-color:#80532c}
+html[data-theme] .school-board,html[data-theme] .replay-board{border-color:var(--forge-edge)}
+html[data-theme] #board .sq.target:after{box-shadow:0 0 0 3px #f5d58d50}
+html[data-theme] #board .sq.target:has(.piece):after{box-shadow:none}
+html[data-theme] #board .sq.last:before{background:#f5dc8b32}
+.shop-preview .piece{width:72%;height:auto;aspect-ratio:1}
+html[data-skin] .board-fx-layer .fx-disc{margin:0}
