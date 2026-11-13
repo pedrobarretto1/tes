@@ -230,6 +230,25 @@ def run(s):
             bought=call('school/buy',a,item='imperial')
             assert bought['theme']=='imperial' and 'imperial' in bought['owned'] and bought['coins']==wallet['coins']-100
             assert call('school/equip',a,item='classic')['theme']=='classic'
+            # Independent cosmetic categories, safe ownership and persistent selection.
+            with s.database() as db:
+                s.wallet_add(db,s.identity(a),500)
+            before=call('school/state',a)
+            assert before['skin']=='skin-classic' and 'skin-classic' in before['owned']
+            status,_=s.social_action('/api/social/school/equip',dict(a,item='skin-gilded'),1000)
+            assert status==403
+            bought=call('school/buy',a,item='skin-gilded')
+            assert bought['skin']=='skin-gilded' and bought['theme']==before['theme'] and bought['coins']==before['coins']-100
+            assert 'skin-gilded' in bought['owned'] and 'imperial' in bought['owned']
+            chosen=call('school/buy',a,item='midnight')
+            assert chosen['theme']=='midnight' and chosen['skin']=='skin-gilded'
+            repeated=call('school/buy',a,item='skin-gilded')
+            assert repeated['coins']==chosen['coins']
+            restored=call('school/equip',a,item='skin-classic')
+            assert restored['theme']=='midnight' and restored['skin']=='skin-classic'
+            assert call('school/state',a)['theme']=='midnight'
+            assert call('school/state',b)['skin']=='skin-classic'
+            assert len(s.THEMES)==12 and len(s.SKINS)==10
             # 8-player cup: simulate seven confirmed wins, verify champion once.
             now=s.time.monotonic()
             competitors=[{'name':'Copa '+str(i),'profileToken':('cup'+str(i))*16} for i in range(8)]
@@ -293,6 +312,6 @@ def run(s):
             assert progress['bestStreak']>=5 and 'streak5' in progress['achievements'] and 'triple_king' in progress['achievements']
             call('account/logout',other_device)
             assert s.identity(other_device) is None and s.identity(auth)==aid
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS=old
