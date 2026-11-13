@@ -11,3 +11,10 @@ html[data-theme="relic-throne"] body{background:radial-gradient(ellipse at 50% 0
 @keyframes relic-reveal{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes relic-glow{from{box-shadow:0 0 10px #c9983e44}to{box-shadow:0 0 30px #e7bd6a88}}
 @media(max-width:650px){.journey-card{padding:12px}.journey-chapter{grid-template-columns:35px minmax(0,1fr);padding:10px}.journey-chapter button{grid-column:2;width:100%}.journey-chapter-copy strong{font-size:17px}.journey-boardframe{padding:var(--forge-mobile,9px)}.relic-preview{grid-template-columns:1fr}.relic-ceremony h2{font-size:25px}.relic-ceremony-content{padding:12px}.shop-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.relic-ceremony-content,.relic-ceremony .relic-art{animation:none}}
+
+html[data-scene="relic"]{--scene-bg:#211a24;--scene-glow:#785032;--scene-accent:#edc787;--scene-dark:#423024}
+.victory[data-scene="relic"]{--result-edge:#ffe2a5;--result-glow:#8e5e2a;--result-dark:#241921}
+.journey-board .sq .piece{pointer-events:none}
+.journey-board .sq.target:after{box-shadow:0 0 0 3px #f5d58d50}
+.journey-board .sq.selected .piece{outline:2px solid #f9df9b;outline-offset:1px}
+.journey-card .club-head button{width:auto}
