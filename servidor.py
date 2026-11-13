@@ -453,7 +453,19 @@ PUZZLES=[
  dict(id='triple',name='Três em linha',level='Avançado',pieces={56:1,49:-1,35:-1,21:-1},goal='Capture três pedras em um único lance.',reward=40)]
 THEMES={'classic':0,'imperial':100,'marble':150,'emerald':120,'midnight':160,'sakura':140,'ocean':130,'desert':110,'obsidian':180,'parchment':90,'cherry':125,'frost':150}
 SKINS={'skin-classic':0,'skin-ivory':60,'skin-gilded':100,'skin-jade':110,'skin-crystal':130,'skin-metal':90,'skin-porcelain':85,'skin-ruby':120,'skin-neon':150,'skin-royal':160}
-SHOP_ITEMS={**THEMES,**SKINS}
+THEMATIC_COLLECTIONS={
+ 'halloween':dict(board='haunted-night',skin='skin-pumpkin',boardPrice=140,skinPrice=100,months=[10]),
+ 'christmas':dict(board='winter-feast',skin='skin-holly',boardPrice=140,skinPrice=100,months=[12]),
+ 'horror':dict(board='midnight-crypt',skin='skin-haunted',boardPrice=150,skinPrice=110,months=[]),
+ 'romance':dict(board='rose-garden',skin='skin-rose',boardPrice=130,skinPrice=90,months=[2,6])}
+THEMATIC_ITEMS={item:spec for spec in THEMATIC_COLLECTIONS.values() for item in (spec['board'],spec['skin'])}
+THEMATIC_PRICES={spec['board']:spec['boardPrice'] for spec in THEMATIC_COLLECTIONS.values()} | {spec['skin']:spec['skinPrice'] for spec in THEMATIC_COLLECTIONS.values()}
+SHOP_ITEMS={**THEMES,**SKINS,**THEMATIC_PRICES}
+def seasonal_open(spec,day=None):
+    day=day or time.strftime('%Y-%m-%d',time.gmtime())
+    return not spec['months'] or day.startswith('2026-11-') or int(day[5:7]) in spec['months']
+def thematic_catalog():
+    return {key:dict(spec,available=seasonal_open(spec)) for key,spec in THEMATIC_COLLECTIONS.items()}
 CHAMPION_ITEMS={'champion-hall':1,'skin-champion':1,'champion-legacy':3,'skin-legend':3,'champion-eternal':5,'skin-eternal':5}
 CHAMPION_SKINS={k for k in CHAMPION_ITEMS if k.startswith('skin-')}
 def champion_count(db,pid):
@@ -470,7 +482,7 @@ def wallet_state(db,pid):
     sql(db,'INSERT INTO piece_styles(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
     skin=sql(db,'SELECT skin FROM piece_styles WHERE player_id=?',(pid,)).fetchone()[0]
     cups=champion_count(db,pid)
-    return dict(coins=coins,theme=theme,skin=skin,cups=cups,owned=['classic','skin-classic']+[x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()]+[item for item,minimum in CHAMPION_ITEMS.items() if cups>=minimum])
+    return dict(coins=coins,theme=theme,skin=skin,cups=cups,thematic=thematic_catalog(),owned=['classic','skin-classic']+[x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()]+[item for item,minimum in CHAMPION_ITEMS.items() if cups>=minimum])
 def school_action(path,d,pid,now):
     day=time.strftime('%Y-%m-%d',time.gmtime());daily=PUZZLES[int(time.time()//86400)%len(PUZZLES)]['id']
     with database() as db:
@@ -483,17 +495,30 @@ def school_action(path,d,pid,now):
             reward=p['reward']+(10 if p['id']==daily else 0) if inserted else 0
             if reward:wallet_add(db,pid,reward)
             return 200,dict(reward=reward,**wallet_state(db,pid))
+        if path.endswith('/bundle'):
+            spec=THEMATIC_COLLECTIONS.get(str(d.get('collection','')))
+            if not spec:return 400,{'error':'Coleção inexistente.'}
+            w=wallet_state(db,pid);items=[spec['board'],spec['skin']];missing=[item for item in items if item not in w['owned']]
+            if missing and not seasonal_open(spec):return 403,{'error':'Coleção sazonal indisponível. Você pode pré-visualizar os itens.'}
+            cost=sum(THEMATIC_PRICES[item] for item in missing)
+            if w['coins']<cost:return 400,{'error':'Moedas insuficientes.'}
+            if cost:sql(db,'UPDATE wallets SET coins=coins-? WHERE player_id=?',(cost,pid))
+            for item in missing:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?)',(pid,item))
+            sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(spec['board'],pid))
+            sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(spec['skin'],pid))
+            return 200,wallet_state(db,pid)
         if path.endswith('/buy') or path.endswith('/equip'):
             item=d.get('item')
             if not isinstance(item,str) or item not in SHOP_ITEMS and item not in CHAMPION_ITEMS:return 400,{'error':'Item inexistente.'}
             w=wallet_state(db,pid)
             if item in CHAMPION_ITEMS and item not in w['owned']:return 403,{'error':'Exclusivo de campeões: conquiste '+str(CHAMPION_ITEMS[item])+' Copa(s) de Honra.'}
             if item not in w['owned']:
+                if item in THEMATIC_ITEMS and not seasonal_open(THEMATIC_ITEMS[item]):return 403,{'error':'Coleção sazonal indisponível.'}
                 if path.endswith('/equip'):return 403,{'error':'Tema ainda bloqueado.'}
                 if w['coins']<SHOP_ITEMS[item]:return 400,{'error':'Moedas insuficientes.'}
                 sql(db,'UPDATE wallets SET coins=coins-? WHERE player_id=?',(SHOP_ITEMS[item],pid))
                 sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?)',(pid,item))
-            if item in SKINS or item in CHAMPION_SKINS:sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(item,pid))
+            if item.startswith('skin-'):sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(item,pid))
             else:sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(item,pid))
             return 200,wallet_state(db,pid)
         solved=[x[0] for x in sql(db,'SELECT puzzle_id FROM puzzle_solves WHERE player_id=?',(pid,)).fetchall()]
@@ -704,7 +729,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path == '/api/health': self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL)})
