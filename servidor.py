@@ -199,7 +199,7 @@ def finish(r,w,resigned=False,reason=None):
                 if row: names[str(game_side(r,seat))]=row[0]
     r['winner']=w
     reason=reason or ('resign' if resigned else 'normal')
-    r['result']=dict(match=r['match'],winner=w,reason=reason,ranked=ranked,names=names,deltas=deltas,points=points,board=r['board'][:],turn=r['turn'],sequence=r['sequence'],duration=max(0,int(time.monotonic()-r.get('started',time.monotonic()))),moves=r.get('moves',[])[:],stats=match_stats(r))
+    r['result']=dict(match=r['match'],winner=w,reason=reason,ranked=ranked,rule=r['rule'],names=names,deltas=deltas,points=points,board=r['board'][:],turn=r['turn'],sequence=r['sequence'],duration=max(0,int(time.monotonic()-r.get('started',time.monotonic()))),moves=r.get('moves',[])[:],stats=match_stats(r))
     if len(p)==2 and p.get(1) and p.get(-1):
         with database() as db:
             sql(db,'INSERT INTO replays(match_id,player_a,player_b,payload) VALUES(?,?,?,?) ON CONFLICT(match_id) DO NOTHING',(r['match'],p[1],p[-1],json.dumps(r['result'])))
@@ -207,17 +207,19 @@ def result_for(r,seat):
     return dict(r['result'],side=game_side(r,seat)) if r.get('result') else None
 def initial():
     return [(-1 if i//8<3 else 1 if i//8>4 else 0) if (i//8+i%8)%2 else 0 for i in range(64)]
+RULES=('free','official','english','mandatory','giveaway')
 DIR=((1,1),(1,-1),(-1,1),(-1,-1))
 def inside(r,c): return 0<=r<8 and 0<=c<8
 def legal(b,s,rule):
-    caps=[]; quiet=[]
+    caps=[]; quiet=[]; short=rule=='english'
     for i,p in enumerate(b):
         if not p or p*s<=0: continue
         def walk(board,at,path,cap):
             steps=[]
             for dr,dc in DIR:
                 r,c=at//8+dr,at%8+dc
-                if abs(p)==1:
+                if short and abs(p)==1 and dr!=-s: continue
+                if abs(p)==1 or short:
                     rr,cc=r+dr,c+dc
                     if inside(r,c) and inside(rr,cc):
                         v,t=r*8+c,rr*8+cc
@@ -235,16 +237,19 @@ def legal(b,s,rule):
                 return
             for t,v in steps:
                 x=board.copy(); x[at]=0; x[t]=p
-                walk(x,t,path+[t],cap+[v])
+                if short: x[v]=0
+                if short and abs(p)==1 and t//8==(0 if s==1 else 7): caps.append({'from':i,'path':path+[t],'cap':cap+[v]})
+                else: walk(x,t,path+[t],cap+[v])
         walk(b,i,[],[])
         for dr,dc in DIR:
             if abs(p)==1 and dr!=-s: continue
             r,c=i//8+dr,i%8+dc
             while inside(r,c) and not b[r*8+c]:
                 quiet.append({'from':i,'path':[r*8+c],'cap':[]})
-                if abs(p)==1: break
+                if abs(p)==1 or short: break
                 r+=dr; c+=dc
     if rule=='free': return caps+quiet
+    if rule in ('english','mandatory'): return caps or quiet
     return [m for m in caps if len(m['cap'])==max(len(x['cap']) for x in caps)] if caps else quiet
 def boardkey(r): return r['rule']+'/'+','.join(map(str,r['board']))+'/'+str(r['turn'])
 def match_stats(r):
@@ -302,7 +307,7 @@ def process(r,seat,msg):
         r['quiet']=r['quiet']+1 if not m['cap'] and abs(p)==2 else 0
         r['turn']=-side; r['sequence']+=1
         k=boardkey(r); r['repeats'][k]=r['repeats'].get(k,0)+1
-        if not legal(b,-side,r['rule']): finish(r,side)
+        if not legal(b,-side,r['rule']): finish(r,-side if r['rule']=='giveaway' else side,reason='giveaway' if r['rule']=='giveaway' else None)
         elif r['quiet']>=40 or r['repeats'][k]>=3: finish(r,0)
         return True
     if t=='rematch' and r['winner'] is not None:
@@ -429,7 +434,7 @@ def social_action(path,d,now):
     if path=='/api/social/matchmaking/start':
         if active_room(pid,now):return 409,{'error':'Saia da sala atual antes de buscar partida.'}
         rule=d.get('rule','free')
-        if rule not in ('free','official'):return 400,{'error':'Regra inválida.'}
+        if rule not in RULES:return 400,{'error':'Regra inválida.'}
         with database() as db: points=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()[0]
         MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False,minutes=clock_value(d),points=points,start=now,seen=now)
         matchmake(pid,now);return 200,social_state(pid,now)
@@ -479,7 +484,7 @@ def social_action(path,d,now):
         if active_room(pid,now) or active_room(target,now): return 409,{'error':'Um jogador está em outra sala.'}
         if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
         key=secrets.token_urlsafe(16); rule=d.get('rule','free')
-        if rule not in ('free','official'): return 400,{'error':'Regra inválida.'}
+        if rule not in RULES: return 400,{'error':'Regra inválida.'}
         INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False,rule=rule,minutes=clock_value(d))
         return 200,social_state(pid,now)
     if path=='/api/social/challenge/respond':
@@ -560,7 +565,7 @@ class Handler(BaseHTTPRequestHandler):
                 pid=profile(d)
                 if d.get('ranked') is not False and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 rule=d.get('rule','free')
-                if rule not in ('free','official'): return self.reply(400,{'error':'Regra inválida.'})
+                if rule not in RULES: return self.reply(400,{'error':'Regra inválida.'})
                 ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False,'minutes':clock_value(d)}
                 reset_match(ROOMS[code]);MATCH_QUEUE.pop(pid,None)
                 return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked'],'minutes':ROOMS[code]['minutes']})
