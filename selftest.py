@@ -271,6 +271,29 @@ def run(s):
             with s.database() as db:
                 assert s.sql(db,'SELECT COUNT(*) FROM event_champions WHERE event_id=?',(eid,)).fetchone()[0]==1
                 assert s.wallet_state(db,e['champion'])['coins']==100
+            # Champion cosmetics are earned, never bought; historic titles count.
+            champ=e['champion']
+            winner_profile=next(who for who in competitors if s.identity(who)==champ)
+            loser_profile=next(who for who in competitors if s.identity(who)!=champ)
+            w=call('school/state',winner_profile)
+            assert w['cups']==1 and 'champion-hall' in w['owned'] and 'skin-champion' in w['owned']
+            assert 'champion-legacy' not in w['owned']
+            assert 'cup_champion' in call('state',winner_profile)['me']['achievements']
+            for who,item in ((loser_profile,'champion-hall'),(winner_profile,'skin-legend')):
+                for action in ('buy','equip'):
+                    status,_=s.social_action('/api/social/school/'+action,dict(who,item=item),now)
+                    assert status==403
+            equipped=call('school/equip',winner_profile,item='skin-champion')
+            assert equipped['skin']=='skin-champion' and equipped['coins']==w['coins']
+            equipped=call('school/equip',winner_profile,item='champion-hall')
+            assert equipped['theme']=='champion-hall' and equipped['skin']=='skin-champion'
+            with s.database() as db:
+                for number in range(2,6):
+                    s.sql(db,'INSERT INTO event_champions(event_id,player_id,name,played_at) VALUES(?,?,?,?)',('test-cup-'+str(number),champ,'Champion','2026-01-01'))
+            w=call('school/state',winner_profile)
+            assert w['cups']==5 and all(item in w['owned'] for item in s.CHAMPION_ITEMS)
+            assert call('school/equip',winner_profile,item='skin-eternal')['skin']=='skin-eternal'
+            assert call('school/state',loser_profile)['cups']==0
             # King of the table: winner remains, loser joins the end of queue.
             created=event('events/create',competitors[0],kind='king')
             kid=created['events'][-1]['id']
@@ -312,6 +335,6 @@ def run(s):
             assert progress['bestStreak']>=5 and 'streak5' in progress['achievements'] and 'triple_king' in progress['achievements']
             call('account/logout',other_device)
             assert s.identity(other_device) is None and s.identity(auth)==aid
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, champion rewards, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS=old
