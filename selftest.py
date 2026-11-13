@@ -176,6 +176,29 @@ def run(s):
             room['closed']=True
             call('matchmaking/start',a,rule='official',minutes=0)
             assert not call('matchmaking/cancel',a)['matchmaking']
+            # Variant-specific movement and results.
+            board=[0]*64;board[42]=1;board[49]=-1
+            assert any(m['cap']==[49] for m in s.legal(board,1,'free'))
+            assert all(not m['cap'] for m in s.legal(board,1,'english'))
+            board=[0]*64;board[35]=2
+            assert max(abs(m['path'][0]//8-4) for m in s.legal(board,1,'english'))==1
+            assert max(abs(m['path'][0]//8-4) for m in s.legal(board,1,'official'))>1
+            board=[0]*64;board[42]=1;board[33]=board[35]=board[19]=-1
+            assert {len(m['cap']) for m in s.legal(board,1,'mandatory')}=={1,2}
+            assert {len(m['cap']) for m in s.legal(board,1,'official')}=={2}
+            assert {len(m['cap']) for m in s.legal(board,1,'english')}=={1,2}
+            board=[0]*64;board[17]=1;board[10]=board[12]=-1
+            assert s.legal(board,1,'english')==[{'from':17,'path':[3],'cap':[10]}]
+            for variant in ('english','mandatory','giveaway'):
+                host=http('/api/create',dict(a,rule=variant,ranked=False))
+                guest=http('/api/join',dict(b,code=host['code']))
+                room=s.ROOMS[host['code']];assert room['rule']==variant
+                if variant=='giveaway':
+                    room['board']=[0]*64;room['board'][42]=1;room['board'][35]=-1
+                    m=s.legal(room['board'],1,variant)[0]
+                    assert s.process(room,1,{'type':'move','sequence':1,'before':s.boardkey(room),'move':m})
+                    assert room['winner']==-1 and room['result']['reason']=='giveaway'
+                room['closed']=True
             # A guest keeps their identifier, points, history and friends after linking.
             call('friend/request',a,target=bid);call('friend/accept',b,target=aid)
             previous=call('state',a)
@@ -207,6 +230,6 @@ def run(s):
             assert progress['bestStreak']>=5 and 'streak5' in progress['achievements'] and 'triple_king' in progress['achievements']
             call('account/logout',other_device)
             assert s.identity(other_device) is None and s.identity(auth)==aid
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS=old
