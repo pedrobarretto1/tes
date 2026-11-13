@@ -15,9 +15,26 @@ LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
 # Fixed, licensed instrument recordings only. Cache per note; never proxy arbitrary URLs.
-PIANO_FILES=frozenset(('A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6'))
+PIANO_FILES=frozenset(('A1','C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6','Ds6','Fs6','A6','C7'))
 PIANO_CACHE={}
 PIANO_LOCKS={name:threading.Lock() for name in PIANO_FILES}
+CLASSICAL_SCORES={
+ 'bach':'https://www.mutopiaproject.org/ftp/BachJS/BWV846/wtk1-prelude1/wtk1-prelude1.mid',
+ 'satie':'https://www.mutopiaproject.org/ftp/SatieE/gymnopedie_1/gymnopedie_1.mid',
+ 'elise':'https://www.mutopiaproject.org/ftp/BeethovenLv/WoO59/fur_Elise_WoO59/fur_Elise_WoO59.mid'}
+SCORE_CACHE={}
+SCORE_LOCKS={name:threading.Lock() for name in CLASSICAL_SCORES}
+def classical_score(name):
+    if name not in CLASSICAL_SCORES:return None
+    with SCORE_LOCKS[name]:
+        if name in SCORE_CACHE:return SCORE_CACHE[name]
+        try:
+            req=Request(CLASSICAL_SCORES[name],headers={'User-Agent':'Casa-de-Damas/4.8'})
+            with urlopen(req,timeout=8) as response:data=response.read(250001)
+            if not 14<len(data)<=250000 or not data.startswith(b'MThd'):return None
+            SCORE_CACHE[name]=data
+            return data
+        except (OSError,ValueError):return None
 def piano_sample(name):
     if name not in PIANO_FILES:return None
     with PIANO_LOCKS[name]:
@@ -746,7 +763,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Cache-Control', 'public, max-age=86400' if kind=='audio/mpeg' and status==200 else 'no-store')
+        self.send_header('Cache-Control', 'public, max-age=86400' if kind in ('audio/mpeg','audio/midi') and status==200 else 'no-store')
         self.end_headers()
         self.wfile.write(body)
     def do_OPTIONS(self): self.reply(204, b'')
@@ -756,6 +773,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
+        elif self.path.split('?')[0].startswith('/audio/classical/'):
+            path=self.path.split('?')[0];name=path.removeprefix('/audio/classical/').removesuffix('.mid')
+            if name not in CLASSICAL_SCORES or not path.endswith('.mid'):return self.reply(404,{'error':'Partitura inexistente.'})
+            data=classical_score(name)
+            return self.reply(200,data,'audio/midi') if data else self.reply(503,{'error':'Partitura indisponível temporariamente.'})
         elif self.path.split('?')[0].startswith('/audio/piano/'):
             path=self.path.split('?')[0]; name=path.removeprefix('/audio/piano/').removesuffix('.mp3')
             if name not in PIANO_FILES or not path.endswith('.mp3'):return self.reply(404,{'error':'Amostra inexistente.'})
