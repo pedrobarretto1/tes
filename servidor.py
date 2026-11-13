@@ -144,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/api/ranking':
             try:
                 with database() as db:
-                    rows=sql(db,'SELECT name,points,wins,losses,draws FROM players ORDER BY points DESC,wins DESC,name LIMIT 100').fetchall()
+                    rows=sql(db,'SELECT name,points,wins,losses,draws FROM players ORDER BY points DESC,wins DESC,name,id LIMIT 100').fetchall()
                 self.reply(200,{'players':[dict(zip(('name','points','wins','losses','draws'),x)) for x in rows],'persistent':bool(DATABASE_URL)})
             except Exception: self.reply(503,{'error':'Banco de dados indisponível.'})
         else: self.reply(404, {'error':'Página inexistente.'})
@@ -162,7 +162,7 @@ class Handler(BaseHTTPRequestHandler):
             with database() as db:
                 p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
                 if not p: return self.reply(200,{'found':False})
-                rank=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND wins>?)',(p[1],p[1],p[2])).fetchone()[0]+1
+                rank=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND (wins>? OR (wins=? AND (name<? OR (name=? AND id<?)))))',(p[1],p[1],p[2],p[2],p[0],p[0],pid)).fetchone()[0]+1
             return self.reply(200,dict(zip(('name','points','wins','losses','draws'),p),found=True,rank=rank))
         with LOCK:
             for k,r in list(ROOMS.items()):
