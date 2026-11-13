@@ -249,6 +249,31 @@ def run(s):
             assert call('school/state',a)['theme']=='midnight'
             assert call('school/state',b)['skin']=='skin-classic'
             assert len(s.THEMES)==12 and len(s.SKINS)==10
+            # Thematic collections: seasons, separate pieces/boards, full bundles and profile frames.
+            assert s.seasonal_open(s.THEMATIC_COLLECTIONS['halloween'],'2026-11-13')
+            assert s.seasonal_open(s.THEMATIC_COLLECTIONS['halloween'],'2027-10-01')
+            assert not s.seasonal_open(s.THEMATIC_COLLECTIONS['halloween'],'2027-12-01')
+            assert s.seasonal_open(s.THEMATIC_COLLECTIONS['christmas'],'2027-12-01')
+            assert s.seasonal_open(s.THEMATIC_COLLECTIONS['romance'],'2027-06-12')
+            assert s.seasonal_open(s.THEMATIC_COLLECTIONS['horror'],'2027-01-01')
+            with s.database() as db:s.wallet_add(db,s.identity(a),1000)
+            w=call('school/state',a)
+            assert len(w['thematic'])==4
+            with patch.object(s,'seasonal_open',return_value=True):
+                board=call('school/buy',a,item='haunted-night')
+                assert board['theme']=='haunted-night' and board['skin']==w['skin'] and board['coins']==w['coins']-140
+                bundle=call('school/bundle',a,collection='halloween')
+                assert bundle['skin']=='skin-pumpkin' and bundle['coins']==board['coins']-100
+                assert call('school/bundle',a,collection='halloween')['coins']==bundle['coins']
+            assert 'halloween' in call('state',a)['me']['thematicFrames']
+            assert call('customize',a,name='Teste A',frame='halloween')['me']['frame']=='halloween'
+            with patch.object(s,'seasonal_open',return_value=False):
+                assert call('school/equip',a,item='skin-pumpkin')['skin']=='skin-pumpkin'
+                assert call('school/bundle',a,collection='halloween')['coins']==bundle['coins']
+                status,_=s.social_action('/api/social/school/bundle',dict(a,collection='christmas'),1000)
+                assert status==403
+            status,_=s.social_action('/api/social/customize',dict(b,name='Teste B',frame='halloween'),1000)
+            assert status==403
             # 8-player cup: simulate seven confirmed wins, verify champion once.
             now=s.time.monotonic()
             competitors=[{'name':'Copa '+str(i),'profileToken':('cup'+str(i))*16} for i in range(8)]
@@ -335,6 +360,6 @@ def run(s):
             assert progress['bestStreak']>=5 and 'streak5' in progress['achievements'] and 'triple_king' in progress['achievements']
             call('account/logout',other_device)
             assert s.identity(other_device) is None and s.identity(auth)==aid
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, champion rewards, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, champion rewards, thematic bundles, seasonal access, profile frames, tournament, king table, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS=old
