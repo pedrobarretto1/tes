@@ -145,8 +145,14 @@ def tick_clock(r,now):
     turn=r['turn'];r['remaining'][turn]=max(0,r['remaining'][turn]-max(0,now-r['clock_at']));r['clock_at']=now
     if r['remaining'][turn]<=0: finish(r,-turn,reason='timeout')
 def room_snapshot(r,seat,now):
-    with database() as db:
-        names={str(game_side(r,s)):row[0] for s,pid in r['profiles'].items() if pid for row in [sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()] if row}
+    cached=r.setdefault('name_by_seat',{})
+    if any(pid and seat not in cached for seat,pid in r['profiles'].items()):
+        with database() as db:
+            for seat,pid in r['profiles'].items():
+                if pid and seat not in cached:
+                    row=sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()
+                    if row: cached[seat]=row[0]
+    names={str(game_side(r,seat)):name for seat,name in cached.items()}
     return dict(match=r['match'],side=game_side(r,seat),board=r['board'],turn=r['turn'],sequence=r['sequence'],rule=r['rule'],names=names,moves=r.get('moves',[]),quiet=r['quiet'],repeats=r['repeats'],minutes=r.get('minutes',0),remaining=r['remaining'],drawOffer=r.get('draw_offer'),stats=match_stats(r),opponentOffline=now-r['seen'].get(-seat,now)>10,grace=max(0,90-int(now-r['seen'].get(-seat,now))),connected=len(r['tokens'])==2)
 def process(r,seat,msg):
     side=game_side(r,seat)
@@ -205,6 +211,7 @@ def session_for(pid,now):
 def matchmake(pid,now):
     q=MATCH_QUEUE.get(pid)
     if not q:return
+    if active_room(pid,now): MATCH_QUEUE.pop(pid,None);return
     for other,o in list(MATCH_QUEUE.items()):
         if now-o['seen']>25 or active_room(other,now): MATCH_QUEUE.pop(other,None);continue
         if other==pid or (q['rule'],q['ranked'],q['minutes'])!=(o['rule'],o['ranked'],o['minutes']):continue
