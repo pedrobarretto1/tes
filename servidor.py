@@ -162,8 +162,8 @@ def social_state(pid,now):
             elif v['state']=='accepted' and now-v['time']<100:
                 r=ROOMS.get(v['code'])
                 if r and not r['closed']:
-                    side=1 if pid==v['sender'] else -1
-                    session=dict(code=v['code'],side=side,token=r['tokens'][side],host=side==1,ranked=r['ranked'],rule=r['rule'])
+                    side=r['host'] if pid==v['sender'] else -r['host']
+                    session=dict(code=v['code'],side=side,token=r['tokens'][side],host=side==r['host'],ranked=r['ranked'],rule=r['rule'])
         hist=sql(db,'SELECT opponent,outcome,delta,played_at FROM match_history WHERE player_id=? ORDER BY played_at DESC,match_id DESC LIMIT 20',(pid,)).fetchall()
     people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
     return dict(me=dict(zip(('name','points','wins','losses','draws'),me)),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at'),x)) for x in hist])
@@ -241,7 +241,8 @@ def social_action(path,d,now):
         if len(ROOMS)>=1000: return 503,{'error':'Servidor cheio.'}
         code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
         while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
-        r=dict(last=now,host=1,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={1:v['sender'],-1:pid},rule=v['rule'],ranked=v['ranked'])
+        host_side=secrets.choice((1,-1))
+        r=dict(last=now,host=host_side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={host_side:v['sender'],-host_side:pid},rule=v['rule'],ranked=v['ranked'])
         reset_match(r);ROOMS[code]=r;v.update(state='accepted',code=code,time=now)
         return 200,social_state(pid,now)
     return 404,{'error':'Ação inexistente.'}
@@ -301,25 +302,24 @@ class Handler(BaseHTTPRequestHandler):
                 if len(ROOMS)>=1000: return self.reply(503, {'error':'Servidor cheio.'})
                 code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
                 while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
-                token=secrets.token_urlsafe(24); side=d.get('side')
-                if side not in (1,-1): return self.reply(400,{'error':'Player inválido.'})
+                token=secrets.token_urlsafe(24); side=secrets.choice((1,-1))
                 pid=profile(d)
                 rule=d.get('rule','free')
                 if rule not in ('free','official'): return self.reply(400,{'error':'Regra inválida.'})
                 ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False}
                 reset_match(ROOMS[code])
-                return self.reply(200,{'code':code,'token':token,'connected':False,'ranked':ROOMS[code]['ranked']})
+                return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked']})
             code=str(d.get('code','')).upper(); r=ROOMS.get(code)
             if not r or r['closed']: return self.reply(404,{'error':'Sala inexistente ou encerrada.'})
             side=d.get('side'); r['last']=now
             if path=='/api/join':
-                if side!=-r['host']: return self.reply(409,{'error':'Escolha o Player oposto ao criador.'})
+                side=-r['host']
                 if len(r['tokens'])==2: return self.reply(409,{'error':'Sala cheia.'})
                 pid=profile(d)
                 if pid and pid==r['profiles'].get(r['host']): return self.reply(409,{'error':'Use outro perfil ou navegador para o adversário.'})
                 r['profiles'][side]=pid
                 token=secrets.token_urlsafe(24); r['tokens'][side]=token; r['seen'][side]=now
-                return self.reply(200,{'code':code,'token':token,'connected':True,'ranked':r.get('ranked',True)})
+                return self.reply(200,{'code':code,'token':token,'connected':True,'side':side,'ranked':r.get('ranked',True)})
             if side not in (1,-1) or not secrets.compare_digest(r['tokens'].get(side,'!'),str(d.get('token',''))): return self.reply(403,{'error':'Sessão inválida.'})
             r['seen'][side]=now
             if path=='/api/leave':
