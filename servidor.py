@@ -50,6 +50,7 @@ def setup():
         sql(db,'CREATE TABLE IF NOT EXISTS wallets (player_id TEXT PRIMARY KEY, coins INTEGER NOT NULL DEFAULT 0, theme TEXT NOT NULL DEFAULT \'classic\')')
         sql(db,'CREATE TABLE IF NOT EXISTS purchases (player_id TEXT NOT NULL, item TEXT NOT NULL, PRIMARY KEY(player_id,item))')
         sql(db,'CREATE TABLE IF NOT EXISTS puzzle_solves (player_id TEXT NOT NULL, puzzle_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY(player_id,puzzle_id))')
+        sql(db,'CREATE TABLE IF NOT EXISTS event_champions (event_id TEXT PRIMARY KEY, player_id TEXT NOT NULL, name TEXT NOT NULL, played_at TEXT NOT NULL)')
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 def identity(d):
@@ -330,6 +331,7 @@ def process(r,seat,msg):
         if not legal(b,-side,r['rule']): finish(r,-side if r['rule']=='giveaway' else side,reason='giveaway' if r['rule']=='giveaway' else None)
         elif r['quiet']>=40 or r['repeats'][k]>=3: finish(r,0)
         return True
+    if r.get('event') and t.startswith('rematch'):return False
     if t=='rematch' and r['winner'] is not None:
         r['rematch'].add(seat); return True
     if t=='rematch-ok' and r['winner'] is not None and -seat in r['rematch']:
@@ -372,6 +374,7 @@ def matchmake(pid,now):
 def notify(db,recipient,actor,kind):
     sql(db,'INSERT INTO notifications(id,recipient,actor,kind,created_at,seen) VALUES(?,?,?,?,?,0)',(secrets.token_hex(16),recipient,actor,kind,time.time()))
 def social_state(pid,now):
+    for event in list(TOURNAMENTS.values()):event_tick(event,now)
     for k,v in list(PRESENCE.items()):
         if now-v>25: del PRESENCE[k]
     for k,v in list(INVITES.items()):
@@ -495,6 +498,76 @@ def live_action(path,d,pid,now):
         if r.get('public') and not r['closed'] and r['winner'] is None and len(r['tokens'])==2:
             snap=room_snapshot(r,1,now);rooms.append(dict(code=code,names=snap['names'],rule=r['rule'],minutes=r.get('minutes',0),viewers=sum(v[0]==code for v in SPECTATORS.values())))
     return 200,{'rooms':rooms[:50]}
+def event_room(event,a,b,now):
+    code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+    while code in ROOMS:code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+    side=secrets.choice((1,-1))
+    r=dict(last=now,host=side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={side:a,-side:b},rule='official',ranked=False,minutes=5,public=True,event=event['id'])
+    reset_match(r);ROOMS[code]=r;return code
+def event_pair(event,a,b,now):
+    return dict(a=a,b=b,code=event_room(event,a,b,now),winner=None)
+def event_tick(e,now):
+    if e['status']!='playing':return
+    for pair in e['pairs']:
+        if pair['winner']:continue
+        r=ROOMS.get(pair['code'])
+        if not r:return
+        if r['winner'] is None:
+            if now-max(r['seen'].values())>90:finish(r,game_side(r,r['host']),True)
+            else:continue
+        if r['winner']==0:
+            r['closed']=True;pair['code']=event_room(e,pair['a'],pair['b'],now);continue
+        pair['winner']=next(pid for seat,pid in r['profiles'].items() if game_side(r,seat)==r['winner'])
+        r['closed']=True
+    if any(not p['winner'] for p in e['pairs']):return
+    winners=[p['winner'] for p in e['pairs']]
+    if e['type']=='king':
+        p=e['pairs'][0];king=winners[0];loser=p['b'] if p['a']==king else p['a'];e['queue'].append(loser);e['king']=king;e['round']+=1;e['history'].append(dict(round=e['round']-1,pairs=e['pairs']));e['history']=e['history'][-10:]
+        challenger=e['queue'].pop(0);e['pairs']=[event_pair(e,king,challenger,now)];return
+    e['history'].append(dict(round=e['round'],pairs=e['pairs']))
+    if len(winners)==1:
+        e['status']='finished';e['champion']=winners[0]
+        with database() as db:
+            name=sql(db,'SELECT name FROM players WHERE id=?',(winners[0],)).fetchone()[0]
+            inserted=sql(db,'INSERT INTO event_champions(event_id,player_id,name,played_at) VALUES(?,?,?,?) ON CONFLICT(event_id) DO NOTHING',(e['id'],winners[0],name,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))).rowcount
+            if inserted:wallet_add(db,winners[0],100)
+        return
+    e['round']+=1;e['pairs']=[event_pair(e,winners[i],winners[i+1],now) for i in range(0,len(winners),2)]
+def event_action(path,d,pid,now):
+    action=path.rsplit('/',1)[-1]
+    for e in list(TOURNAMENTS.values()):event_tick(e,now)
+    if action=='create':
+        kind=d.get('kind','cup')
+        if kind not in ('cup','king'):return 400,{'error':'Evento inválido.'}
+        if len(TOURNAMENTS)>=100:return 503,{'error':'Limite de eventos atingido.'}
+        if active_room(pid,now) or any(pid in e['players'] and e['status']!='finished' for e in TOURNAMENTS.values()):return 409,{'error':'Você já está em uma sala ou evento.'}
+        key=secrets.token_hex(5);TOURNAMENTS[key]=dict(id=key,type=kind,host=pid,players=[pid],status='waiting',round=1,pairs=[],history=[],queue=[],champion=None)
+    elif action in ('join','leave','start'):
+        e=TOURNAMENTS.get(str(d.get('event','')))
+        if not e:return 404,{'error':'Evento inexistente.'}
+        if action=='join':
+            if e['status']!='waiting' or len(e['players'])>=8:return 409,{'error':'Inscrições encerradas.'}
+            if pid not in e['players']:
+                if active_room(pid,now) or any(pid in x['players'] and x['status']!='finished' for x in TOURNAMENTS.values()):return 409,{'error':'Você já está em uma sala ou evento.'}
+                e['players'].append(pid)
+        elif action=='leave':
+            if e['status']!='waiting':return 409,{'error':'O evento já começou.'}
+            if pid in e['players']:e['players'].remove(pid)
+            if not e['players']:TOURNAMENTS.pop(e['id'],None)
+            elif e['host']==pid:e['host']=e['players'][0]
+        elif action=='start':
+            if e['host']!=pid or e['status']!='waiting' or e['type']!='king' or len(e['players'])<2:return 409,{'error':'São necessários pelo menos dois jogadores.'}
+            e['status']='playing';e['queue']=e['players'][2:];e['pairs']=[event_pair(e,*e['players'][:2],now)]
+        if e['type']=='cup' and e['status']=='waiting' and len(e['players'])==8:
+            e['status']='playing';players=e['players'][:];secrets.SystemRandom().shuffle(players);e['pairs']=[event_pair(e,players[i],players[i+1],now) for i in range(0,8,2)]
+    elif action!='list':return 404,{'error':'Ação inválida.'}
+    with database() as db:
+        names={p[0]:p[1] for p in sql(db,'SELECT id,name FROM players').fetchall()}
+        champs=sql(db,'SELECT name,played_at FROM event_champions ORDER BY played_at DESC LIMIT 20').fetchall()
+    result=[]
+    for e in TOURNAMENTS.values():
+        result.append(dict(id=e['id'],type=e['type'],status=e['status'],round=e['round'],host=e['host']==pid,joined=pid in e['players'],players=[names.get(x,'Jogador') for x in e['players']],pairs=[dict(a=names.get(p['a'],'Jogador'),b=names.get(p['b'],'Jogador'),winner=names.get(p['winner']) if p['winner'] else None) for p in e['pairs']],champion=names.get(e.get('champion')),king=names.get(e.get('king')),queue=[names.get(x,'Jogador') for x in e['queue']]))
+    return 200,{'events':result[-30:],'champions':[dict(name=x[0],date=x[1]) for x in champs]}
 def social_action(path,d,now):
     if path.startswith('/api/social/account/'):return account_action(path,d,now)
     if path=='/api/social/register':
@@ -506,6 +579,7 @@ def social_action(path,d,now):
     PRESENCE[pid]=now
     if path.startswith('/api/social/school/'):return school_action(path,d,pid,now)
     if path.startswith('/api/social/live/'):return live_action(path,d,pid,now)
+    if path.startswith('/api/social/events/'):return event_action(path,d,pid,now)
     if path=='/api/social/customize':return customize(pid,d,now)
     if path in ('/api/social/search','/api/social/player'):
         return social_lookup(path,d,pid,now)
