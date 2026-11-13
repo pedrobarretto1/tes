@@ -770,7 +770,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
