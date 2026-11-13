@@ -52,6 +52,7 @@ def setup():
         sql(db,'CREATE TABLE IF NOT EXISTS purchases (player_id TEXT NOT NULL, item TEXT NOT NULL, PRIMARY KEY(player_id,item))')
         sql(db,'CREATE TABLE IF NOT EXISTS puzzle_solves (player_id TEXT NOT NULL, puzzle_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY(player_id,puzzle_id))')
         sql(db,'CREATE TABLE IF NOT EXISTS event_champions (event_id TEXT PRIMARY KEY, player_id TEXT NOT NULL, name TEXT NOT NULL, played_at TEXT NOT NULL)')
+        sql(db,'CREATE INDEX IF NOT EXISTS event_champions_player_idx ON event_champions(player_id)')
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 def identity(d):
@@ -76,7 +77,7 @@ def profile(d):
         else:sql(db,'INSERT INTO players(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',(pid,name))
     return pid
 AVATARS={'crown','knight','shield','oak','rook','star'}
-TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king'}
+TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion'}
 FRAMES={'wood','bronze','silver','gold'}
 ACHIEVEMENTS={
  'first_win':('Primeiro Duelo','Vença uma partida ranqueada.','first_win'),
@@ -100,7 +101,10 @@ def cosmetics_for(db,pid,refresh=False):
         if friends>=5:unlock(db,pid,'friends5')
     x=sql(db,'SELECT avatar,title,frame,streak,best_streak,completed FROM cosmetics WHERE player_id=?',(pid,)).fetchone()
     earned=[row[0] for row in sql(db,'SELECT code FROM achievements WHERE player_id=? ORDER BY code',(pid,)).fetchall()]
-    return dict(avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned)
+    cups=champion_count(db,pid)
+    if cups and 'cup_champion' not in earned:
+        unlock(db,pid,'cup_champion');earned.append('cup_champion')
+    return dict(avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned,cups=cups)
 def award_progress(db,pid,outcome,promotions):
     ensure_cosmetics(db,pid)
     sql(db,'UPDATE cosmetics SET streak=CASE WHEN ?=1 THEN streak+1 ELSE 0 END,completed=completed+? WHERE player_id=?',(int(outcome=='win'),int(outcome!='resign'),pid))
@@ -450,6 +454,10 @@ PUZZLES=[
 THEMES={'classic':0,'imperial':100,'marble':150,'emerald':120,'midnight':160,'sakura':140,'ocean':130,'desert':110,'obsidian':180,'parchment':90,'cherry':125,'frost':150}
 SKINS={'skin-classic':0,'skin-ivory':60,'skin-gilded':100,'skin-jade':110,'skin-crystal':130,'skin-metal':90,'skin-porcelain':85,'skin-ruby':120,'skin-neon':150,'skin-royal':160}
 SHOP_ITEMS={**THEMES,**SKINS}
+CHAMPION_ITEMS={'champion-hall':1,'skin-champion':1,'champion-legacy':3,'skin-legend':3,'champion-eternal':5,'skin-eternal':5}
+CHAMPION_SKINS={k for k in CHAMPION_ITEMS if k.startswith('skin-')}
+def champion_count(db,pid):
+    return sql(db,'SELECT COUNT(*) FROM event_champions WHERE player_id=?',(pid,)).fetchone()[0]
 def puzzle_board(p):
     b=[0]*64
     for i,v in p['pieces'].items():b[i]=v
@@ -461,7 +469,8 @@ def wallet_state(db,pid):
     coins,theme=sql(db,'SELECT coins,theme FROM wallets WHERE player_id=?',(pid,)).fetchone()
     sql(db,'INSERT INTO piece_styles(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
     skin=sql(db,'SELECT skin FROM piece_styles WHERE player_id=?',(pid,)).fetchone()[0]
-    return dict(coins=coins,theme=theme,skin=skin,owned=['classic','skin-classic']+[x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()])
+    cups=champion_count(db,pid)
+    return dict(coins=coins,theme=theme,skin=skin,cups=cups,owned=['classic','skin-classic']+[x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()]+[item for item,minimum in CHAMPION_ITEMS.items() if cups>=minimum])
 def school_action(path,d,pid,now):
     day=time.strftime('%Y-%m-%d',time.gmtime());daily=PUZZLES[int(time.time()//86400)%len(PUZZLES)]['id']
     with database() as db:
@@ -476,14 +485,15 @@ def school_action(path,d,pid,now):
             return 200,dict(reward=reward,**wallet_state(db,pid))
         if path.endswith('/buy') or path.endswith('/equip'):
             item=d.get('item')
-            if not isinstance(item,str) or item not in SHOP_ITEMS:return 400,{'error':'Item inexistente.'}
+            if not isinstance(item,str) or item not in SHOP_ITEMS and item not in CHAMPION_ITEMS:return 400,{'error':'Item inexistente.'}
             w=wallet_state(db,pid)
+            if item in CHAMPION_ITEMS and item not in w['owned']:return 403,{'error':'Exclusivo de campeões: conquiste '+str(CHAMPION_ITEMS[item])+' Copa(s) de Honra.'}
             if item not in w['owned']:
                 if path.endswith('/equip'):return 403,{'error':'Tema ainda bloqueado.'}
                 if w['coins']<SHOP_ITEMS[item]:return 400,{'error':'Moedas insuficientes.'}
                 sql(db,'UPDATE wallets SET coins=coins-? WHERE player_id=?',(SHOP_ITEMS[item],pid))
                 sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?)',(pid,item))
-            if item in SKINS:sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(item,pid))
+            if item in SKINS or item in CHAMPION_SKINS:sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(item,pid))
             else:sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(item,pid))
             return 200,wallet_state(db,pid)
         solved=[x[0] for x in sql(db,'SELECT puzzle_id FROM puzzle_solves WHERE player_id=?',(pid,)).fetchall()]
@@ -541,7 +551,9 @@ def event_tick(e,now):
         with database() as db:
             name=sql(db,'SELECT name FROM players WHERE id=?',(winners[0],)).fetchone()[0]
             inserted=sql(db,'INSERT INTO event_champions(event_id,player_id,name,played_at) VALUES(?,?,?,?) ON CONFLICT(event_id) DO NOTHING',(e['id'],winners[0],name,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))).rowcount
-            if inserted:wallet_add(db,winners[0],100)
+            if inserted:
+                wallet_add(db,winners[0],100)
+                unlock(db,winners[0],'cup_champion')
         return
     e['round']+=1;e['pairs']=[event_pair(e,winners[i],winners[i+1],now) for i in range(0,len(winners),2)]
 def event_action(path,d,pid,now):
