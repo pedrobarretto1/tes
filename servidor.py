@@ -50,18 +50,30 @@ def game_side(r,seat):
 def finish(r,w,resigned=False):
     if r.get('winner') is not None: return
     p=r['profiles']
-    if r.get('ranked',True) and len(p)==2 and p[1] and p[-1] and p[1]!=p[-1]:
+    ranked=bool(r.get('ranked',True) and len(p)==2 and p[1] and p[-1] and p[1]!=p[-1])
+    names={}; deltas={}; points={}
+    if ranked:
         with database() as db:
             inserted=sql(db,'INSERT INTO results(id) VALUES(?) ON CONFLICT(id) DO NOTHING',(r['match'],)).rowcount
             if inserted:
                 for seat in (1,-1):
                     side=game_side(r,seat)
                     delta=5 if w==0 else 25 if w==side else (-20 if resigned else -15)
+                    old=sql(db,'SELECT name,points FROM players WHERE id=?',(p[seat],)).fetchone()
+                    names[str(side)]=old[0]
+                    deltas[str(side)]=max(0,old[1]+delta)-old[1]
+                    points[str(side)]=max(0,old[1]+delta)
                     sql(db,'UPDATE players SET points=CASE WHEN points+? < 0 THEN 0 ELSE points+? END,wins=wins+?,losses=losses+?,draws=draws+? WHERE id=?',(delta,delta,int(w==side),int(w==-side),int(w==0),p[seat]))
                     opponent=sql(db,'SELECT name FROM players WHERE id=?',(p[-seat],)).fetchone()[0]
                     outcome='draw' if w==0 else 'win' if w==side else 'resign' if resigned else 'loss'
                     sql(db,'INSERT INTO match_history(match_id,player_id,opponent,outcome,delta,played_at) VALUES(?,?,?,?,?,?)',(r['match'],p[seat],opponent,outcome,delta,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())))
+    if not names:
+        with database() as db:
+            for seat,pid in p.items():
+                row=sql(db,'SELECT name,points FROM players WHERE id=?',(pid,)).fetchone() if pid else None
+                if row: names[str(game_side(r,seat))]=row[0]
     r['winner']=w
+    r['result']=dict(match=r['match'],winner=w,reason='resign' if resigned else 'normal',ranked=ranked,names=names,deltas=deltas,points=points)
 def initial():
     return [(-1 if i//8<3 else 1 if i//8>4 else 0) if (i//8+i%8)%2 else 0 for i in range(64)]
 DIR=((1,1),(1,-1),(-1,1),(-1,-1))
@@ -105,7 +117,7 @@ def legal(b,s,rule):
     return [m for m in caps if len(m['cap'])==max(len(x['cap']) for x in caps)] if caps else quiet
 def boardkey(r): return r['rule']+'/'+','.join(map(str,r['board']))+'/'+str(r['turn'])
 def reset_match(r):
-    r.update(board=initial(),turn=1,sequence=0,winner=None,quiet=0,match=secrets.token_hex(16),rematch=set())
+    r.update(board=initial(),turn=1,sequence=0,winner=None,result=None,quiet=0,match=secrets.token_hex(16),rematch=set())
     r['repeats']={boardkey(r):1}
 def process(r,seat,msg):
     side=game_side(r,seat)
@@ -339,33 +351,44 @@ class Handler(BaseHTTPRequestHandler):
                 while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
                 token=secrets.token_urlsafe(24); side=secrets.choice((1,-1))
                 pid=profile(d)
+                if d.get('ranked') is not False and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 rule=d.get('rule','free')
                 if rule not in ('free','official'): return self.reply(400,{'error':'Regra inválida.'})
                 ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False}
                 reset_match(ROOMS[code])
                 return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked']})
             code=str(d.get('code','')).upper(); r=ROOMS.get(code)
-            if not r or r['closed']: return self.reply(404,{'error':'Sala inexistente ou encerrada.'})
+            if not r: return self.reply(404,{'error':'Sala inexistente ou encerrada.'})
             side=d.get('side'); r['last']=now
             if path=='/api/join':
+                if r['closed']: return self.reply(404,{'error':'Sala encerrada.'})
                 side=-r['host']
                 if len(r['tokens'])==2: return self.reply(409,{'error':'Sala cheia.'})
                 pid=profile(d)
+                if r.get('ranked',True) and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 if pid and pid==r['profiles'].get(r['host']): return self.reply(409,{'error':'Use outro perfil ou navegador para o adversário.'})
                 r['profiles'][side]=pid
                 token=secrets.token_urlsafe(24); r['tokens'][side]=token; r['seen'][side]=now
                 return self.reply(200,{'code':code,'token':token,'connected':True,'side':side,'ranked':r.get('ranked',True)})
             if side not in (1,-1) or not secrets.compare_digest(r['tokens'].get(side,'!'),str(d.get('token',''))): return self.reply(403,{'error':'Sessão inválida.'})
             r['seen'][side]=now
+            if path=='/api/resign':
+                if len(r['tokens'])!=2: return self.reply(409,{'error':'Aguarde o adversário.'})
+                if r['winner'] is None:
+                    if r['closed']: return self.reply(409,{'error':'Sala encerrada.'})
+                    finish(r,-game_side(r,side),True)
+                return self.reply(200,{'ok':True,'result':r.get('result'),'closed':r['closed']})
             if path=='/api/leave':
                 if len(r['tokens'])==2 and r['winner'] is None: finish(r,-game_side(r,side),True)
-                r['closed']=True; return self.reply(200,{'ok':True})
+                r['closed']=True
+                return self.reply(200,{'ok':True,'result':r.get('result'),'closed':True})
             if path=='/api/poll':
-                if -side in r['seen'] and now-r['seen'][-side]>90:
+                if not r['closed'] and -side in r['seen'] and now-r['seen'][-side]>90:
                     if r['winner'] is None: finish(r,game_side(r,side),True)
-                    r['closed']=True; return self.reply(410,{'error':'Adversário desconectado.'})
+                    r['closed']=True
                 messages=r['queues'][side][:]; r['queues'][side].clear()
-                return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages})
+                return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages,'result':r.get('result'),'closed':r['closed']})
+            if r['closed']: return self.reply(409,{'error':'Sala encerrada.'})
             if path=='/api/send':
                 if len(r['tokens'])!=2: return self.reply(409,{'error':'Aguarde o adversário.'})
                 m=d.get('message')
