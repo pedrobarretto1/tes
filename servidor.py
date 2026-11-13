@@ -39,7 +39,7 @@ def profile(d):
     with database() as db:
         sql(db,'INSERT INTO players(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',(pid,name))
     return pid
-def finish(r,w):
+def finish(r,w,resigned=False):
     if r.get('winner') is not None: return
     p=r['profiles']
     if len(p)==2 and p[1] and p[-1] and p[1]!=p[-1]:
@@ -47,7 +47,7 @@ def finish(r,w):
             inserted=sql(db,'INSERT INTO results(id) VALUES(?) ON CONFLICT(id) DO NOTHING',(r['match'],)).rowcount
             if inserted:
                 for side in (1,-1):
-                    delta=5 if w==0 else 25 if w==side else -15
+                    delta=5 if w==0 else 25 if w==side else (-20 if resigned else -15)
                     sql(db,'UPDATE players SET points=CASE WHEN points+? < 0 THEN 0 ELSE points+? END,wins=wins+?,losses=losses+?,draws=draws+? WHERE id=?',(delta,delta,int(w==side),int(w==-side),int(w==0),p[side]))
     r['winner']=w
 def initial():
@@ -100,7 +100,7 @@ def process(r,side,msg):
     if t=='hello': return True
     if t=='resign':
         if r['winner'] is not None: return False
-        finish(r,-side); return True
+        finish(r,-side,True); return True
     if t=='move':
         if r['winner'] is not None or side!=r['turn'] or msg.get('sequence')!=r['sequence']+1 or msg.get('before')!=boardkey(r): return False
         m=msg.get('move')
@@ -155,6 +155,15 @@ class Handler(BaseHTTPRequestHandler):
             d=json.loads(self.rfile.read(n)); assert isinstance(d,dict)
         except Exception: return self.reply(400, {'error':'Pedido inválido.'})
         path=self.path.split('?')[0]; now=time.monotonic()
+        if path=='/api/profile':
+            token=str(d.get('profileToken',''))
+            if not 32<=len(token)<=128: return self.reply(400,{'error':'Perfil inválido.'})
+            pid=hashlib.sha256(token.encode()).hexdigest()
+            with database() as db:
+                p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
+                if not p: return self.reply(200,{'found':False})
+                rank=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND wins>?)',(p[1],p[1],p[2])).fetchone()[0]+1
+            return self.reply(200,dict(zip(('name','points','wins','losses','draws'),p),found=True,rank=rank))
         with LOCK:
             for k,r in list(ROOMS.items()):
                 if now-r['last']>TTL: del ROOMS[k]
@@ -184,9 +193,11 @@ class Handler(BaseHTTPRequestHandler):
             if side not in (1,-1) or not secrets.compare_digest(r['tokens'].get(side,'!'),str(d.get('token',''))): return self.reply(403,{'error':'Sessão inválida.'})
             r['seen'][side]=now
             if path=='/api/leave':
+                if len(r['tokens'])==2 and r['winner'] is None: finish(r,-side,True)
                 r['closed']=True; return self.reply(200,{'ok':True})
             if path=='/api/poll':
                 if -side in r['seen'] and now-r['seen'][-side]>90:
+                    if r['winner'] is None: finish(r,side,True)
                     r['closed']=True; return self.reply(410,{'error':'Adversário desconectado.'})
                 messages=r['queues'][side][:]; r['queues'][side].clear()
                 return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages})
