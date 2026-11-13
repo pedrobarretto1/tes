@@ -25,7 +25,7 @@ const scenes={
  'rose-garden':{id:'romance',name:'Jardim de Rosas',corners:['rose','heart','rose','petal'],ambient:['petal','heart'],result:{victory:['petal','rose','♡','O jardim floresce em sua homenagem.'],defeat:['petal','heart','♡','As pétalas descansam.'],resign:['rose','petal','♡','Uma última rosa se despede.'],draw:['heart','petal','♡','O jardim encontra equilíbrio.']}}
 };
 function art(name,cls=''){let el=document.createElement('span');el.className='theme-art '+cls;el.setAttribute('aria-hidden','true');el.innerHTML='<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">'+(SVG[name]||'')+'</svg>';return el}
-let settings={quality:matchMedia('(max-width:650px)').matches?'medium':'full',decor:true,particles:true,sound:false};try{let saved=JSON.parse(localStorage.getItem('damas-theme-fx')||'{}');settings={...settings,...saved}}catch(e){}
+let settings={quality:matchMedia('(max-width:650px)').matches?'medium':'full',decor:true,particles:true,sound:true};try{let saved=JSON.parse(localStorage.getItem('damas-theme-fx')||'{}');settings={...settings,...saved}}catch(e){}
 if(!['full','medium','light','off'].includes(settings.quality))settings.quality='medium';
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 let resultTimer=0;const ambient=document.createElement('div');ambient.className='theme-ambient';ambient.setAttribute('aria-hidden','true');document.body.prepend(ambient);
