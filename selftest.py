@@ -27,10 +27,26 @@ def run(s):
             d=call('state',a);assert d['players'][0]['id']==bid and d['players'][0]['online']
             call('friend/request',a,target=bid)
             assert call('state',b)['players'][0]['relation']=='incoming'
+            assert call('state',b)['notifications'][0]['kind']=='friend_request'
             call('friend/accept',b,target=aid)
             assert call('state',a)['players'][0]['relation']=='friend'
+            assert call('state',a)['notifications'][0]['kind']=='friend_accepted'
             call('friend/remove',a,target=bid)
             assert call('state',b)['players'][0]['relation']=='none'
+            call('friend/request',a,target=bid)
+            call('friend/decline',b,target=aid)
+            a_notices=call('state',a)
+            assert any(n['kind']=='friend_declined' for n in a_notices['notifications'])
+            assert a_notices['unread']>=2
+            assert call('notifications/read',a,all=True)['unread']==0
+            assert call('state',b)['unread']>0
+            call('friend/request',a,target=bid)
+            call('friend/accept',b,target=aid)
+            s.PRESENCE[bid]=960
+            assert next(p for p in call('state',a)['players'] if p['id']==bid)['online']==False
+            call('state',b)
+            assert next(p for p in call('state',a)['players'] if p['id']==bid)['online']==True
+            call('friend/remove',a,target=bid)
             d=call('challenge',a,target=bid,ranked=True,rule='free')
             invite=d['challenges'][0]['id']
             with patch.object(s.secrets,'choice',side_effect=lambda seq: seq[-1]):
@@ -81,6 +97,6 @@ def run(s):
                 assert host['side']==expected and guest['side']==-expected
                 assert s.ROOMS[host['code']]['host']==expected
                 s.ROOMS[host['code']]['closed']=True
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES=old
