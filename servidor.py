@@ -78,7 +78,8 @@ def profile(d):
     return pid
 AVATARS={'crown','knight','shield','oak','rook','star'}
 TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion'}
-FRAMES={'wood','bronze','silver','gold'}
+THEMATIC_FRAMES={'halloween':'haunted-night','christmas':'winter-feast','horror':'midnight-crypt','romance':'rose-garden'}
+FRAMES={'wood','bronze','silver','gold'} | set(THEMATIC_FRAMES)
 ACHIEVEMENTS={
  'first_win':('Primeiro Duelo','Vença uma partida ranqueada.','first_win'),
  'ten_wins':('Guardião do Tabuleiro','Vença dez partidas ranqueadas.','ten_wins'),
@@ -104,7 +105,9 @@ def cosmetics_for(db,pid,refresh=False):
     cups=champion_count(db,pid)
     if cups and 'cup_champion' not in earned:
         unlock(db,pid,'cup_champion');earned.append('cup_champion')
-    return dict(avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned,cups=cups)
+    purchased={row[0] for row in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()}
+    thematic_frames=[frame for frame,board in THEMATIC_FRAMES.items() if board in purchased]
+    return dict(avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned,cups=cups,thematicFrames=thematic_frames)
 def award_progress(db,pid,outcome,promotions):
     ensure_cosmetics(db,pid)
     sql(db,'UPDATE cosmetics SET streak=CASE WHEN ?=1 THEN streak+1 ELSE 0 END,completed=completed+? WHERE player_id=?',(int(outcome=='win'),int(outcome!='resign'),pid))
@@ -172,8 +175,11 @@ def customize(pid,d,now):
         avatar=d.get('avatar',c['avatar']);title=d.get('title',c['title']);frame=d.get('frame',c['frame'])
         if avatar not in AVATARS or title not in TITLES or frame not in FRAMES:return 400,{'error':'Personalização inválida.'}
         if title!='visitor' and title not in c['achievements']:return 403,{'error':'Título ainda bloqueado.'}
-        minimum={'wood':0,'bronze':1000,'silver':1250,'gold':1500}[frame]
-        if frame!=c['frame'] and me[0]<minimum:return 403,{'error':'Moldura ainda bloqueada.'}
+        if frame in THEMATIC_FRAMES:
+            if frame not in c['thematicFrames']:return 403,{'error':'Adquira o tabuleiro temático para desbloquear esta moldura.'}
+        else:
+            minimum={'wood':0,'bronze':1000,'silver':1250,'gold':1500}[frame]
+            if frame!=c['frame'] and me[0]<minimum:return 403,{'error':'Moldura ainda bloqueada.'}
         name=' '.join(str(d.get('name','')).split())[:24]
         if not name:return 400,{'error':'Informe seu nome.'}
         sql(db,'UPDATE players SET name=? WHERE id=?',(name,pid))
