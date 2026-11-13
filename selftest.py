@@ -5,10 +5,10 @@ from unittest.mock import patch
 import json
 
 def run(s):
-    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE)
+    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS)
     with TemporaryDirectory() as tmp:
         try:
-            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={}
+            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={};s.LOGIN_LIMITS={}
             s.setup()
             a={'name':'Teste A','profileToken':'a'*64};b={'name':'Teste B','profileToken':'b'*64}
             def call(path,who,**kw):
@@ -176,6 +176,37 @@ def run(s):
             room['closed']=True
             call('matchmaking/start',a,rule='official',minutes=0)
             assert not call('matchmaking/cancel',a)['matchmaking']
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation',flush=True)
+            # A guest keeps their identifier, points, history and friends after linking.
+            call('friend/request',a,target=bid);call('friend/accept',b,target=aid)
+            previous=call('state',a)
+            linked=call('account/link',a,username='teste_a',password='teste-senha-123')
+            auth=dict(name='Teste A',profileToken=linked['token'])
+            assert s.identity(auth)==aid and s.identity(a) is None
+            assert linked['state']['me']['points']==previous['me']['points']
+            assert linked['state']['history']==previous['history']
+            assert any(p['id']==bid and p['relation']=='friend' for p in linked['state']['players'])
+            assert 'first_win' in linked['state']['me']['achievements']
+            bad,_=s.social_action('/api/social/account/login',{'username':'teste_a','password':'senha-errada'},1000)
+            assert bad==401
+            login=call('account/login',b,username='teste_a',password='teste-senha-123')
+            other_device=dict(name='Teste A',profileToken=login['token'])
+            assert s.identity(other_device)==aid and other_device['profileToken']!=auth['profileToken']
+            assert call('state',other_device)['me']['points']==previous['me']['points']
+            saved=call('customize',other_device,name='Guardiao A',avatar='knight',title='first_win',frame='bronze')
+            assert saved['me']['avatar']=='knight' and saved['me']['title']=='first_win'
+            public=call('player',b,target=aid)['player']
+            assert public['name']=='Guardiao A' and public['avatar']=='knight' and 'account' not in public
+            status,_=s.social_action('/api/social/customize',dict(other_device,name='Guardiao A',title='triple_king'),1000)
+            assert status==403
+            assert http('/api/profile',other_device)['points']==previous['me']['points']
+            with s.database() as db:
+                secret=s.sql(db,'SELECT salt,password_hash FROM accounts WHERE player_id=?',(aid,)).fetchone()
+                assert secret[1]!='teste-senha-123' and len(secret[0])==32 and len(secret[1])==64
+                for _ in range(5):s.award_progress(db,aid,'win',3)
+            progress=call('state',other_device)['me']
+            assert progress['bestStreak']>=5 and 'streak5' in progress['achievements'] and 'triple_king' in progress['achievements']
+            call('account/logout',other_device)
+            assert s.identity(other_device) is None and s.identity(auth)==aid
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
-            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE=old
+            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS=old
