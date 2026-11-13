@@ -97,6 +97,44 @@ def run(s):
                 assert host['side']==expected and guest['side']==-expected
                 assert s.ROOMS[host['code']]['host']==expected
                 s.ROOMS[host['code']]['closed']=True
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online',flush=True)
+            # Real HTTP handler regression: resignation then immediate exit,
+            # winner can still fetch authoritative result, with points awarded once.
+            for expected in (1,-1):
+                orig=s.secrets.choice
+                with patch.object(s.secrets,'choice',side_effect=lambda seq:expected if isinstance(seq,tuple) else orig(seq)):
+                    host=http('/api/create',dict(a,rule='free'))
+                guest=http('/api/join',dict(b,code=host['code']))
+                ha={k:host[k] for k in ('code','side','token')}
+                gb={k:guest[k] for k in ('code','side','token')}
+                before_a=call('state',a)['me']['points'];before_b=call('state',b)['me']['points']
+                result=http('/api/resign',gb)['result']
+                assert result['winner']==expected and result['side']==-expected and result['ranked']
+                assert result['deltas'][str(expected)]==25 and result['deltas'][str(-expected)]==-20
+                http('/api/leave',gb)
+                data=http('/api/poll',ha)
+                assert data['closed'] and data['result']['winner']==expected and data['result']['side']==expected
+                assert data['result']['points'][str(expected)]==before_a+25
+                assert http('/api/poll',ha)['result']['match']==result['match']
+                assert http('/api/resign',gb)['result']['match']==result['match']
+                assert call('state',a)['me']['points']==before_a+25 and call('state',b)['me']['points']==before_b-20
+            # Leaving directly must also produce the victory screen payload.
+            host=http('/api/create',dict(a,rule='free'))
+            guest=http('/api/join',dict(b,code=host['code']))
+            ha={k:host[k] for k in ('code','side','token')};gb={k:guest[k] for k in ('code','side','token')}
+            before_a=call('state',a)['me']['points'];before_b=call('state',b)['me']['points']
+            http('/api/leave',gb)
+            result=http('/api/poll',ha)['result']
+            assert result['winner']==ha['side'] and result['reason']=='resign'
+            assert call('state',a)['me']['points']==before_a+25 and call('state',b)['me']['points']==before_b-20
+            # Casual results use the same reliable delivery without affecting PH.
+            host=http('/api/create',dict(a,rule='free',ranked=False))
+            guest=http('/api/join',dict(b,code=host['code']))
+            ha={k:host[k] for k in ('code','side','token')};gb={k:guest[k] for k in ('code','side','token')}
+            before_a=call('state',a)['me']['points'];before_b=call('state',b)['me']['points']
+            http('/api/resign',ha);http('/api/leave',ha)
+            result=http('/api/poll',gb)['result']
+            assert result['winner']==gb['side'] and not result['ranked']
+            assert call('state',a)['me']['points']==before_a and call('state',b)['me']['points']==before_b
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES=old
