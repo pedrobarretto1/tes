@@ -73,7 +73,9 @@ def finish(r,w,resigned=False):
                 row=sql(db,'SELECT name,points FROM players WHERE id=?',(pid,)).fetchone() if pid else None
                 if row: names[str(game_side(r,seat))]=row[0]
     r['winner']=w
-    r['result']=dict(match=r['match'],winner=w,reason='resign' if resigned else 'normal',ranked=ranked,names=names,deltas=deltas,points=points)
+    r['result']=dict(match=r['match'],winner=w,reason='resign' if resigned else 'normal',ranked=ranked,names=names,deltas=deltas,points=points,board=r['board'][:],turn=r['turn'],sequence=r['sequence'])
+def result_for(r,seat):
+    return dict(r['result'],side=game_side(r,seat)) if r.get('result') else None
 def initial():
     return [(-1 if i//8<3 else 1 if i//8>4 else 0) if (i//8+i%8)%2 else 0 for i in range(64)]
 DIR=((1,1),(1,-1),(-1,1),(-1,-1))
@@ -377,17 +379,17 @@ class Handler(BaseHTTPRequestHandler):
                 if r['winner'] is None:
                     if r['closed']: return self.reply(409,{'error':'Sala encerrada.'})
                     finish(r,-game_side(r,side),True)
-                return self.reply(200,{'ok':True,'result':r.get('result'),'closed':r['closed']})
+                return self.reply(200,{'ok':True,'result':result_for(r,side),'closed':r['closed']})
             if path=='/api/leave':
                 if len(r['tokens'])==2 and r['winner'] is None: finish(r,-game_side(r,side),True)
                 r['closed']=True
-                return self.reply(200,{'ok':True,'result':r.get('result'),'closed':True})
+                return self.reply(200,{'ok':True,'result':result_for(r,side),'closed':True})
             if path=='/api/poll':
                 if not r['closed'] and -side in r['seen'] and now-r['seen'][-side]>90:
                     if r['winner'] is None: finish(r,game_side(r,side),True)
                     r['closed']=True
                 messages=r['queues'][side][:]; r['queues'][side].clear()
-                return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages,'result':r.get('result'),'closed':r['closed']})
+                return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages,'result':result_for(r,side),'closed':r['closed']})
             if r['closed']: return self.reply(409,{'error':'Sala encerrada.'})
             if path=='/api/send':
                 if len(r['tokens'])!=2: return self.reply(409,{'error':'Aguarde o adversário.'})
