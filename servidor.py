@@ -2,6 +2,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata, re
 from contextlib import contextmanager
+from urllib.request import urlopen, Request
 
 ROOMS = {}
 PRESENCE = {}
@@ -13,6 +14,23 @@ TOURNAMENTS = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
+# Fixed, licensed instrument recordings only. Cache per note; never proxy arbitrary URLs.
+PIANO_FILES=frozenset(('A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6'))
+PIANO_CACHE={}
+PIANO_LOCKS={name:threading.Lock() for name in PIANO_FILES}
+def piano_sample(name):
+    if name not in PIANO_FILES:return None
+    with PIANO_LOCKS[name]:
+        if name in PIANO_CACHE:return PIANO_CACHE[name]
+        try:
+            req=Request('https://tonejs.github.io/audio/salamander/'+name+'.mp3',headers={'User-Agent':'Casa-de-Damas/4.7'})
+            with urlopen(req,timeout=8) as response:
+                data=response.read(1500001)
+            if not 1000<len(data)<=1500000 or not (data.startswith(b'ID3') or data[0]==255):return None
+            PIANO_CACHE[name]=data
+            return data
+        except (OSError,ValueError):return None
+
 
 # Persistent PostgreSQL when DATABASE_URL is configured; temporary SQLite otherwise.
 DATABASE_URL=os.environ.get('DATABASE_URL','')
@@ -728,7 +746,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Cache-Control', 'public, max-age=86400' if kind=='audio/mpeg' and status==200 else 'no-store')
         self.end_headers()
         self.wfile.write(body)
     def do_OPTIONS(self): self.reply(204, b'')
@@ -738,6 +756,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
+        elif self.path.split('?')[0].startswith('/audio/piano/'):
+            path=self.path.split('?')[0]; name=path.removeprefix('/audio/piano/').removesuffix('.mp3')
+            if name not in PIANO_FILES or not path.endswith('.mp3'):return self.reply(404,{'error':'Amostra inexistente.'})
+            data=piano_sample(name)
+            return self.reply(200,data,'audio/mpeg') if data else self.reply(503,{'error':'Piano indisponível temporariamente.'})
         elif self.path == '/api/health': self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL)})
         elif self.path == '/api/ranking':
             try:
