@@ -253,6 +253,7 @@ def finish(r,w,resigned=False,reason=None):
     r['winner']=w
     reason=reason or ('resign' if resigned else 'normal')
     r['result']=dict(match=r['match'],winner=w,reason=reason,ranked=ranked,rule=r['rule'],names=names,deltas=deltas,points=points,board=r['board'][:],turn=r['turn'],sequence=r['sequence'],duration=max(0,int(time.monotonic()-r.get('started',time.monotonic()))),moves=r.get('moves',[])[:],stats=match_stats(r))
+    if reason=='inevitable' and r.get('proof'):r['result']['proof']=dict(r['proof'])
     if len(p)==2 and p.get(1) and p.get(-1):
         with database() as db:
             sql(db,'INSERT INTO replays(match_id,player_a,player_b,payload) VALUES(?,?,?,?) ON CONFLICT(match_id) DO NOTHING',(r['match'],p[1],p[-1],json.dumps(r['result'])))
@@ -314,7 +315,41 @@ def legal(b,s,rule):
     if not mandatory: return caps+quiet
     if not majority: return caps or quiet
     return [m for m in caps if len(m['cap'])==max(len(x['cap']) for x in caps)] if caps else quiet
-def boardkey(r): return r['rule']+'/'+','.join(map(str,r['board']))+'/'+str(r['turn'])
+def position_key(board,turn,rule):return rule+'/'+','.join(map(str,board))+'/'+str(turn)
+def boardkey(r): return position_key(r['board'],r['turn'],r['rule'])
+
+# A proof, not an evaluation. All legal continuations (including opponent mistakes)
+# must end with the SAME winner. Unknown, draw, budget exhaustion => keep playing.
+def inevitable_result(board,turn,rule,quiet,repeats,sequence,remaining=None):
+    if sequence<12 or sum(bool(p) for p in board)>5 or quiet>=40:return None
+    if remaining and min(remaining.values())<=15:return None
+    if repeats.get(position_key(board,turn,rule),0)>=3:return None
+    seen=dict(repeats);nodes=0;deadline=time.monotonic()+.025
+    def prove(b,side,q,depth):
+        nonlocal nodes
+        nodes+=1
+        if nodes>900 or time.monotonic()>deadline:return None
+        moves=legal(b,side,rule)
+        if not moves:return (side if rule=='giveaway' else -side,0)
+        if q>=40 or seen.get(position_key(b,side,rule),0)>=3 or depth==0:return None
+        unanimous=None;distance=0
+        for m in moves:
+            x=b.copy();p=x[m['from']];to=m['path'][-1];x[m['from']]=0
+            for v in m['cap']:x[v]=0
+            n=board_size(rule);x[to]=p*2 if abs(p)==1 and to//n==(0 if side==1 else n-1) else p
+            k=position_key(x,-side,rule);seen[k]=seen.get(k,0)+1
+            try:answer=prove(x,-side,q+1 if not m['cap'] and abs(p)==2 else 0,depth-1)
+            finally:
+                seen[k]-=1
+                if not seen[k]:del seen[k]
+            if answer is None:return None
+            w,d=answer
+            if unanimous is not None and w!=unanimous:return None
+            unanimous=w;distance=max(distance,d+1)
+        return (unanimous,distance)
+    result=prove(board,turn,quiet,4)
+    return dict(winner=result[0],plies=result[1]) if result and result[1]>0 else None
+
 def match_stats(r):
     stats={'1':{'captures':0,'promotions':0},'-1':{'captures':0,'promotions':0}}
     for m in r.get('moves',[]):
@@ -326,7 +361,7 @@ def clock_value(d):
 def reset_match(r):
     now=time.monotonic()
     seconds=r.get('minutes',0)*60
-    r.update(board=initial_for(r['rule']),turn=1,sequence=0,winner=None,result=None,quiet=0,match=secrets.token_hex(16),rematch=set(),moves=[],chat=[],chat_seen={},draw_offer=None,remaining={1:seconds,-1:seconds},clock_at=None,started=now)
+    r.update(board=initial_for(r['rule']),turn=1,sequence=0,winner=None,result=None,proof=None,quiet=0,match=secrets.token_hex(16),rematch=set(),moves=[],chat=[],chat_seen={},draw_offer=None,remaining={1:seconds,-1:seconds},clock_at=None,started=now)
 
     r['repeats']={boardkey(r):1}
 def tick_clock(r,now):
@@ -376,6 +411,10 @@ def process(r,seat,msg):
         k=boardkey(r); r['repeats'][k]=r['repeats'].get(k,0)+1
         if not legal(b,-side,r['rule']): finish(r,-side if r['rule']=='giveaway' else side,reason='giveaway' if r['rule']=='giveaway' else None)
         elif r['quiet']>=40 or r['repeats'][k]>=3: finish(r,0)
+        else:
+            proof=inevitable_result(b,r['turn'],r['rule'],r['quiet'],r['repeats'],r['sequence'],r['remaining'] if r.get('minutes') else None)
+            if proof:
+                r['proof']=proof;finish(r,proof['winner'],reason='inevitable')
         return True
     if r.get('event') and t.startswith('rematch'):return False
     if t=='rematch' and r['winner'] is not None:
