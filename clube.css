@@ -35,3 +35,19 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 
 /* V4.1: variant selection */
 #rulechoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}#rulechoices button{min-height:38px;white-space:normal;font-size:11px;padding:8px 5px}#rulechoices button:last-child{grid-column:1/-1}#rulechoices button[data-rule='giveaway'].active{border-color:#e4b272;background:linear-gradient(135deg,#88633a,#503220)}.club-settings select{min-width:0}
+
+/* V5.2 — confirmation belongs to the game, not the browser. */
+.resign-dialog{box-sizing:border-box;width:min(430px,calc(100% - 28px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #b9925b;border-radius:15px;color:#f4dfbd;background:linear-gradient(145deg,#493322,#291c14);box-shadow:0 24px 80px #000b,inset 0 0 0 3px #77512c55;overflow:auto}
+.resign-dialog::backdrop{background:#100b08b8;backdrop-filter:blur(4px)}
+.resign-card{display:grid;gap:10px;padding:24px;text-align:center;justify-items:center}
+.resign-emblem{display:grid;place-items:center;width:62px;height:62px;border:1px solid #c8a16c;border-radius:50%;background:radial-gradient(circle at 30% 20%,#795337,#36241b);font:32px Georgia;color:#f2cba0;box-shadow:inset 0 0 0 4px #36261a}
+.resign-card h2{font:normal 25px Georgia;margin:0;color:#f6e2be}
+.resign-card p{margin:0;color:#dac1a2;font:14px/1.55 Arial}
+.resign-card .resign-points{color:#ffc2b5;background:#6e332d70;border:1px solid #ac6c5d;padding:8px 12px;border-radius:8px;font-weight:700}
+.resign-card .resign-points[hidden]{display:none}
+.resign-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-top:6px}
+.resign-actions button{min-height:44px;width:100%;font:700 12px/1.4 Arial;padding:10px 8px;border-radius:8px;white-space:normal}
+.resign-danger{background:linear-gradient(#9c5146,#713329);color:#fff0e2;border:1px solid #bc7966;cursor:pointer}
+.resign-danger:hover{background:linear-gradient(#ad6454,#843d33)}
+.resign-card .resign-note{font:11px/1.4 Arial;color:#bba58b}
+@media(max-width:480px){.resign-card{padding:20px 15px;gap:9px}.resign-actions{grid-template-columns:1fr}.resign-card h2{font-size:23px}}
