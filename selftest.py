@@ -13,6 +13,13 @@ def run(s):
                 assert status==200,(path,status,d)
                 return d
             call('register',a);call('register',b)
+            c={'name':'João da Silva','profileToken':'c'*64};call('register',c)
+            cid=s.identity(c);s.PRESENCE.pop(cid)
+            found=call('search',a,query='JOAO');assert found['total']==1 and found['players'][0]['id']==cid and not found['players'][0]['online']
+            assert call('player',a,target=cid)['player']['points']==1000
+            call('friend/request',a,target=cid);assert call('player',a,target=cid)['player']['relation']=='outgoing'
+            call('friend/remove',a,target=cid)
+            assert call('search',a,query='inexistente')['players']==[]
             aid=s.identity(a);bid=s.identity(b)
             d=call('state',a);assert d['players'][0]['id']==bid and d['players'][0]['online']
             call('friend/request',a,target=bid)
@@ -42,6 +49,6 @@ def run(s):
             assert room['rule']=='official' and not room['ranked']
             s.process(room,1,{'type':'resign'})
             assert call('state',a)['me']['points']==1025 and call('state',b)['me']['points']==980
-            print('SELFTEST OK: presence, friendship, removal, invitations, four moves, ranked resignation, duplicate result, casual mode',flush=True)
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode',flush=True)
         finally:
             s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES=old
