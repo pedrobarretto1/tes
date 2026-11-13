@@ -5,10 +5,10 @@ from unittest.mock import patch
 import json
 
 def run(s):
-    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES)
+    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE)
     with TemporaryDirectory() as tmp:
         try:
-            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={}
+            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={}
             s.setup()
             a={'name':'Teste A','profileToken':'a'*64};b={'name':'Teste B','profileToken':'b'*64}
             def call(path,who,**kw):
@@ -135,6 +135,44 @@ def run(s):
             result=http('/api/poll',gb)['result']
             assert result['winner']==gb['side'] and not result['ranked']
             assert call('state',a)['me']['points']==before_a and call('state',b)['me']['points']==before_b
-            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result',flush=True)
+            # Matchmaking: two compatible players, opposite colors, same room.
+            s.ROOMS[host['code']]['closed']=True
+            s.MATCH_QUEUE.clear()
+            queued=call('matchmaking/start',a,rule='free',ranked=True,minutes=5)
+            assert queued['matchmaking'] and not queued['session']
+            found=call('matchmaking/start',b,rule='free',ranked=True,minutes=5)
+            other=call('state',a)['session'];match=found['session']
+            assert other['code']==match['code'] and other['side']==-match['side']
+            room=s.ROOMS[match['code']]
+            assert room['minutes']==5 and not s.MATCH_QUEUE
+            aa={k:other[k] for k in ('code','side','token')}
+            bb={k:match[k] for k in ('code','side','token')}
+            # Snapshot recovery on refresh includes board, side, moves and clocks.
+            data=http('/api/poll',aa);assert data['snapshot']['minutes']==5
+            seat=aa if aa['side']==1 else bb
+            move=s.legal(room['board'],1,room['rule'])[0]
+            http('/api/send',dict(seat,message=json.dumps({'type':'move','sequence':1,'before':s.boardkey(room),'move':move})))
+            resumed=call('state',a)['session'];assert resumed['token']==aa['token']
+            snap=http('/api/poll',aa)['snapshot'];assert snap['sequence']==1 and snap['board']==room['board'] and len(snap['moves'])==1
+            before_a=call('state',a)['me']['points'];before_b=call('state',b)['me']['points']
+            http('/api/send',dict(aa,message=json.dumps({'type':'draw-offer'})))
+            assert http('/api/poll',bb)['snapshot']['drawOffer']==aa['side']
+            http('/api/send',dict(bb,message=json.dumps({'type':'draw-accept'})))
+            result=http('/api/poll',aa)['result']
+            assert result['winner']==0 and result['reason']=='agreement' and len(result['moves'])==1
+            assert call('state',a)['me']['points']==before_a+5 and call('state',b)['me']['points']==before_b+5
+            assert call('replay',a,match=result['match'])['replay']['moves']==result['moves']
+            room['closed']=True
+            # Timeout uses server time, awards a normal loss, no resignation penalty.
+            host=http('/api/create',dict(a,rule='free',minutes=3))
+            guest=http('/api/join',dict(b,code=host['code']))
+            room=s.ROOMS[host['code']]
+            s.tick_clock(room,1000);s.tick_clock(room,1181)
+            assert room['winner']==-1 and room['result']['reason']=='timeout'
+            assert room['result']['deltas']['1']==-15 and room['result']['deltas']['-1']==25
+            room['closed']=True
+            call('matchmaking/start',a,rule='official',minutes=0)
+            assert not call('matchmaking/cancel',a)['matchmaking']
+            print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation',flush=True)
         finally:
-            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES=old
+            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE=old
