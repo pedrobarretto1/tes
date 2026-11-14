@@ -29,7 +29,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   Não bloquear partidas oficiais, ranking ou campanhas. Nenhum saldo alterado.
 - test_clas.py: hierarquia, legado, autorização, histórico, retorno/resposta,
   suspensão/expiração, expulsão, transferência; test_clas_ui.js: abas e
-  ações por cargo. CI/publicação pendentes. Branch clas-conselho-real.
+  ações por cargo. CI 43637006196 aprovado: 22 testes Python, SELFTEST, regressão Torre e Chromium 375/758/1280 px. PR #10 integrada: e8e2f8f77667bacd5190ccc247d47b15949b7238. Render dep-dbsc5m56e07s739efrl0 live.
 - Rollback: reverter código preservando novas tabelas (não apagar histórico).
   Validação manual entre contas reais ainda pendente.
 
