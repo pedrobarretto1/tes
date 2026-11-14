@@ -46,7 +46,7 @@ Propostas adicionais: máximo de derrotas e mínimo de partidas concluídas.
 Taxa = vitórias / (vitórias + derrotas + empates) × 100; zero partidas = sem taxa, não qualifica se taxa exigida. Usar dados de ranking do servidor, não dados enviados pelo cliente. Sem expulsão automática quando a estatística cai depois de entrar; regras valem para admissão.
 - Candidato consulta requisitos e diagnóstico; se não atende, não pode solicitar.
 - Solicitação pendente única por candidato/clã. Apenas dono recebe notificação com nome, stats públicos, requisitos e status de cada um, Aceitar/Recusar/X. Revalidação no aceite (requisitos atuais, vaga, conta e ausência de outro clã). Entra numa única transação; pedidos concorrentes invalidados.
-- Dono pode convidar um perfil; convidado escolhe aceitar/recusar; mesma validação, sem bypass. Fechar cartão não recusa. Pedido de clã persiste; política de validade proposta 7 dias, notificação acionável sem timer local. Limites de envio e cooldown após recusa. Chat nunca expõe tokens, sessões, senhas.
+- Dono pode convidar um perfil; convidado escolhe aceitar/recusar; Convite Real dispensa requisitos, mantendo as demais validações. Fechar cartão não recusa. Pedido de clã persiste; política de validade proposta 7 dias, notificação acionável sem timer local. Limites de envio e cooldown após recusa. Chat nunca expõe tokens, sessões, senhas.
 - Se requisitos forem alterados, comparar regras atuais e informar candidato, não aprovar silenciosamente com regra antiga.
 
 ## Nível
