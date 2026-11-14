@@ -221,14 +221,14 @@ def run(s):
             # Explicit opt-in spectator streams from local, AI and campaign matches.
             broadcaster={'name':'Mestre Ao Vivo','profileToken':'e'*64};viewer={'name':'Observador','profileToken':'f'*64}
             call('register',broadcaster);call('register',viewer)
-            bid=s.identity(broadcaster)
+            broadcaster_id=s.identity(broadcaster)
             payload=dict(public=True,match='local-1',mode='ai',rule='official',board=s.initial_for('official'),side=1,turn=1,sequence=0,last=[],result=None)
             status,_=s.social_action('/api/social/live/publish',dict(broadcaster,**{**payload,'public':False}),1000);assert status==403
             status,_=s.social_action('/api/social/live/publish',dict(broadcaster,**{**payload,'board':[0]*63}),1000);assert status==400
             live=call('live/publish',broadcaster,**payload);code=live['code']
-            assert any(p['id']==bid and p['live']['code']==code for p in call('state',viewer)['players'])
-            assert call('player',viewer,target=bid)['player']['live']['mode']=='ai'
-            watched=call('live/watch',viewer,target=bid);assert watched['code']==code and watched['board']==payload['board'] and 'token' not in watched
+            assert any(p['id']==broadcaster_id and p['live']['code']==code for p in call('state',viewer)['players'])
+            assert call('player',viewer,target=broadcaster_id)['player']['live']['mode']=='ai'
+            watched=call('live/watch',viewer,target=broadcaster_id);assert watched['code']==code and watched['board']==payload['board'] and 'token' not in watched
             move=s.legal(payload['board'],1,'official')[0];payload.update(board=s.journey_apply(payload['board'],move),sequence=1,turn=-1,last=[move['from'],*move['path']])
             assert call('live/publish',broadcaster,**payload)['code']==code
             assert call('live/watch',viewer,code=code)['sequence']==1
