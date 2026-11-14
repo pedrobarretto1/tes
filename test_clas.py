@@ -241,7 +241,13 @@ class ClanTest(unittest.TestCase):
         self.assertTrue(any(not c['ok'] for c in r['checks']))
         self.assertEqual(self.call('bob','recommend-review',id=r['id'],opinion='support')[0],403)
         self.assertEqual(self.call('alice','recommend-decide',id=r['id'],accept=True)[0],403)
+        self.assertEqual(self.call('alice','invite',target='other')[0],403)
         self.assertEqual(self.call('alice','recommend-review',id=r['id'],opinion='support')[0],200)
+        # A favorable opinion is not an invitation, admission, or approval.
+        self.assertEqual(self.call('other','state')[1]['requests'],[])
+        self.assertIsNone(self.call('other','state')[1]['mine'])
+        self.assertEqual(self.call('alice','recommend-decide',id=r['id'],accept=True)[0],403)
+        self.assertEqual(self.call('alice','invite',target='other')[0],403)
         rr=self.call('owner','state')[1]['mine']['recommendations'][0]
         self.assertEqual(rr['opinion'],'support')
         with s.database() as db:
