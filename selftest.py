@@ -76,12 +76,31 @@ def run(s):
             assert s.process(room,b_side,{'type':'resign'})
             assert call('state',a)['me']['points']==1050 and call('state',b)['me']['points']==960
             room['closed']=True
-            d=call('challenge',a,target=bid,ranked=False,rule='official')
-            d=call('challenge/respond',b,invite=d['challenges'][0]['id'],accept=True)
+            d=call('challenge',a,target=bid,ranked=False,rule='free')
+            invite=d['challenges'][0]['id']
+            assert s.social_action('/api/social/challenge/respond',dict(a,invite=invite,accept=True,rule='official'),1000)[0]==409
+            assert s.social_action('/api/social/challenge/respond',dict(b,invite=invite,accept=True,rule='bogus'),1000)[0]==400
+            d=call('challenge/respond',b,invite=invite,accept=True,rule='official')
             room=s.ROOMS[d['session']['code']]
-            assert room['rule']=='official' and not room['ranked']
+            assert room['rule']=='official' and not room['ranked'] and len(room['board'])==64
+            assert call('state',a)['session']['rule']=='official'
+            assert s.social_action('/api/social/challenge/respond',dict(b,invite=invite,accept=True,rule='english'),1000)[0]==409
             s.process(room,1,{'type':'resign'})
             assert call('state',a)['me']['points']==1050 and call('state',b)['me']['points']==960
+            room['closed']=True
+            # Receiver can choose a larger board; casual-only rules cannot award PH.
+            d=call('challenge',a,target=bid,ranked=True,rule='free')
+            invite=d['challenges'][0]['id']
+            d=call('challenge/respond',b,invite=invite,accept=True,rule='international')
+            room=s.ROOMS[d['session']['code']]
+            assert room['rule']=='international' and not room['ranked'] and len(room['board'])==100
+            assert call('state',a)['session']['rule']=='international'
+            room['closed']=True
+            # A ranked eligible choice preserves the sender's ranked preference.
+            d=call('challenge',a,target=bid,ranked=True,rule='canadian')
+            d=call('challenge/respond',b,invite=d['challenges'][0]['id'],accept=True,rule='english')
+            room=s.ROOMS[d['session']['code']]
+            assert room['rule']=='english' and room['ranked'] and len(room['board'])==64
             room['closed']=True
             def http(path,body):
                 handler=object.__new__(s.Handler); payload=json.dumps(body).encode()
