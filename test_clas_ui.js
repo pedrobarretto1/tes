@@ -44,6 +44,20 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert.equal(await page.locator('.clan-preview-description').textContent(),'Honra, lealdade e glória.');
       assert.equal(await page.locator('.clan-foundation-preview .clan-crest').getAttribute('data-emblem'),'knight');
       const crest=page.locator('.clan-foundation-preview .clan-crest');
+      // The heading and back button must stay within the outer border while the form scrolls.
+      const header=page.locator('#clanoverlay .club-head'),shell=page.locator('#clanoverlay .clan-shell'),scroll=page.locator('#clanscroll');
+      await scroll.evaluate(el=>el.scrollTop=el.scrollHeight);
+      const [hb,sb,cb]=await Promise.all([header.boundingBox(),shell.boundingBox(),scroll.boundingBox()]);
+      assert(hb.y>=sb.y+8&&hb.y+hb.height<=cb.y+1,'header overlaps scroll or border at '+width);
+      assert(hb.x>=sb.x+8&&hb.x+hb.width<=sb.x+sb.width-8,'header outside frame at '+width);
+      assert(cb.y+cb.height<=sb.y+sb.height-8,'scroll content outside frame at '+width);
+      assert(await scroll.evaluate(el=>el.scrollTop>0),'form should scroll');
+      await page.setViewportSize({width,height:540});
+      const [hs,ss,cs]=await Promise.all([header.boundingBox(),shell.boundingBox(),scroll.boundingBox()]);
+      assert(ss.y>=0&&ss.y+ss.height<=541,'short viewport shell clipped');
+      assert(hs.y>=ss.y+8&&hs.y+hs.height<=cs.y+1,'short viewport heading clipped');
+      await page.setViewportSize({width,height:800});
+      await scroll.evaluate(el=>el.scrollTop=0);
       await page.getByLabel('Estilo da moldura').selectOption('ornate');
       await page.getByRole('button',{name:'Cor do símbolo · Rubi',exact:true}).click();
       await page.getByRole('button',{name:'Cor da moldura · Prata',exact:true}).click();
