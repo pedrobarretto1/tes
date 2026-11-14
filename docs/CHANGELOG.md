@@ -20,7 +20,8 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   sem API, Voltar sem requisição, restrição casual, confirmação única com regra
   escolhida, convite expirado bloqueado. Não houve teste em dois navegadores.
 - Commits: 066e24de, b3c34c1b, aa04b8e8. Sem mudança em servidor, banco, Torre
-  ou Jornada. Publicação a confirmar.
+  ou Jornada. Render live: dep-dbsa0iuc6qcc738jr8mg, commit 77c95e30c99e128155b830b39cd37acbef2b6ef0.
+  SELFTEST geral e 8 testes da Torre aprovados; Neon conectado.
 - Rollback: reverter os três commits funcionais e preservar o seletor anterior.
 
 ## 14/11/2026 — Desafiado escolhe a modalidade do convite
