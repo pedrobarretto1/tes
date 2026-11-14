@@ -861,6 +861,41 @@ def journey_draw_reason(run,position):
     if run['repeats'].get(position,0)>=3:return 'repetition'
     return None
 
+def journey_bot_lost(run,depth=4):
+    # Bounded proof: the human has a winning continuation against every
+    # possible bot reply. Draw limits are respected; unknown means play on.
+    if sum(bool(p) for p in run['board'])>5:return False
+    nodes=0;deadline=time.monotonic()+.035
+    def prove(state,side,left):
+        nonlocal nodes
+        nodes+=1
+        if nodes>1800 or time.monotonic()>deadline:return False
+        moves=legal(state['board'],side,'official')
+        if not moves:return side==-1
+        if not left:return False
+        for m in moves:
+            b=state['board'];x=journey_apply(b,m);k=position_key(x,-side,'official')
+            child=dict(state,board=x,sequence=state['sequence']+1,quiet=state['quiet']+1 if not m['cap'] and abs(b[m['from']])==2 else 0,repeats=dict(state['repeats']))
+            child['repeats'][k]=child['repeats'].get(k,0)+1
+            if not legal(x,-side,'official'):won=side==1
+            elif journey_draw_reason(child,k):won=False
+            else:won=prove(child,-side,left-1)
+            if side==1 and won:return True
+            if side==-1 and not won:return False
+        return side==-1
+    return prove(run,-1,depth)
+
+def journey_bot_offer(run):
+    b=run['board'];clock=run.get('endgame')
+    if run.get('outcome') is not None or run.get('botOffer') or run['sequence']-run.get('botOfferAt',-100)<10:return
+    if not clock or clock['remaining']<=0 or any(abs(p)==1 for p in b):return
+    if any(m['cap'] for side in (1,-1) for m in legal(b,side,'official')):return
+    repeated=run['repeats'].get(position_key(b,1,'official'),0)>=2
+    # Offer only in a quiet, low-material ending, not on material alone.
+    if run['quiet']>=6 or repeated or (b.count(2)==b.count(-2)==1 and run['quiet']>=2):
+        run['botOffer']=dict(sequence=run['sequence'],reason='stalled')
+        run['botOfferAt']=run['sequence']
+
 def journey_award(db,pid,run,completed,unlocked):
     if run['outcome']=='win' and run['chapter']==completed:
         completed+=1;run['reward']=25*completed;wallet_add(db,pid,run['reward'])
@@ -920,13 +955,18 @@ def journey_action(path,d,pid,now):
                 if not any(pair[0] in owned for pair in ROYAL_PATHS.values()):return 403,{'error':'Escolha sua primeira relíquia.'}
             if run and run.get('version')==2 and run['outcome'] is None and run['chapter']==chapter and run.get('path')==path_key and d.get('restart') is not True:return 200,journey_public(completed,run,unlocked,db,pid)
             board=journey_board(chapter);run=dict(id=secrets.token_hex(12),version=2,chapter=chapter,path=path_key,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
+        elif action=='draw/respond':
+            if not run or run['outcome'] is not None or d.get('id')!=run['id'] or not run.get('botOffer') or d.get('sequence')!=run['sequence'] or type(d.get('accept')) is not bool:return 409,{'error':'Proposta de empate indisponível.'}
+            run.pop('botOffer',None)
+            if d['accept']:run['outcome']='draw';run['reason']='agreement'
         elif action=='resign':
             if not run or run['outcome'] is not None or d.get('id')!=run['id']:return 409,{'error':'Partida desatualizada.'}
-            run['outcome']='loss';run['reason']='resign'
+            run.pop('botOffer',None);run['outcome']='loss';run['reason']='resign'
         elif action=='move':
             if not run or run['outcome'] is not None or d.get('id')!=run['id'] or type(d.get('sequence')) is not int or d['sequence']!=run['sequence']:return 409,{'error':'Partida desatualizada. Atualize a jornada.'}
             m=d.get('move')
             if m not in legal(run['board'],1,'official'):return 400,{'error':'Lance inválido.'}
+            run.pop('botOffer',None)
             def play(m,side):
                 b=run['board'];piece=b[m['from']];run['board']=journey_apply(b,m);run['sequence']+=1
                 run['quiet']=run['quiet']+1 if not m['cap'] and abs(piece)==2 else 0
@@ -938,9 +978,13 @@ def journey_action(path,d,pid,now):
                     if reason:run['outcome']='draw';run['reason']=reason
             play(m,1)
             if run['outcome'] is None:
-                ai=journey_ai(run['board'],run['chapter'],run.get('path'))
-                if ai:play(ai,-1)
-                else:run['outcome']='win'
+                if journey_bot_lost(run):
+                    run['outcome']='win';run['reason']='bot_resign'
+                else:
+                    ai=journey_ai(run['board'],run['chapter'],run.get('path'))
+                    if ai:play(ai,-1)
+                    else:run['outcome']='win'
+            if run['outcome'] is None:journey_bot_offer(run)
             completed,unlocked=journey_award(db,pid,run,completed,unlocked)
         else:return 404,{'error':'Ação desconhecida.'}
         sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
