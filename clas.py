@@ -304,7 +304,7 @@ def action(s,path,d,pid):
                 if not 1<=len(body)<=500:return err('Mensagem deve ter de 1 a 500 caracteres.')
                 if sql(db,'SELECT COUNT(*) FROM clan_messages WHERE author=? AND created_at>?',(pid,now-10)).fetchone()[0]>=5:return err('Envie mensagens mais devagar.',429)
                 sql(db,'INSERT INTO clan_messages VALUES(?,?,?,?,?)',(secrets.token_hex(12),cid,pid,body,now))
-            rows=sql(db,'SELECT m.id,m.author,p.name,m.body,m.created_at,CASE WHEN cm.player_id IS NULL THEN NULL WHEN c.owner=m.author THEN 'king' ELSE COALESCE(cr.role,'member') END FROM clan_messages m JOIN players p ON p.id=m.author JOIN clans c ON c.id=m.clan_id LEFT JOIN clan_members cm ON cm.player_id=m.author AND cm.clan_id=m.clan_id LEFT JOIN clan_roles cr ON cr.player_id=cm.player_id WHERE m.clan_id=? ORDER BY m.created_at DESC,m.id DESC LIMIT 50',(cid,)).fetchall()
+            rows=sql(db,"SELECT m.id,m.author,p.name,m.body,m.created_at,CASE WHEN cm.player_id IS NULL THEN NULL WHEN c.owner=m.author THEN 'king' ELSE COALESCE(cr.role,'member') END FROM clan_messages m JOIN players p ON p.id=m.author JOIN clans c ON c.id=m.clan_id LEFT JOIN clan_members cm ON cm.player_id=m.author AND cm.clan_id=m.clan_id LEFT JOIN clan_roles cr ON cr.player_id=cm.player_id WHERE m.clan_id=? ORDER BY m.created_at DESC,m.id DESC LIMIT 50",(cid,)).fetchall()
             return 200,{'clan':cid,'messages':[dict(zip(('id','author','name','body','created_at','role'),r)) for r in reversed(rows)]}
         else:return err('Ação desconhecida.',404)
         return 200,state(db,sql,pid)
