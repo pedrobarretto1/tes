@@ -57,11 +57,13 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert.equal(await crest.locator('svg.clan-jerusalem-cross path').count(),5);
       assert.equal(await crest.locator('svg.clan-jerusalem-cross').evaluate(el=>getComputedStyle(el).fill),'rgb(165, 45, 67)');
       await page.getByLabel('Brasão da ordem').selectOption('knight');
-      assert.equal(await crest.locator('svg').count(),0);
+      assert.equal(await crest.locator('svg.clan-jerusalem-cross').count(),0);
       const shapes=new Set();
       for(const style of ['royal','fortress','dark','sacred','ancient','ornate']){
         await page.getByLabel('Estilo da moldura').selectOption(style);
-        shapes.add(await crest.evaluate(el=>getComputedStyle(el).clipPath));
+        shapes.add(await crest.locator('.crest-outer').getAttribute('d'));
+        assert((await crest.locator('svg.clan-crest-metal path').count())>=7);
+        assert.equal(await crest.locator('.crest-field').getAttribute('fill'),'#672e42');
       }
       assert.equal(shapes.size,6);
       for(const label of ['Cor do símbolo','Cor da moldura','Cor do fundo'])await page.getByRole('button',{name:label+' · Ouro',exact:true}).click();
