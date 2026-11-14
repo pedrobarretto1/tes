@@ -16,6 +16,11 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   adapta cartões, notificações e preview maior de fundação. Cache v74/v69.
 - test_clas_ui.js: verifica seis paths distintos, camadas, cor de fundo,
   troca da Cruz de Jerusalém, preview e editor administrativo.
+- Correção adicional (print): cabeçalho do Salão escapava da moldura durante
+  rolagem. index.html separa #clanscroll; CSS limita shell ao grid do viewport,
+  cabeçalho fixo dentro da borda e corpo rolável, preview com margem interna;
+  renderClan/openClan reiniciam rolagem ao trocar aba. Teste Chromium confere
+  limites do topo/rodapé durante rolagem e viewport baixo de 540 px.
 - Sem alteração de servidor, schema, economia ou dados. CI/publicação pendentes.
   Rollback: reverter renderer e CSS; designs salvos continuam compatíveis.
 
