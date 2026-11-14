@@ -20,7 +20,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
 - Testes: sintaxe JS e simulação de dois cartões, timers 30/10/7 s,
   deduplicação, aceite de desafio sem API, recusa de amizade, X e timeout
   sem recusa; todos aprovados. Sem teste visual em navegadores reais.
-- Commits 7116bc50, 90ade956, 4e834a98, e8d524b8. Publicação a confirmar.
+- Commits 7116bc50, 90ade956, 4e834a98, e8d524b8. Render live: dep-dbsad7jbc2fs73b1p2n0, commit df5d523f0707d37c858ea173b66d7cf2d8f86a6b. SELFTEST geral e 12 testes da Torre aprovados; Neon conectado.
 - Banco não modificado: exclusão do perfil visitante solicitado depende de
   confirmação explícita após identificar o registro. Não registrar dados pessoais.
 - Rollback: reverter commits da UI; sem alteração no protocolo ou na Torre.
