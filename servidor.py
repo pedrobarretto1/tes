@@ -837,13 +837,13 @@ def journey_ai(b,chapter,path=None,run=None,stats=None):
         # Extend compulsory captures at the horizon, not arbitrary quiet moves.
         if depth<=0 and (not ms[0]['cap'] or qleft<=0):return evaluate(x,side)
         k=(tuple(x),side,ply);entry=tt.get(k) if depth>0 else None
-        original_alpha=alpha;original_beta=beta
         if entry and entry[0]>=depth:
             _,v,flag,_=entry
             if flag=='exact':return v
             if flag=='lower':alpha=max(alpha,v)
             if flag=='upper':beta=min(beta,v)
             if alpha>=beta:return v
+        original_alpha=alpha;original_beta=beta
         value=-INF;choice=None
         for m in order(x,ms,side,ply,entry[3] if entry else None):
             v=-search(journey_apply(x,m),-side,depth-1,-beta,-alpha,ply+1,qleft-(depth<=0))
@@ -855,9 +855,6 @@ def journey_ai(b,chapter,path=None,run=None,stats=None):
                 break
         if depth>0 and len(tt)<24000:
             flag='upper' if value<=original_alpha else 'lower' if value>=original_beta else 'exact'
-            # A narrowed TT window can also produce a bound, never an exact value.
-            if entry and entry[0]>=depth and entry[2]=='upper' and value>=entry[1] and flag=='exact':flag='lower'
-            if entry and entry[0]>=depth and entry[2]=='lower' and value<=entry[1] and flag=='exact':flag='upper'
             tt[k]=(depth,value,flag,choice)
         return value
     # Exact draw adjudication for the imminent move; search itself is bounded

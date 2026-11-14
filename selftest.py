@@ -414,10 +414,11 @@ def run(s):
             choice=s.journey_ai(trap,2,stats=stats)
             assert choice in s.legal(trap,-1,'official') and trap==original and stats['depth']>=1
             assert not any(m['cap'] for m in s.legal(s.journey_apply(trap,choice),1,'official'))
-            for level,path in ((0,None),(4,None),(4,'shadow'),(4,'divine'),(4,'infinite')):
+            for level,path in ((0,None),(1,None),(2,None),(3,None),(4,None),(4,'shadow'),(4,'divine'),(4,'infinite')):
                 stats={};board=s.initial_for('official');m=s.journey_ai(board,level,path,stats=stats)
                 assert m in s.legal(board,-1,'official') and stats['depth']>=1
                 assert stats['maxDepth']==(12 if path else s.JOURNEY[level]['depth'])
+                print('JOURNEY AI BENCH',level+1,path or 'normal',stats,flush=True)
             print('JOURNEY AI OK: legal moves, tactical trap, five budgets and three legendary paths',flush=True)
             # Test fixture only: complete a near-terminal traditional game.
             board=[0]*64;board[42]=1;board[35]=-1
