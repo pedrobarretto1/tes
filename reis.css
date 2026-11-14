@@ -36,3 +36,12 @@ html[data-skin^="skin-relic-"]:not([data-skin="skin-relic-throne"]) .piece.king:
 .royal-ending .board{transition:filter 1.5s}
 .royal-ending[data-outcome="defeat"] .board,.royal-ending[data-outcome="resign"] .board{filter:brightness(.55) saturate(.5)}
 @media(max-width:520px){.royal-paths{grid-template-columns:1fr}.royal-path-card{display:grid;grid-template-columns:36px 1fr;text-align:left}.royal-path-card p,.royal-path-card button{grid-column:2}.royal-path-card p{min-height:0}.royal-path-icon{grid-row:1/3}}
+
+.royal-preview{width:100%;max-width:280px;aspect-ratio:540/610;position:relative;isolation:isolate;overflow:visible;margin:0 auto}
+.royal-preview-arch{position:absolute;inset:0;pointer-events:none}.royal-preview-arch svg{display:block;width:100%;height:100%}
+.royal-preview .royal-preview-grid{position:absolute;left:12.963%;top:19.18%;width:74.074%;height:65.574%;padding:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);gap:0;aspect-ratio:1;border:1px solid var(--forge-edge);border-radius:0;box-shadow:none;background:none;overflow:hidden}
+.royal-preview .shop-square{min-width:0;min-height:0;position:relative;display:grid;place-items:center;aspect-ratio:1;background-size:100% 100%,100% 100%}
+.royal-preview .shop-square .piece{width:80%;height:auto;aspect-ratio:1;border-width:1px;box-shadow:none}
+.royal-preview .shop-square .piece:before{border-width:.5px}
+.royal-path-card .royal-preview{max-width:190px}
+@media(max-width:520px){.royal-path-card .royal-preview{grid-column:1/-1;grid-row:auto;max-width:180px}.royal-path-card .royal-path-icon{grid-row:auto}.royal-path-card p,.royal-path-card button{grid-column:1/-1}.royal-path-card{grid-template-columns:36px 1fr}.royal-path-card strong{align-self:center}}
