@@ -180,8 +180,32 @@ function paintCrestSymbol(glyph,symbol){
   const cross=document.createElementNS(ns,'path');cross.setAttribute('d','M32 0H59V32H92V59H59V92H32V59H0V32H32Z');cross.setAttribute('transform','translate('+x+' '+y+')');svg.append(cross);
  }glyph.append(svg)
 }
-function paintCrest(shield,value){let d=crestDesign(value);shield.dataset.emblem=d.symbol;shield.dataset.frame=d.frame_style;shield.dataset.symbolColor=d.symbol_color;shield.dataset.frameColor=d.frame_color;shield.dataset.backgroundColor=d.background_color;shield.style.setProperty('--crest-symbol',crestColors[d.symbol_color][1]);shield.style.setProperty('--crest-frame',crestColors[d.frame_color][1]);shield.style.setProperty('--crest-bg',crestColors[d.background_color][1]);paintCrestSymbol(shield.children[0],d.symbol);shield.children[1].textContent=d.frame_style==='ornate'?'✦':d.frame_style==='sacred'?'✧':d.frame_style==='ancient'?'◆':d.frame_style==='fortress'?'▪':d.frame_style==='dark'?'◈':'♢'}
-function clanCrest(value='shield'){let shield=node('span','clan-crest'),glyph=node('span','clan-crest-glyph'),ornament=node('span','clan-crest-ornament');shield.setAttribute('aria-hidden','true');shield.append(glyph,ornament);paintCrest(shield,value);return shield}
+// Heraldic metalwork: original vector geometry; no images, filters or animation.
+const heraldicFrames={
+ royal:{outer:'M12 17Q35 18 60 9Q85 18 108 17L106 69Q103 99 60 129Q17 99 14 69Z',inner:'M23 27Q42 27 60 20Q78 27 97 27L95 69Q92 92 60 115Q28 92 25 69Z',decor:'M13 19Q4 13 8 7Q16 2 22 13M107 19Q116 13 112 7Q104 2 98 13M45 13L49 5L60 11L71 5L75 13M45 13L60 18L75 13M45 119L60 136L75 119M55 128L60 133L65 128'},
+ fortress:{outer:'M10 13H23V7H35V13H50V7H70V13H85V7H97V13H110L107 83L60 130L13 83Z',inner:'M23 25H97L94 78L60 114L26 78Z',decor:'M12 31H22M12 49H22M13 67H24M108 31H98M108 49H98M107 67H96M18 85L28 80M102 85L92 80M34 103L40 95M86 103L80 95',rivets:[[17,24],[103,24],[19,58],[101,58],[60,120]]},
+ dark:{outer:'M8 11Q24 23 39 14L60 5L81 14Q96 23 112 11L104 45L110 78Q93 107 60 136Q27 107 10 78L16 45Z',inner:'M25 29Q42 26 60 18Q78 26 95 29L91 48L97 75Q82 99 60 118Q38 99 23 75L29 48Z',decor:'M8 11L24 36L16 45M112 11L96 36L104 45M10 78L29 84L38 105M110 78L91 84L82 105M48 12L60 5L72 12M49 120L60 136L71 120'},
+ sacred:{outer:'M60 5C77 19 101 17 110 39C119 63 102 104 60 133C18 104 1 63 10 39C19 17 43 19 60 5Z',inner:'M60 20C77 30 93 28 98 44C105 65 88 97 60 117C32 97 15 65 22 44C27 28 43 30 60 20Z',decor:'M60 9L60 18M55 13H65M15 40Q9 34 13 26Q20 17 29 21M105 40Q111 34 107 26Q100 17 91 21M32 108Q17 107 16 93M88 108Q103 107 104 93M54 122L60 130L66 122',rivets:[[60,14],[16,55],[104,55],[60,125]]},
+ ancient:{outer:'M17 12Q60 5 103 12L110 29L103 84Q91 111 60 131Q29 111 17 84L10 29Z',inner:'M28 25Q60 18 92 25L97 33L91 80Q80 102 60 115Q40 102 29 80L23 33Z',decor:'M19 20L30 15M90 15L101 20M15 34L22 30L19 40M105 34L98 30L101 40M21 74L27 79L23 88M99 74L93 79L97 88M35 105L41 100M85 105L79 100M53 121L60 126L67 121',rivets:[[33,19],[87,19],[18,52],[102,52],[60,123]]},
+ ornate:{outer:'M60 5Q73 15 84 10Q96 4 99 17Q113 12 112 30L105 43Q118 58 109 76Q104 95 86 110L60 134L34 110Q16 95 11 76Q2 58 15 43L8 30Q7 12 21 17Q24 4 36 10Q47 15 60 5Z',inner:'M60 22Q76 28 92 26L95 43Q106 62 96 76Q86 97 60 115Q34 97 24 76Q14 62 25 43L28 26Q44 28 60 22Z',decor:'M15 43Q35 35 22 22Q15 17 14 27Q16 34 23 29M105 43Q85 35 98 22Q105 17 106 27Q104 34 97 29M12 67Q30 64 20 52M108 67Q90 64 100 52M21 87Q40 82 32 99M99 87Q80 82 88 99M40 113Q52 101 60 120Q68 101 80 113M60 7L53 15L60 23L67 15Z',rivets:[[60,15],[17,63],[103,63],[60,126]]}
+};
+function crestSvg(tag,attrs){let el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(let [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el}
+function crestShade(hex,amount){let n=parseInt(hex.slice(1),16),v=[n>>16,(n>>8)&255,n&255].map(c=>Math.round(amount>0?c+(255-c)*amount:c*(1+amount)));return '#'+v.map(c=>c.toString(16).padStart(2,'0')).join('')}
+function paintCrestFrame(svg,d){
+ let f=heraldicFrames[d.frame_style],base=crestColors[d.frame_color][1],bg=crestColors[d.background_color][1],light=crestShade(base,.52),dark=crestShade(base,-.48),mid=crestShade(base,-.22);
+ svg.replaceChildren();svg.dataset.style=d.frame_style;
+ let add=(tag,attrs)=>svg.append(crestSvg(tag,attrs));
+ add('path',{d:f.outer,fill:dark,stroke:crestShade(base,-.65),'stroke-width':2,'stroke-linejoin':'round',class:'crest-outer'});
+ add('path',{d:f.outer,fill:base,stroke:light,'stroke-width':2.2,'stroke-linejoin':'round',transform:'translate(1.8 1.8) scale(.97)'});
+ add('path',{d:f.inner,fill:dark,stroke:mid,'stroke-width':6,'stroke-linejoin':'round'});
+ add('path',{d:f.inner,fill:bg,stroke:light,'stroke-width':1.5,'stroke-linejoin':'round',class:'crest-field'});
+ add('path',{d:f.inner,fill:'none',stroke:crestShade(bg,.20),'stroke-width':1,transform:'translate(4.8 5.6) scale(.92)'});
+ add('path',{d:f.decor,fill:'none',stroke:dark,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'});
+ add('path',{d:f.decor,fill:'none',stroke:light,'stroke-width':1.4,'stroke-linecap':'round','stroke-linejoin':'round'});
+ for(let [x,y] of f.rivets||[]){add('circle',{cx:x,cy:y,r:2.5,fill:dark,stroke:light,'stroke-width':.9});add('circle',{cx:x-.6,cy:y-.7,r:.65,fill:light})}
+}
+function paintCrest(shield,value){let d=crestDesign(value);shield.dataset.emblem=d.symbol;shield.dataset.frame=d.frame_style;shield.dataset.symbolColor=d.symbol_color;shield.dataset.frameColor=d.frame_color;shield.dataset.backgroundColor=d.background_color;shield.style.setProperty('--crest-symbol',crestColors[d.symbol_color][1]);shield.style.setProperty('--crest-frame',crestColors[d.frame_color][1]);shield.style.setProperty('--crest-bg',crestColors[d.background_color][1]);paintCrestSymbol(shield.children[0],d.symbol);paintCrestFrame(shield.children[1],d)}
+function clanCrest(value='shield'){let shield=node('span','clan-crest'),glyph=node('span','clan-crest-glyph'),ornament=crestSvg('svg',{viewBox:'0 0 120 140',class:'clan-crest-metal','aria-hidden':'true'});shield.setAttribute('aria-hidden','true');shield.append(glyph,ornament);paintCrest(shield,value);return shield}
 function crestControls(parent,value,onChange){
  let design=crestDesign(value),grid=node('div','crest-editor'),controls={};
  function choice(key,label,options){let wrap=node('label','clan-field'),select=node('select','');wrap.append(node('span','clan-field-label',label));for(let [id,title] of options){let o=node('option','',title);o.value=id;select.append(o)}select.value=design[key];wrap.append(select);grid.append(wrap);controls[key]=select;select.onchange=()=>{design[key]=select.value;onChange({...design})}}
