@@ -5,6 +5,26 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Pedido de empate em janela do jogo
+- Pedido: destacar a oferta de empate na tela do adversário, sem aviso genérico
+  do navegador, com foco visual e decisões dentro do jogo.
+- index.html: dialog drawdialog, card medieval em madeira/dourado, ícone SVG,
+  nome do adversário, mensagem de PH, botões Aceitar empate/Continuar jogando.
+  Backdrop escurece a mesa; foco acessível no botão de continuar, sem alert/confirm.
+- syncDrawDialog integra clockSnapshot.drawOffer em updateDuelControls;
+  respondDraw envia draw-accept/draw-decline pelo protocolo existente. Janela
+  abre apenas para destinatário online, inclusive modo concentração, e fecha
+  quando servidor limpa oferta, termina partida, reinicia ou desconecta.
+  drawReplyPending evita duplicidade; reconexão/erro libera tentativa; ações
+  bloqueadas sem conexão. Escape não aceita/recusa implicitamente. Relógio não
+  pausa. Antigos avisos laterais ocultos; IA e Torre/Jornada preservadas.
+- Testes: sintaxe dos scripts OK; simulação isolada aprovada para abertura
+  única, resposta de recusa/aceite, proteção de duplicidade, atualização de
+  PH/casual, fechamento por estado/resultado, reconexão e ausência de janela
+  no remetente/offline. Sem teste visual em dois navegadores reais.
+- Commit cf0a2e3b; publicação a confirmar. Sem alteração de servidor ou banco.
+- Rollback: reverter commit funcional para restaurar aviso lateral.
+
 ## 14/11/2026 — Aceitar desafio abre escolha antes de criar a sala
 - Pedido: ao aceitar um desafio recebido, abrir uma tela própria para escolher
   a modalidade antes de entrar na partida, em vez do seletor no cartão do convite.
