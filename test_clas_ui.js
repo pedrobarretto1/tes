@@ -105,6 +105,13 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       });
       const tab=label=>page.locator('#clantabs').getByRole('button',{name:label,exact:true});
       assert.equal(await tab('Administração').count(),0);assert.equal(await tab('Personalização').count(),0);assert.equal(await tab('Denúncias').count(),0);assert(await tab('Torneios').isVisible());
+      await page.evaluate(()=>window.roleFixture('member','members'));
+      const plates=page.locator('.clan-nameplate');
+      assert.equal(await plates.count(),4);
+      for(let i=0;i<4;i++){let plate=plates.nth(i);let name=await plate.locator('.clan-person-name').boundingBox(),badge=await plate.locator('.clan-role-badge').boundingBox();assert(badge.y>=name.y+name.height-1,'cargo must be below name')}
+      assert.equal(await page.getByRole('button',{name:'Enviar convite real',exact:true}).count(),0);
+      await page.evaluate(()=>window.roleFixture('king','members'));
+      assert(await page.getByRole('button',{name:'Enviar convite real',exact:true}).isVisible());
       await page.evaluate(()=>window.roleFixture('captain','manage'));
       assert(await tab('Administração').isVisible());assert(await tab('Denúncias').isVisible());assert.equal(await tab('Personalização').count(),0);
       assert.equal(await page.getByRole('button',{name:'Remover',exact:true}).count(),0);
