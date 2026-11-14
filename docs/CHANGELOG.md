@@ -24,7 +24,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
 - Sem alteração de servidor, schema, economia ou dados. CI 43634927016 aprovado:
   20 testes Python, SELFTEST, regressão Torre, Chromium 375/758/1280 px e altura
   540 px. PR #9 integrada: 42502eaf096e53baf2773577056f4d200f1eda63.
-  Render dep-dbsbr23m8hqs73camacg, publicação iniciada; confirmar live.
+  Render dep-dbsbr23m8hqs73camacg live; SELFTEST, 14 testes Torre e Neon OK.
   Rollback: reverter renderer, HTML e CSS; designs salvos continuam compatíveis.
 
 ## 14/11/2026 — Cruz de Jerusalém nos brasões
