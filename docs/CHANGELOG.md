@@ -5,6 +5,27 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Insígnias de cargo e Convite Real
+- Pedido: cargo abaixo do nome de todos os membros; Rei pode convidar
+  independentemente dos requisitos.
+- clas.py: apply continua validando requisitos; invite autorizado somente
+  pelo Rei dispensa requisitos no envio e no aceite. Mantidos conta registrada,
+  vaga, unicidade, consentimento, expiração e limites. notices sinaliza royal.
+  public_identity retorna identidade pública do clã; chat inclui cargo atual
+  por associação, sem cargo para ex-membro. servidor.py expõe clã nos perfis.
+- clube.js/clube.css/index.html: insígnia vertical em Membros, Administração,
+  chat e perfis público/próprio, cores por cargo e sigla no perfil; chat
+  re-renderiza quando o cargo muda. Convite Real identificado nos pedidos,
+  avisos, perfil e lista. Cache v76/v71.
+- Decisões: convite não força ingresso; convite já emitido permanece válido
+  durante troca de Rei até expiração. Títulos cosméticos preservados. Sem
+  mudança de schema, saldo, penalidade ou torneios.
+- test_clas.py: exceção real, bloqueio de aplicação, aceite autorizado,
+  recusa, capacidade, cargos no chat/perfil e ex-membro; test_clas_ui.js:
+  quatro insígnias abaixo do nome e controle exclusivo do Rei.
+  CI/publicação pendentes. Branch clas-cargos-convite-real.
+- Rollback: reverter código; sem alteração de dados ou migração.
+
 ## 14/11/2026 — Conselho Real: hierarquia, administração e denúncias
 - Pedido: Rei com controle integral, Vice-capitão personaliza, Capitão
   acompanha membros/denuncia, Membro sem opções administrativas.
