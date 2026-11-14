@@ -542,7 +542,9 @@ THEMATIC_COLLECTIONS={
  'romance':dict(board='rose-garden',skin='skin-rose',boardPrice=130,skinPrice=90,months=[2,6])}
 THEMATIC_ITEMS={item:spec for spec in THEMATIC_COLLECTIONS.values() for item in (spec['board'],spec['skin'])}
 THEMATIC_PRICES={spec['board']:spec['boardPrice'] for spec in THEMATIC_COLLECTIONS.values()} | {spec['skin']:spec['skinPrice'] for spec in THEMATIC_COLLECTIONS.values()}
-RELIC_ITEMS={'relic-throne','skin-relic-throne'}
+ROYAL_PATHS={'shadow':('relic-shadow','skin-relic-shadow'),'divine':('relic-divine','skin-relic-divine'),'infinite':('relic-infinite','skin-relic-infinite')}
+ROYAL_ITEMS={item for pair in ROYAL_PATHS.values() for item in pair}
+RELIC_ITEMS={'relic-throne','skin-relic-throne'} | ROYAL_ITEMS
 SHOP_ITEMS={**THEMES,**SKINS,**THEMATIC_PRICES}
 def seasonal_open(spec,day=None):
     day=day or time.strftime('%Y-%m-%d',time.gmtime())
@@ -758,28 +760,45 @@ def journey_ai(b,chapter):
             best=choice;moves=[best]+[m for m in moves if m!=best]
         except TimeoutError:break
     return best
-def journey_public(completed,run,unlocked):
-    return dict(completed=completed,chapters=JOURNEY,unlocked=unlocked,run=({**run,'legal':legal(run['board'],1,'official') if run['outcome'] is None else []} if run else None))
+def journey_public(completed,run,unlocked,db,pid):
+    owned={x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()}
+    return dict(paths=[key for key,pair in ROYAL_PATHS.items() if pair[0] in owned],completed=completed,chapters=JOURNEY,unlocked=unlocked,run=({**run,'legal':legal(run['board'],1,'official') if run['outcome'] is None else []} if run else None))
 def journey_action(path,d,pid,now):
     action=path.rsplit('/',1)[-1]
     with database() as db:
         sql(db,'INSERT INTO journey(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
         completed,payload,unlocked=sql(db,'SELECT completed,payload,unlocked_at FROM journey WHERE player_id=?',(pid,)).fetchone()
         run=json.loads(payload) if payload else None
-        if action=='state':return 200,journey_public(completed,run,unlocked)
+        if action=='state':return 200,journey_public(completed,run,unlocked,db,pid)
         if active_room(pid,now):return 409,{'error':'Saia da sala online antes de jogar a jornada.'}
+        if action=='claim':
+            key=d.get('path')
+            if completed<5 or not isinstance(key,str) or key not in ROYAL_PATHS:return 403,{'error':'Caminho indisponível.'}
+            owned=wallet_state(db,pid)['owned']
+            if any(pair[0] in owned for pair in ROYAL_PATHS.values()):return 403,{'error':'Conquiste os outros caminhos em duelo.'}
+            for item in ROYAL_PATHS[key]:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+            return 200,journey_public(completed,run,unlocked,db,pid)
         if action=='equip':
             if completed<5:return 403,{'error':'Conclua a Jornada do Mestre primeiro.'}
             w=wallet_state(db,pid)
-            sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',('relic-throne',pid))
-            sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',('skin-relic-throne',pid))
+            key=d.get('path')
+            if key is not None and (not isinstance(key,str) or key not in ROYAL_PATHS):return 400,{'error':'Caminho inválido.'}
+            pair=ROYAL_PATHS[key] if key else ('relic-throne','skin-relic-throne')
+            if any(item not in w['owned'] for item in pair):return 403,{'error':'Conquiste esta relíquia primeiro.'}
+            sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(pair[0],pid))
+            sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(pair[1],pid))
             ensure_cosmetics(db,pid);sql(db,'UPDATE cosmetics SET title=?,frame=? WHERE player_id=?',('last_king','last-king',pid))
             return 200,wallet_state(db,pid)
         if action=='start':
             chapter=d.get('chapter')
             if type(chapter) is not int or not 0<=chapter<5 or chapter>completed:return 403,{'error':'Capítulo bloqueado.'}
-            if run and run.get('version')==2 and run['outcome'] is None and run['chapter']==chapter and d.get('restart') is not True:return 200,journey_public(completed,run,unlocked)
-            board=journey_board(chapter);run=dict(id=secrets.token_hex(12),version=2,chapter=chapter,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
+            path_key=d.get('path')
+            if path_key is not None:
+                if not isinstance(path_key,str) or path_key not in ROYAL_PATHS or completed<5 or chapter!=4:return 403,{'error':'Caminho bloqueado.'}
+                owned=wallet_state(db,pid)['owned']
+                if not any(pair[0] in owned for pair in ROYAL_PATHS.values()):return 403,{'error':'Escolha sua primeira relíquia.'}
+            if run and run.get('version')==2 and run['outcome'] is None and run['chapter']==chapter and run.get('path')==path_key and d.get('restart') is not True:return 200,journey_public(completed,run,unlocked,db,pid)
+            board=journey_board(chapter);run=dict(id=secrets.token_hex(12),version=2,chapter=chapter,path=path_key,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
         elif action=='resign':
             if not run or run['outcome'] is not None or d.get('id')!=run['id']:return 409,{'error':'Partida desatualizada.'}
             run['outcome']='loss';run['reason']='resign'
@@ -803,11 +822,14 @@ def journey_action(path,d,pid,now):
                 completed+=1;run['reward']=25*completed;wallet_add(db,pid,run['reward'])
                 if completed==5:
                     unlocked=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
-                    for item in RELIC_ITEMS:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+                    for item in ('relic-throne','skin-relic-throne'):sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
                     unlock(db,pid,'last_king');run['relicUnlocked']=True
+            if run['outcome']=='win' and run.get('path') in ROYAL_PATHS and completed==5:
+                for item in ROYAL_PATHS[run['path']]:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+                run['pathUnlocked']=run['path']
         else:return 404,{'error':'Ação desconhecida.'}
         sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
-        return 200,journey_public(completed,run,unlocked)
+        return 200,journey_public(completed,run,unlocked,db,pid)
 
 def social_action(path,d,now):
     if path.startswith('/api/social/account/'):return account_action(path,d,now)
@@ -917,7 +939,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
