@@ -22,7 +22,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   única, resposta de recusa/aceite, proteção de duplicidade, atualização de
   PH/casual, fechamento por estado/resultado, reconexão e ausência de janela
   no remetente/offline. Sem teste visual em dois navegadores reais.
-- Commit cf0a2e3b; publicação a confirmar. Sem alteração de servidor ou banco.
+- Commit cf0a2e3b; Render live: dep-dbsa7367bikc73f1r410, commit 4426887220cbc05e420b6c27eec26436bf1f1116. SELFTEST geral e 8 testes da Torre aprovados; Neon conectado. Sem alteração de servidor ou banco.
 - Rollback: reverter commit funcional para restaurar aviso lateral.
 
 ## 14/11/2026 — Aceitar desafio abre escolha antes de criar a sala
