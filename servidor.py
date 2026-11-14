@@ -710,19 +710,13 @@ def event_action(path,d,pid,now):
 # Journey of the Master. All positions, legal moves, opponent turns and rewards
 # are authoritative on the server. One saved run per profile; no ranked PH.
 JOURNEY=[
- dict(name='O Aprendiz',hall='I · A Primeira Mesa',theme='classic',depth=1,quote='Cada grande mestre começou com um primeiro salto.',description='Aprenda a capturar em sequência. Uma pequena vantagem para começar.'),
- dict(name='O Estrategista',hall='II · O Salão Antigo',theme='imperial',depth=2,quote='A paciência vale mais que a pressa.',description='Proteja suas peças e encontre a melhor troca.'),
- dict(name='O Guardião',hall='III · A Cripta',theme='midnight-crypt',depth=3,quote='Nem toda armadilha está à vista.',description='Damas e pedras em um final de ataque e defesa.'),
+ dict(name='O Aprendiz',hall='I · A Primeira Mesa',theme='classic',depth=1,quote='Cada grande mestre começou com um primeiro salto.',description='Partida completa contra um adversário iniciante.'),
+ dict(name='O Estrategista',hall='II · O Salão Antigo',theme='imperial',depth=2,quote='A paciência vale mais que a pressa.',description='Partida completa contra um adversário que valoriza a posição.'),
+ dict(name='O Guardião',hall='III · A Cripta',theme='midnight-crypt',depth=3,quote='Nem toda armadilha está à vista.',description='Partida completa contra um adversário que calcula armadilhas.'),
  dict(name='O Mestre Imperial',hall='IV · O Palácio',theme='champion-legacy',depth=4,quote='O trono exige mais do que coragem.',description='Uma partida completa contra um adversário mais forte.'),
  dict(name='O Último Rei',hall='V · O Trono',theme='relic-throne',depth=5,quote='Que a última pedra revele quem merece a coroa.',description='O duelo final. Vença para conquistar a relíquia lendária.')]
 def journey_board(chapter):
-    if chapter>=3:return initial_for('official')
-    layouts=[{42:1,44:1,46:1,35:-1,21:-1},
-             {40:1,42:1,44:1,46:1,49:1,51:1,12:-1,14:-1,17:-1,19:-1,21:-1},
-             {40:1,42:1,44:1,51:1,58:2,12:-1,14:-1,21:-1,26:-1,5:-2}]
-    b=[0]*64
-    for i,v in layouts[chapter].items():b[i]=v
-    return b
+    return initial_for('official')
 def journey_apply(b,m):
     x=b.copy();p=x[m['from']];to=m['path'][-1];x[m['from']]=0
     for v in m['cap']:x[v]=0
@@ -784,8 +778,11 @@ def journey_action(path,d,pid,now):
         if action=='start':
             chapter=d.get('chapter')
             if type(chapter) is not int or not 0<=chapter<5 or chapter>completed:return 403,{'error':'Capítulo bloqueado.'}
-            if run and run['outcome'] is None and run['chapter']==chapter and d.get('restart') is not True:return 200,journey_public(completed,run,unlocked)
-            board=journey_board(chapter);run=dict(id=secrets.token_hex(12),chapter=chapter,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],reward=0)
+            if run and run.get('version')==2 and run['outcome'] is None and run['chapter']==chapter and d.get('restart') is not True:return 200,journey_public(completed,run,unlocked)
+            board=journey_board(chapter);run=dict(id=secrets.token_hex(12),version=2,chapter=chapter,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
+        elif action=='resign':
+            if not run or run['outcome'] is not None or d.get('id')!=run['id']:return 409,{'error':'Partida desatualizada.'}
+            run['outcome']='loss';run['reason']='resign'
         elif action=='move':
             if not run or run['outcome'] is not None or d.get('id')!=run['id'] or type(d.get('sequence')) is not int or d['sequence']!=run['sequence']:return 409,{'error':'Partida desatualizada. Atualize a jornada.'}
             m=d.get('move')
@@ -793,6 +790,7 @@ def journey_action(path,d,pid,now):
             def play(m,side):
                 b=run['board'];piece=b[m['from']];run['board']=journey_apply(b,m);run['sequence']+=1
                 run['quiet']=run['quiet']+1 if not m['cap'] and abs(piece)==2 else 0
+                run.setdefault('moves',[]).append(dict(m,side=side,promotion=abs(piece)==1 and abs(run['board'][m['path'][-1]])==2))
                 run['last']=[m['from']]+m['path'];k=position_key(run['board'],-side,'official');run['repeats'][k]=run['repeats'].get(k,0)+1
                 if not legal(run['board'],-side,'official'):run['outcome']='win' if side==1 else 'loss'
                 elif run['quiet']>=40 or run['repeats'][k]>=3 or run['sequence']>=500:run['outcome']='draw'
