@@ -184,3 +184,22 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 #clanoverlay .clan-scroll{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#8e744d #202426;padding:0 3px 4px 0;scroll-padding-top:10px}
 #clanoverlay .clan-foundation-preview{top:8px}
 @media(max-width:650px){#clanoverlay .clan-foundation-preview{top:auto}}
+
+/* Conselho Real: insignias, administration and private case timeline. */
+#clanoverlay .clan-admin-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#clanoverlay .clan-role-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid #857457;border-radius:4px;background:#1b2326;color:#d4c4a5;font:700 12px Arial}
+#clanoverlay .clan-role-badge[data-role=king]{border-color:#d8b875;background:#463622;color:#ffe1a1}
+#clanoverlay .clan-role-badge[data-role=vice]{border-color:#a69abf;color:#e0d3fb;background:#30283d}
+#clanoverlay .clan-role-badge[data-role=captain]{border-color:#a1b2bd;color:#d6e1e8;background:#293943}
+#clanoverlay .clan-role-line{color:#e4c895;font-weight:700}
+#clanoverlay .clan-admin-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:8px;margin-top:10px}
+#clanoverlay .clan-admin-actions .clan-field{margin:0}
+#clanoverlay .clan-admin-actions button{min-height:40px}
+#clanoverlay .clan-admin-actions select{min-width:0;max-width:100%;color-scheme:dark}
+#clanoverlay .clan-report-form{margin-top:12px;border-top:1px solid #79694d;padding-top:10px}
+#clanoverlay .clan-report-form summary{cursor:pointer;color:#e5c897;font:700 13px Arial;padding:7px 0}
+#clanoverlay .clan-report-history{border-left:2px solid #a78b5c;padding:10px 12px;margin:10px 0;background:#171e21;border-radius:0 4px 4px 0}
+#clanoverlay .clan-report-history p{white-space:pre-wrap;margin:5px 0}
+#clanoverlay .clan-report-history small{color:#b1a38b;font:11px Arial}
+#clanoverlay [hidden]{display:none!important}
+@media(max-width:420px){#clanoverlay .clan-admin-actions{grid-template-columns:minmax(0,1fr)}}
