@@ -51,7 +51,14 @@ def piano_sample(name):
 
 
 # Persistent PostgreSQL when DATABASE_URL is configured; temporary SQLite otherwise.
-DATABASE_URL=os.environ.get('DATABASE_URL','')
+DATABASE_URL=os.environ.get('DATABASE_URL','').strip()
+from urllib.parse import urlsplit
+def database_provider():
+    if not DATABASE_URL:return 'sqlite'
+    return 'neon' if (urlsplit(DATABASE_URL).hostname or '').endswith('.neon.tech') else 'postgresql'
+if os.environ.get('RENDER')=='true' or os.environ.get('RENDER_SERVICE_ID'):
+    if database_provider()!='neon':
+        raise RuntimeError('Production requires Neon DATABASE_URL; refusing temporary or obsolete database.')
 if DATABASE_URL:
     try: import psycopg
     except ImportError:
@@ -1211,7 +1218,12 @@ class Handler(BaseHTTPRequestHandler):
             if name not in PIANO_FILES or not path.endswith('.mp3'):return self.reply(404,{'error':'Amostra inexistente.'})
             data=piano_sample(name)
             return self.reply(200,data,'audio/mpeg') if data else self.reply(503,{'error':'Piano indisponível temporariamente.'})
-        elif self.path == '/api/health': self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL)})
+        elif self.path.split('?')[0] == '/api/health':
+            try:
+                with database() as db:sql(db,'SELECT 1').fetchone()
+                self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL),'database':database_provider()})
+            except Exception:
+                self.reply(503, {'ok':False,'persistentRanking':bool(DATABASE_URL),'database':database_provider(),'error':'Banco indisponível.'})
         elif self.path == '/api/ranking':
             try:
                 with database() as db:
@@ -1312,6 +1324,7 @@ if __name__=='__main__':
     from selftest import run
     run(sys.modules[__name__])
     setup()
+    print('DATABASE READY: '+database_provider(),flush=True)
     port=int(os.environ.get('PORT','8765'))
     print(f'Casa de Damas: http://localhost:{port} (Ctrl+C para encerrar)',flush=True)
     ThreadingHTTPServer(('0.0.0.0',port),Handler).serve_forever()
