@@ -10,6 +10,7 @@ INVITES = {}
 MATCH_QUEUE = {}
 LOGIN_LIMITS = {}
 SPECTATORS = {}
+LOCAL_LIVE = {}  # Ephemeral, opt-in read-only broadcasts; never used for scoring.
 TOURNAMENTS = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
@@ -466,11 +467,20 @@ def matchmake(pid,now):
         code=secrets.token_hex(4).upper().replace('0','A').replace('1','B')
         while code in ROOMS:code=secrets.token_hex(4).upper().replace('0','A').replace('1','B')
         side=secrets.choice((1,-1))
-        r=dict(last=now,host=side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={side:pid,-side:other},rule=q['rule'],ranked=q['ranked'],minutes=q['minutes'])
+        r=dict(last=now,host=side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={side:pid,-side:other},rule=q['rule'],ranked=q['ranked'],minutes=q['minutes'],public=q.get('public') is True and o.get('public') is True)
         reset_match(r);ROOMS[code]=r
         MATCH_QUEUE.pop(pid,None);MATCH_QUEUE.pop(other,None);return
 def notify(db,recipient,actor,kind):
     sql(db,'INSERT INTO notifications(id,recipient,actor,kind,created_at,seen) VALUES(?,?,?,?,?,0)',(secrets.token_hex(16),recipient,actor,kind,time.time()))
+def live_for(pid,now):
+    for code,r in ROOMS.items():
+        if pid in r['profiles'].values() and r.get('public') and not r['closed'] and r['winner'] is None and len(r['tokens'])==2 and now-max(r['seen'].values())<90:
+            return dict(code=code,mode='online')
+    v=LOCAL_LIVE.get(pid)
+    if v and now-v['seen']<=15 and v['result'] is None and not active_room(pid,now):
+        return dict(code=v['code'],mode=v['mode'])
+    return None
+
 def social_state(pid,now):
     for event in list(TOURNAMENTS.values()):event_tick(event,now)
     for k,v in list(PRESENCE.items()):
@@ -489,7 +499,7 @@ def social_state(pid,now):
             if other==pid: continue
             p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(other,)).fetchone()
             if not p: continue
-            people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,busy=active_room(other,now),relation=rel.get(other,'none')))
+            people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,busy=active_room(other,now) or bool(live_for(other,now)),live=live_for(other,now),relation=rel.get(other,'none')))
         challenges=[]; session=session_for(pid,now)
         for key,v in INVITES.items():
             if pid not in (v['sender'],v['receiver']): continue
@@ -516,7 +526,7 @@ def public_player(db,pid,row,now):
     rel=sql(db,'SELECT sender,receiver,state FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,other,other,pid)).fetchone()
     relation='none' if not rel else 'friend' if rel[2]=='accepted' else 'outgoing' if rel[0]==pid else 'incoming'
     online=now-PRESENCE.get(other,-1000)<=25
-    return dict(id=other,name=n,points=points,wins=wins,losses=losses,draws=draws,relation=relation,online=online,busy=online and active_room(other,now))
+    return dict(id=other,name=n,points=points,wins=wins,losses=losses,draws=draws,relation=relation,online=online,busy=online and (active_room(other,now) or bool(live_for(other,now))),live=live_for(other,now) if online else None)
 def social_lookup(path,d,pid,now):
     with database() as db:
         if path=='/api/social/search':
@@ -623,18 +633,51 @@ def school_action(path,d,pid,now):
 def live_action(path,d,pid,now):
     for k,v in list(SPECTATORS.items()):
         if now-v[1]>15:SPECTATORS.pop(k,None)
-    if path.endswith('/watch'):
-        code=str(d.get('code',''));r=ROOMS.get(code)
-        if not r or not r.get('public') or len(r['tokens'])!=2:return 404,{'error':'Partida pública indisponível.'}
-        SPECTATORS[pid]=(code,now)
-        snapshot=room_snapshot(r,1,now)
-        return 200,dict(board=snapshot['board'],names=snapshot['names'],turn=snapshot['turn'],rule=r['rule'],sequence=r['sequence'],remaining=r['remaining'],minutes=r.get('minutes',0),result=r['winner'],closed=r['closed'],viewers=sum(v[0]==code for v in SPECTATORS.values()))
-    if path.endswith('/leave'):
+    for k,v in list(LOCAL_LIVE.items()):
+        if now-v['seen']>15:LOCAL_LIVE.pop(k,None)
+    action=path.rsplit('/',1)[-1]
+    if action=='stop':
+        LOCAL_LIVE.pop(pid,None);return 200,{'ok':True}
+    if action=='publish':
+        if d.get('public') is not True or active_room(pid,now):return 403,{'error':'Transmissão indisponível.'}
+        rule=d.get('rule');board=d.get('board');mode=d.get('mode');turn=d.get('turn');result=d.get('result');seq=d.get('sequence');side=d.get('side');match=d.get('match')
+        if not valid_rule(rule) or mode not in ('ai','local','journey') or type(turn)!=int or turn not in (1,-1) or type(side)!=int or side not in (1,-1) or (result is not None and (type(result)!=int or result not in (-1,0,1))) or type(seq)!=int or not 0<=seq<=100000 or not isinstance(match,str) or not 1<=len(match)<=80:return 400,{'error':'Transmissão inválida.'}
+        n=board_size(rule)
+        if not isinstance(board,list) or len(board)!=n*n or any(type(p)!=int or p not in (-2,-1,0,1,2) or (p and (i//n+i%n)%2==0) for i,p in enumerate(board)):return 400,{'error':'Tabuleiro inválido.'}
+        last=d.get('last',[])
+        if not isinstance(last,list) or len(last)>n*n or any(type(i)!=int or not 0<=i<n*n for i in last):return 400,{'error':'Lance inválido.'}
+        v=LOCAL_LIVE.get(pid)
+        if v and v['match']==match and seq<v['sequence']:return 409,{'error':'Posição desatualizada.'}
+        with database() as db:
+            name=sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()[0]
+        opponent='Jogador local' if mode=='local' else 'Computador'
+        if mode=='journey':opponent=' '.join(str(d.get('opponent','Mestre')).split())[:50] or 'Mestre'
+        code=v['code'] if v and v['match']==match else 'L-'+secrets.token_hex(12)
+        LOCAL_LIVE[pid]=dict(code=code,match=match,seen=now,board=board,names={str(side):name,str(-side):opponent},turn=turn,rule=rule,mode=mode,sequence=seq,last=last,result=result,closed=False,minutes=0,remaining=None)
+        return 200,{'ok':True,'code':code}
+    if action=='leave':
         SPECTATORS.pop(pid,None);return 200,{'ok':True}
+    if action=='watch':
+        code=str(d.get('code',''));target=str(d.get('target',''))
+        if target and not code:
+            live=live_for(target,now);code=live['code'] if live else ''
+        r=ROOMS.get(code)
+        if r and r.get('public') and len(r['tokens'])==2 and now-max(r['seen'].values())<90:
+            SPECTATORS[pid]=(code,now);snap=room_snapshot(r,1,now);moves=snap.get('moves',[])
+            last=[moves[-1]['from'],*moves[-1]['path']] if moves else []
+            return 200,dict(code=code,mode='online',board=snap['board'],names=snap['names'],turn=snap['turn'],rule=r['rule'],sequence=r['sequence'],last=last,remaining=r['remaining'],minutes=r.get('minutes',0),result=r['winner'],closed=r['closed'],viewers=sum(v[0]==code for v in SPECTATORS.values()))
+        for owner,v in LOCAL_LIVE.items():
+            if v['code']==code and not active_room(owner,now):
+                SPECTATORS[pid]=(code,now)
+                return 200,dict({k:val for k,val in v.items() if k not in ('match','seen')},viewers=sum(x[0]==code for x in SPECTATORS.values()))
+        return 404,{'error':'Partida pública indisponível ou transmissão encerrada.'}
+    if action!='list':return 404,{'error':'Ação inválida.'}
     rooms=[]
     for code,r in ROOMS.items():
-        if r.get('public') and not r['closed'] and r['winner'] is None and len(r['tokens'])==2:
-            snap=room_snapshot(r,1,now);rooms.append(dict(code=code,names=snap['names'],rule=r['rule'],minutes=r.get('minutes',0),viewers=sum(v[0]==code for v in SPECTATORS.values())))
+        if r.get('public') and not r['closed'] and r['winner'] is None and len(r['tokens'])==2 and now-max(r['seen'].values())<90:
+            snap=room_snapshot(r,1,now);rooms.append(dict(code=code,mode='online',names=snap['names'],rule=r['rule'],minutes=r.get('minutes',0),viewers=sum(v[0]==code for v in SPECTATORS.values())))
+    for owner,v in LOCAL_LIVE.items():
+        if v['result'] is None and not active_room(owner,now):rooms.append(dict(code=v['code'],mode=v['mode'],names=v['names'],rule=v['rule'],minutes=0,viewers=sum(x[0]==v['code'] for x in SPECTATORS.values())))
     return 200,{'rooms':rooms[:50]}
 def event_room(event,a,b,now):
     code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
@@ -872,7 +915,7 @@ def social_action(path,d,now):
         rule=d.get('rule','free')
         if not valid_rule(rule):return 400,{'error':'Regra inválida.'}
         with database() as db: points=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()[0]
-        MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),minutes=clock_value(d),points=points,start=now,seen=now)
+        MATCH_QUEUE[pid]=dict(rule=rule,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),minutes=clock_value(d),points=points,start=now,seen=now,public=d.get('public') is True)
         matchmake(pid,now);return 200,social_state(pid,now)
     if path=='/api/social/matchmaking/cancel':
         MATCH_QUEUE.pop(pid,None);return 200,social_state(pid,now)
@@ -921,7 +964,7 @@ def social_action(path,d,now):
         if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
         key=secrets.token_urlsafe(16); rule=d.get('rule','free')
         if not valid_rule(rule): return 400,{'error':'Regra inválida.'}
-        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),rule=rule,minutes=clock_value(d))
+        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),rule=rule,minutes=clock_value(d),public=d.get('public') is True)
         return 200,social_state(pid,now)
     if path=='/api/social/challenge/respond':
         v=INVITES.get(str(d.get('invite','')))
@@ -936,7 +979,7 @@ def social_action(path,d,now):
         code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
         while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
         host_side=secrets.choice((1,-1))
-        r=dict(last=now,host=host_side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={host_side:v['sender'],-host_side:pid},rule=v['rule'],ranked=v['ranked'],minutes=v.get('minutes',0))
+        r=dict(last=now,host=host_side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={host_side:v['sender'],-host_side:pid},rule=v['rule'],ranked=v['ranked'],minutes=v.get('minutes',0),public=v.get('public') is True and d.get('public') is True)
         reset_match(r);ROOMS[code]=r;MATCH_QUEUE.pop(pid,None);MATCH_QUEUE.pop(v['sender'],None);v.update(state='accepted',code=code,time=now)
         return 200,social_state(pid,now)
     return 404,{'error':'Ação inexistente.'}
@@ -959,7 +1002,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/royal-demo.html':
             self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
