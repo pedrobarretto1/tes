@@ -69,6 +69,7 @@ def finish(s,db,pid,g,w,reason):
     else:
         actual=0;coins=0
     g['result']=dict(match=g['match'],winner=w,reason=reason,ranked=True,side=side,rule=g['rule'],level=g['level'],bot=True,deltas={str(side):actual},coins=coins,points={str(side):old[0]+actual},board=g['board'][:],turn=g['turn'],sequence=g['sequence'],moves=g['moves'][:],stats=s.match_stats(g),duration=max(0,int(time.time()-g['started'])),names={str(side):old[1],str(-side):'Computador'})
+    if reason=='inevitable' and g.get('proof'):g['result']['proof']=g['proof']
     if inserted:s.sql(db,'INSERT INTO replays(match_id,player_a,player_b,payload) VALUES(?,?,?,?) ON CONFLICT(match_id) DO NOTHING',(g['match'],pid,'bot:'+g['level'],json.dumps(g['result'])))
 
 def tick(s,db,pid,g):
@@ -86,7 +87,11 @@ def play(s,db,pid,g,m):
     k=s.boardkey(g);g['repeats'][k]=g['repeats'].get(k,0)+1;g['clock_at']=time.time();g['offer']=False
     if not s.legal(g['board'],g['turn'],g['rule']):finish(s,db,pid,g,g['turn'] if g['rule']=='giveaway' else side,'giveaway' if g['rule']=='giveaway' else 'normal')
     elif g['quiet']>=40 or g['repeats'][k]>=3:finish(s,db,pid,g,0,'normal')
-    elif g['turn']==g['side'] and g['rule']!='giveaway' and g['sequence']-g['offer_at']>=10 and 0<sum(bool(p) for p in g['board'])<=4 and all(abs(p)!=1 for p in g['board']) and all(not any(m['cap'] for m in s.legal(g['board'],t,g['rule'])) for t in (1,-1)) and (g['quiet']>=8 or g['repeats'][k]>=2):
+    else:
+        proof=s.inevitable_result(g['board'],g['turn'],g['rule'],g['quiet'],g['repeats'],g['sequence'],g['remaining'] if g['minutes'] else None)
+        if proof:
+            g['proof']=proof;finish(s,db,pid,g,proof['winner'],'inevitable');return
+    if g['result'] is None and g['turn']==g['side'] and g['rule']!='giveaway' and g['sequence']-g['offer_at']>=10 and 0<sum(bool(p) for p in g['board'])<=4 and all(abs(p)!=1 for p in g['board']) and all(not any(m['cap'] for m in s.legal(g['board'],t,g['rule'])) for t in (1,-1)) and (g['quiet']>=8 or g['repeats'][k]>=2):
         g['offer']=True;g['offer_at']=g['sequence']
 
 def action(s,path,d,pid):
