@@ -100,6 +100,8 @@ def setup():
         sql(db,'CREATE INDEX IF NOT EXISTS event_champions_player_idx ON event_champions(player_id)')
         import clas
         clas.setup(db,sql)
+        import bot_duels
+        bot_duels.setup(db,sql)
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 def identity(d):
@@ -1224,6 +1226,9 @@ def social_action(path,d,now):
     if path.startswith('/api/social/clans/'):
         import clas
         return clas.action(sys.modules[__name__],path,d,pid)
+    if path.startswith('/api/social/bot/'):
+        import bot_duels
+        return bot_duels.action(sys.modules[__name__],path,d,pid)
     if path.startswith('/api/social/tower/'):return tower_action(path,d,pid,now)
     if path.startswith('/api/social/journey/'):return journey_action(path,d,pid,now)
     if path.startswith('/api/social/school/'):return school_action(path,d,pid,now)

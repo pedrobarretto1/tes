@@ -1,0 +1,40 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawn}=require('node:child_process');
+const {chromium}=require('playwright');
+const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from pathlib import Path; root=s.BASE; s.BASE=Path(tempfile.mkdtemp()); s.DATABASE_URL=''; [ (s.BASE/p.name).symlink_to(p) for p in root.iterdir() if p.is_file() and p.suffix in ('.html','.js','.css','.svg','.json','.png','.webp','.jpg') ]; s.setup(); h=s.ThreadingHTTPServer(('127.0.0.1',0),s.Handler); print(h.server_address[1],flush=True); h.serve_forever()"],{stdio:['ignore','pipe','inherit']});
+(async()=>{
+ let browser;
+ try{
+  const port=await new Promise((resolve,reject)=>{let timer=setTimeout(()=>reject(Error('server startup timeout')),10000);server.stdout.once('data',x=>{clearTimeout(timer);resolve(Number(String(x).trim()))});server.once('error',reject);server.once('exit',code=>reject(Error('server exited '+code)))});
+  browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:800}});
+  let errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith('http://127.0.0.1:')?r.continue():r.abort());
+  await page.addInitScript(()=>{localStorage.setItem('damas-name','Teste IA');localStorage.setItem('damas-profile-token','bot-ui-test-token-012345678901234567890123')});
+  await page.goto('http://127.0.0.1:'+port,{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>!document.getElementById('clubmenu').classList.contains('hidden'),{},{timeout:15000});
+  await page.locator('#clubmenux').click();
+  await page.locator('#start').click();
+  await page.waitForFunction(()=>botGame&&turn===mySide&&!animating&&!movePending,{},{timeout:15000});
+  assert.equal(await page.evaluate(()=>botGame.level),'medium');
+  const before=await page.evaluate(()=>sequence);
+  const m=await page.evaluate(()=>legal(b,turn)[0]);
+  await page.locator('#board [data-square="'+m.from+'"]').click();
+  for(const square of m.path)await page.locator('#board [data-square="'+square+'"]').click();
+  await page.waitForFunction(seq=>sequence>=seq+2&&!animating&&!movePending,before,{timeout:15000});
+  await page.locator('#focusresign').click();await page.locator('#resignconfirm').click();
+  await page.waitForFunction(()=>confirmedResult?.bot&&winner&&document.getElementById('resultpoints').textContent.includes('10 PH'),{},{timeout:15000});
+  assert.equal(await page.evaluate(()=>confirmedResult.coins),0);
+  await page.locator('#closevictory').click();
+  await page.evaluate(()=>{setFocus(false);document.querySelector('[data-level=easy]').click();document.getElementById('start').click()});
+  await page.waitForFunction(()=>offlineStarted&&!thinking&&!animating,{},{timeout:15000});
+  assert.equal(await page.evaluate(()=>botGame),null);
+  await page.evaluate(()=>{setFocus(false);document.querySelector('[data-level=hard]').click();document.getElementById('start').click()});
+  await page.waitForFunction(()=>botGame?.level==='hard'&&turn===mySide&&!animating&&!movePending,{},{timeout:15000});
+  await page.locator('#focusresign').click();await page.locator('#resignconfirm').click();
+  await page.waitForFunction(()=>confirmedResult?.bot&&winner&&document.getElementById('resultpoints').textContent.includes('20 PH'),{},{timeout:15000});
+  const profile=await page.evaluate(async()=>{const r=await fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:profileToken()})});return r.json()});
+  assert.equal(profile.points,970);assert.equal(profile.losses,2);
+  assert.deepEqual(errors,[]);
+  console.log('BOT UI OK: server moves, medium/hard rewards, easy practice, profile persistence');
+ }finally{if(browser)await browser.close();server.kill()}
+})().catch(e=>{console.error(e);process.exitCode=1});

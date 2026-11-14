@@ -5,6 +5,14 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Recompensas nas partidas contra computador
+- Pedido: Fácil sem recompensa, Médio 50%, Difícil 100% dos benefícios de partidas ranqueadas contra pessoas.
+- bot_duels.py: partidas autoritativas persistidas (bot_duels, uma por jogador), sorteio de cores, motor oficial, busca minimax com limites de profundidade/nós/tempo, relógio servidor, lances legais, empate automático/oferta e final inevitável. Nenhum resultado declarado pelo navegador. Idempotência por match/sequence/nonce e results; recompensa, histórico, replay, estatísticas e conquistas na mesma transação.
+- Médio: +13/-8/+3/-10 PH (vitória/derrota/empate/desistência), moedas +8 vitória/+4 derrota ou empate; Difícil +25/-15/+5/-20 PH, +15/+8 moedas. Metades arredondadas em magnitude para cima; moedas só a partir de oito lances e sem desistência. Estatísticas discretas contam uma partida inteira. PH nunca abaixo de zero. Recomeçar partida remunerada não concluída = desistência; Fácil e modalidades casuais permanecem locais e sem recompensa.
+- Regras remuneradas iguais às ranqueadas online: Livre, Brasileira, Inglesa, Captura Obrigatória, Antidamas. Duelo de Damas, Internacional, Canadense e personalizadas continuam casuais. Jornada/Torre intactas. Recompensas de sobrevivência seguem a dificuldade da partida normal.
+- servidor.py: setup aditivo, rotas /api/social/bot/*. index.html: fluxo de partida servidor, animações por lance, relógio, resultado com PH/moedas, reconexão/retry e aviso da dificuldade. Sem alteração da economia PvP.
+- Testes: test_bot_duels.py economia/identidade/duplicidade/validação; test_bot_ui.js Chromium com servidor local real; CI pendente. Branch duelos-ia-recompensas; rollback reverte código preservando tabela e histórico. Não apagar dados.
+
 ## 14/11/2026 — Recrutamento por recomendação
 - Pedido adicional: demais cargos recomendam jogador; apenas Capitão e Rei
   recebem, com estatísticas públicas e requisitos.
