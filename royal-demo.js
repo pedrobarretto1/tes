@@ -19,7 +19,7 @@ function move(from,to,cap=null,promote=false,onDone=null){
 }
 function reveal(type){if(!endingType)return;E('resulttitle').textContent=({victory:'Vitória',defeat:'Derrota',resign:'Desistência'})[type];result.classList.add('shown');result.inert=false;result.setAttribute('aria-hidden','false');busy=false;endingType=null;buttons();status.textContent='Final concluído. Repita a animação ou explore outra relíquia.'}
 function final(type){lastFinal=type;endingType=type;busy=true;buttons();status.textContent='A relíquia reage ao destino da partida…';if(!window.royalEnd(type,()=>reveal(type)))reveal(type)}
-function run(a){if(a==='reset'){reset();status.textContent='Tabuleiro restaurado.';return}if(a==='skip'){if(endingType){let t=endingType;window.royalReset();reveal(t)}return}if(busy)return;
+function run(a){if(a==='reset'){reset();status.textContent='Tabuleiro restaurado.';return}if(a==='skip'){if(endingType)window.royalSkip?.();return}if(busy)return;
  if(a==='resign'){let saved=b.slice();reset(saved);final(a);return}
  if(a==='move'){reset();status.textContent='Observe o símbolo acompanhando o movimento.';move(40,33);return}
  if(a==='capture'||a==='victory'){reset(setup([[42,1],[35,-1],[17,2],[26,1],[49,1],...(a==='capture'?[[19,-1],[21,-1]]:[])]));status.textContent='Sua pedra captura a adversária.';move(42,28,35,false,()=>{if(a==='victory')final(a);else status.textContent='A relíquia celebra sua captura.'});return}
