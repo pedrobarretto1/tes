@@ -1,6 +1,12 @@
 # Clãs da Casa de Damas — especificação inicial
 
-Status: planejamento, 14/11/2026. Pedido do criador: criar/entrar em clã, requisitos opcionais, convites e pedidos exclusivos ao dono, chat, nível médio e torneios internos com prêmios financiados pelo organizador. Ainda não implementado. Propostas de limites, fórmula e PH precisam de revisão antes da economia entrar em produção.
+Status: planejamento, 14/11/2026. Pedido do criador: criar/entrar em clã, requisitos opcionais, convites e pedidos exclusivos ao dono, chat, nível médio e torneios internos com prêmios financiados pelo organizador. Núcleo social implementado na branch clas-social-beta; publicação a confirmar. Torneios, prêmios e PH ainda não implementados.
+
+## Implementação social v1
+- clas.py: schema aditivo e autoridade de recrutamento, nível, chat e gestão; servidor.py integra setup, API /api/social/clans/* e estado social. Perfil público e próprio mostram nível. index.html/clube.js/clube.css: Salão dos Clãs, formulário, busca, membros, pedidos, administração, chat e aba de torneios informativa.
+- Conta registrada, 30 membros, um clã por conta. Pedidos 7 dias, limite 10 por candidato, cooldown de 5 minutos após recusa. Dono pode convidar pelo perfil público, inclusive via busca, ou pela lista do clã. Chat privado em texto puro, 500 caracteres, últimas 50 mensagens, 5 envios/10 s; paginação antiga, denúncia, moderação e retenção ainda pendentes. Não há exclusão automática por queda de estatísticas.
+- Nível conforme fórmula abaixo, conquistas oficiais permitidas explicitamente; média exibida com uma casa. Gestão: dono transfere liderança, remove membros ou dissolve somente quando for o único membro; saída de dono bloqueada. Requisitos editáveis. Notificações acionáveis sem timer local, revalidação no servidor.
+- Testes SQLite em test_clas.py; CI inclui regressões da Torre e gerais. Nenhum prêmio debitado, nenhuma mudança de PH. Torneios internos, cofre, desempates e auditoria continuam próximos passos.
 
 ## Produto
 - Clube → Clãs: busca por nome/sigla, lista paginada, criar clã, Meu clã.
@@ -87,4 +93,4 @@ Esquema aditivo proposto: clans, clan_members (unique player_id), clan_requests 
 2. Torneios internos persistidos sem prêmios, regras/partidas/reconexão e testes de resultado.
 3. Cofre de moedas e skins, auditoria, testes de concorrência e falha. Publicar primeiro beta controlada.
 4. Decidir PH com criador, se necessário migrar economia/ranking com testes e política de saldo. Só então liberar.
-Nenhuma alteração de código, DB ou deploy nesta etapa de especificação. Registrar cada mudança em CHANGELOG.md e atualizar AGENTS.md com link.
+Registrar cada mudança em CHANGELOG.md e atualizar AGENTS.md com link. A implementação social usa migração aditiva no startup; nenhuma tabela existente é removida.
