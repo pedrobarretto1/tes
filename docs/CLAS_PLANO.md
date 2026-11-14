@@ -1,8 +1,10 @@
 # Clãs da Casa de Damas — especificação inicial
 
-Status: planejamento, 14/11/2026. Pedido do criador: criar/entrar em clã, requisitos opcionais, convites e pedidos exclusivos ao dono, chat, nível médio e torneios internos com prêmios financiados pelo organizador. Núcleo social implementado na branch clas-social-beta; publicação a confirmar. Torneios, prêmios e PH ainda não implementados.
+Status: planejamento, 14/11/2026. Pedido do criador: criar/entrar em clã, requisitos opcionais, convites e pedidos exclusivos ao dono, chat, nível médio e torneios internos com prêmios financiados pelo organizador. Núcleo social v1 publicado: PR #5, commit 8d7cb4de18a59d4507af4e7e8e5cbf7c77bf8d04, Render dep-dbsbddlg1s2s73enea1g live. Torneios, prêmios e PH ainda não implementados.
 
 ## Implementação social v1
+Validação: CI final 43632355617, 18 testes aprovados, SELFTEST e regressão UI Torre aprovados. Simulação de interface Clãs passou; teste visual e ingresso entre duas contas reais pendentes. Neon confirmou cinco tabelas novas.
+
 - clas.py: schema aditivo e autoridade de recrutamento, nível, chat e gestão; servidor.py integra setup, API /api/social/clans/* e estado social. Perfil público e próprio mostram nível. index.html/clube.js/clube.css: Salão dos Clãs, formulário, busca, membros, pedidos, administração, chat e aba de torneios informativa.
 - Conta registrada, 30 membros, um clã por conta. Pedidos 7 dias, limite 10 por candidato, cooldown de 5 minutos após recusa. Dono pode convidar pelo perfil público, inclusive via busca, ou pela lista do clã. Chat privado em texto puro, 500 caracteres, últimas 50 mensagens, 5 envios/10 s; paginação antiga, denúncia, moderação e retenção ainda pendentes. Não há exclusão automática por queda de estatísticas.
 - Nível conforme fórmula abaixo, conquistas oficiais permitidas explicitamente; média exibida com uma casa. Gestão: dono transfere liderança, remove membros ou dissolve somente quando for o único membro; saída de dono bloqueada. Requisitos editáveis. Notificações acionáveis sem timer local, revalidação no servidor.
