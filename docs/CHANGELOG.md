@@ -5,6 +5,24 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Clãs: primeira versão social
+- Pedido: aplicar clãs após aprovação do plano. Entrega inicial sem torneios
+  financiados: criação, busca, requisitos opcionais, solicitações e convites,
+  dono exclusivo, membros, nível individual/médio, chat privado.
+- clas.py: schema aditivo clans/clan_members/clan_requests/clan_messages/guard,
+  constraints e transação de admissão; validação de conta, vaga, requisitos
+  e permissões. Chat texto puro, rate limit e últimas 50 mensagens.
+- servidor.py: setup e rotas social/clans; nível no perfil e avisos privados.
+  clube.js/index.html/clube.css: salão medieval, abas e cartões acionáveis;
+  convite direto no perfil e administração. Cache v70/v65.
+- Decisões: 30 membros, 1 clã por conta registrada, pedido válido 7 dias,
+  cooldown 5 min após recusa; sem timer visual. Torneios apenas aba informativa,
+  sem débito, sem PH transferível. Moderação/paginação antiga pendentes.
+- test_clas.py: 4 testes com SQLite, CI inicial 43632242305 aprovado,
+  incluindo 14 testes Torre, regressão UI e SELFTEST. Última revisão a validar.
+- PR #5; publicação pendente. Não alterar dados existentes; schema aditivo.
+  Rollback: reverter código mantendo tabelas e dados de clãs; não apagar banco.
+
 ## 14/11/2026 — Proposta de desempate nos torneios de clãs
 - Pedido: definir empate inicial/final e consequência para quem propõe/aceita.
 - docs/CLAS_PLANO.md: empate não elimina; revanche com cores invertidas;
