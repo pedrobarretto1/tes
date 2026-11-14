@@ -1401,6 +1401,12 @@ class Handler(BaseHTTPRequestHandler):
 if __name__=='__main__':
     from selftest import run
     run(sys.modules[__name__])
+    # Run Tower integration tests on a temporary SQLite database, never Neon.
+    import unittest
+    sys.modules.setdefault('servidor',sys.modules[__name__])
+    suite=unittest.defaultTestLoader.loadTestsFromNames(['test_torre','test_torre_api'])
+    if not unittest.TextTestRunner(verbosity=1).run(suite).wasSuccessful():
+        raise RuntimeError('Tower beta checks failed')
     setup()
     print('DATABASE READY: '+database_provider(),flush=True)
     port=int(os.environ.get('PORT','8765'))
