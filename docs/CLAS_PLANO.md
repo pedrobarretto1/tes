@@ -1,0 +1,50 @@
+# Clãs da Casa de Damas — especificação inicial
+
+Status: planejamento, 14/11/2026. Pedido do criador: criar/entrar em clã, requisitos opcionais, convites e pedidos exclusivos ao dono, chat, nível médio e torneios internos com prêmios financiados pelo organizador. Ainda não implementado. Propostas de limites, fórmula e PH precisam de revisão antes da economia entrar em produção.
+
+## Produto
+- Clube → Clãs: busca por nome/sigla, lista paginada, criar clã, Meu clã.
+- Clã: nome único normalizado, sigla, brasão, descrição, dono, membros, data, nível, chat e torneios.
+- Proposta inicial: um clã por conta, até 30 membros, somente conta com login para ingresso/criação e torneios financiados. Visitantes podem consultar clãs. Não exigir CPF, e-mail ou novos dados pessoais.
+- Dono administra requisitos, convites, solicitações, remoção de membros, transferência de liderança e dissolução. Somente dono decide ingresso e recebe pedido de entrada. Membros organizam torneios, não aprovam recrutamento.
+- Ao sair, dono transfere liderança ou dissolve após resolver torneios e reservas; não deixar clã órfão. Troca de dono atômica. Não remover membro para alterar chave de torneio em andamento.
+
+## Recrutamento
+Requisitos independentes, todos opcionais (null = Nenhum). Combinação AND:
+PH mínimo, vitórias mínimas, derrotas mínimas, taxa mínima de vitória, nível mínimo.
+Propostas adicionais: máximo de derrotas e mínimo de partidas concluídas.
+Taxa = vitórias / (vitórias + derrotas + empates) × 100; zero partidas = sem taxa, não qualifica se taxa exigida. Usar dados de ranking do servidor, não dados enviados pelo cliente. Sem expulsão automática quando a estatística cai depois de entrar; regras valem para admissão.
+- Candidato consulta requisitos e diagnóstico; se não atende, não pode solicitar.
+- Solicitação pendente única por candidato/clã. Apenas dono recebe notificação com nome, stats públicos, requisitos e status de cada um, Aceitar/Recusar/X. Revalidação no aceite (requisitos atuais, vaga, conta e ausência de outro clã). Entra numa única transação; pedidos concorrentes invalidados.
+- Dono pode convidar um perfil; convidado escolhe aceitar/recusar; mesma validação, sem bypass. Fechar cartão não recusa. Pedido de clã persiste; política de validade proposta 7 dias, notificação acionável sem timer local. Limites de envio e cooldown após recusa. Chat nunca expõe tokens, sessões, senhas.
+- Se requisitos forem alterados, comparar regras atuais e informar candidato, não aprovar silenciosamente com regra antiga.
+
+## Nível
+Hoje não há nível numérico canônico no perfil: existem PH, vitórias/derrotas/empates, cosmetics.completed, achievements, cups e journey.completed; Torre possui highest por modalidade. Criar nível derivado de feitos, não do saldo de PH/moedas ou compras.
+Proposta v1: XP = 10×vitórias + 3×empates + 2×partidas ranqueadas concluídas (cosmetics.completed, exclui desistência) + 25×conquistas oficiais distintas + 50×capítulos concluídos da Jornada. Nível = 1 + floor(sqrt(XP/50)). Ex.: XP 800 → nível 5. Valores propostos, não medidos. Não contar conquistas cosméticas compradas, não contar torneios privados como vitórias ranqueadas. Torre e campeonatos futuros poderão somar feitos únicos após validação. Persistir fórmula versionada, calcular servidor, não conceder XP com PH transferido. Evitar farming de partidas rápidas/mesmos pares; inicialmente exibir nível como progresso, não rank de habilidade.
+Nível do clã = média aritmética dos níveis dos membros atuais, exibida com uma casa decimal; ranking usa valor preciso. Ex.: 5, 8, 11 → 8. Média pode cair ao entrar/sair; mostrar também total de membros, conquistas e troféus. Proposta: ranking de clãs só com >=5 membros e 7 dias de existência; não expulsar iniciantes para melhorar média. Nível não é força competitiva.
+
+## Chat
+Mensagens persistidas no Neon por clã, autor, texto, timestamp e ID. Só membros leem/escrevem; servidor confere associação a cada requisição. Texto puro, escape via textContent, comprimento <=500, paginação incremental, limite de envio, denúncia/silenciar, dono pode moderar com trilha. Não logar texto privado em console. Retenção inicial 90 dias proposta. Notificações existentes e polling incremental; não reconsultar histórico inteiro a cada atualização.
+
+## Torneios internos e premiação
+Membros podem organizar, sem taxa de entrada. Escolhem nome, regra oficial suportada, horário/inscrições, participantes (4 ou 8 inicialmente), formato eliminatório, prazo por rodada e prêmio. Chave e regras congeladas após início; empate exige revanche com limite e regra de desempate publicada; W.O. por ausência e desconexão com janela de reconexão. Resultado exclusivamente do motor servidor, não botão do organizador.
+Prêmios:
+- Moedas: organizador informa inteiro positivo, servidor verifica saldo, debita e cria reserva na mesma transação. Limite inicial sugerido 500 por evento, 1 evento financiado ativo por organizador, ajustar após testes. Sem dinheiro real.
+- Skin: compra para prêmio dentro do clã, no catálogo SHOP_ITEMS elegível (não relíquia exclusiva, item campeão, grátis ou sazonal fechado). Preço validado servidor, débito em moedas, reserva registra SKU e preço. Não remover skin já pertencente ao organizador; comprar uma licença de presente separada. Ao campeão, inserir purchases ON CONFLICT; não equipar automaticamente. Se já possui, política divulgada previamente: creditar moedas equivalentes ao preço pago (não duplicar item, sem alteração de custo). Sem entrega antes da final.
+- PH: **fragilidade crítica**. Atualmente players.points é saldo e ranking simultaneamente; visitante começa com 1000, vitória +25, derrota -15, desistência -20, empate +5. Transferir PH diretamente permitiria contas alternativas financiar um campeão, distorcer ranking e requisitos. Não liberar transferência direta no MVP. Alternativas: (A) honra de torneio/clã separada, sem afetar ranking; (B) se criador exigir PH reais, separar PH competitivo (obtido em partidas oficiais) de saldo de honra presenteável, migrar ranking e requisitos para competitivo, definir origem elegível e limites; não financiar com PH inicial/gratuito. Decisão explícita antes da implementação. Sem converter moedas em PH.
+- Criador não altera vencedor, prêmio ou regras depois da inscrição; proposta de torneio financiado: criador pode competir, se vencer recebe devolução da própria reserva (não recompensa duplicada), registrar resultado e transparência. Avaliar proibir sua participação em caso de abuso. Sem recompensa competitiva oficial, sem PH de partidas internas e sem duplicar conquistas oficiais.
+- Cancelamento pré-início devolve reserva exata ao patrocinador. Após início: sem cancelamento unilateral; só timeout/falha objetiva/regras publicadas e auditoria. Organizador sair do clã não cancela obrigação. Se final decidida, prêmio entregue mesmo se clã mudar de dono. Não permitir dissolução com reserva em aberto.
+
+## Persistência e segurança
+O código atual usa TOURNAMENTS em memória; event_champions grava campeão, mas estado de evento/salas não é suficiente para valores depositados. Não usar eventos atuais como cofre. Antes de torneios financiados persistir chave, participantes, regras, partidas, IDs, snapshots/movimentos, prazos e estado de liquidação; retomar após restart Render e reconexão. Ações de cancelamento/resultado verificadas servidor.
+Esquema aditivo proposto: clans, clan_members (unique player_id), clan_requests (pending único, tipo, status), clan_messages, clan_tournaments, clan_tournament_entries, clan_tournament_matches, clan_prize_escrow, clan_ledger. FK/constraints, índices por clã e status, transações PostgreSQL/SQLite. Saldo não negativo, atualização condicional coins>=amount, lock de linhas e ordem consistente; reserva, débito e criação atômicos. Liquidação/refund com estado único reserved→paid/refunded e chave idempotente por torneio, no mesmo commit que crédito/purchase. Não confiar em preço, saldo, dono, nível, requisitos, vencedor ou idempotência do cliente.
+- Abuse: conta vinculada + mínimo de partidas ranqueadas concluídas e idade da conta (metadado novo, sem inferir passado), participantes distintos, limites por dia/organizador, histórico e auditoria de transações, alertas de partidas repetidas e desistências suspeitas, sem automatizar ban apenas por heurística. Não criar taxa de entrada/apostas. Privacidade: mostrar só campos públicos de perfil.
+- Testes: autorização dono/membro/terceiro, requisitos todos null/AND/zero, revalidação concorrente, único clã e vagas, chat XSS/rate/paginação, saldo insuficiente/negativo, dois débitos simultâneos, duplicação de confirmação, campeão único, skin já possuída, cancelamento/refund, queda antes/depois de commit, retomada de chave/partida, clã dissolvido, isolamento Jornada/Torre/ranking.
+
+## Entrega por etapas
+1. Núcleo social: nível derivado, criação, busca, membros, pedidos/convites e notificações; chat. Testes e UI temática, branch isolada, banco aditivo. Sem prêmios.
+2. Torneios internos persistidos sem prêmios, regras/partidas/reconexão e testes de resultado.
+3. Cofre de moedas e skins, auditoria, testes de concorrência e falha. Publicar primeiro beta controlada.
+4. Decidir PH com criador, se necessário migrar economia/ranking com testes e política de saldo. Só então liberar.
+Nenhuma alteração de código, DB ou deploy nesta etapa de especificação. Registrar cada mudança em CHANGELOG.md e atualizar AGENTS.md com link.
