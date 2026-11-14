@@ -68,16 +68,20 @@ E('clubnavopen').onclick=()=>openClub();E('clubnavprofile').onclick=openMyProfil
 
 let moveEffect=null;
 window.clubFXDestination=null;
-window.cancelClubMoveFX=()=>{let fx=moveEffect;if(!fx)return;moveEffect=null;fx.cancelled=true;for(let animation of fx.animations)animation.cancel();fx.layer.remove();E('board').classList.remove('board-fx-active');window.clubFXDestination=null;E('board').querySelectorAll('.fx-hidden').forEach(p=>p.classList.remove('fx-hidden'))};
+window.cancelClubMoveFX=()=>{let fx=moveEffect;if(!fx)return;moveEffect=null;fx.cancelled=true;fx.observer?.disconnect();for(let animation of fx.animations)animation.cancel();fx.layer.remove();E('board').classList.remove('board-fx-active');window.clubFXDestination=null;E('board').querySelectorAll('.fx-hidden').forEach(p=>p.classList.remove('fx-hidden'))};
 window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   window.cancelClubMoveFX();
   let board=E('board'),frame=board.parentElement,to=m.path.at(-1),dest=board.querySelector('[data-square="'+to+'"]'),piece=dest?.querySelector('.piece'),source=board.querySelector('[data-square="'+m.from+'"]');
   if(!old||!piece||!source||!frame){return}
   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!piece.animate){return}
-  let layer=node('div','board-fx-layer');layer.setAttribute('aria-hidden','true');document.body.append(layer);board.classList.add('board-fx-active');
+  let layer=node('div','board-fx-layer');layer.setAttribute('aria-hidden','true');frame.append(layer);board.classList.add('board-fx-active');
   let fx={layer,animations:[],cancelled:false};moveEffect=fx;window.clubFXDestination=to;piece.classList.add('fx-hidden');
-  const pos=i=>{let r=board.querySelector('[data-square="'+i+'"]').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,w:r.width*.78}};
-  function place(p,i){let r=pos(i);p.style.left=r.x+'px';p.style.top=r.y+'px';p.style.width=r.w+'px';p.style.height=r.w+'px'}
+  // Anchor the animation to the board itself. Percent positions survive scroll,
+  // responsive sizing and changes in the side panel while a stone is in flight.
+  function align(){let a=frame.getBoundingClientRect(),b=board.getBoundingClientRect();layer.style.left=(b.left-a.left-frame.clientLeft)+'px';layer.style.top=(b.top-a.top-frame.clientTop)+'px';layer.style.width=b.width+'px';layer.style.height=b.height+'px'}
+  align();if(typeof ResizeObserver!=='undefined'){fx.observer=new ResizeObserver(align);fx.observer.observe(board);fx.observer.observe(frame)}
+  const pos=i=>{let r=board.querySelector('[data-square="'+i+'"]').getBoundingClientRect(),a=layer.getBoundingClientRect(),x=r.left-a.left+r.width/2,y=r.top-a.top+r.height/2;return {x,y,w:r.width*.78,u:x/a.width*100,v:y/a.height*100,size:r.width*.78/a.width*100}};
+  function place(p,i){let r=pos(i);p.style.left=r.u+'%';p.style.top=r.v+'%';p.style.width=r.size+'%';p.style.height='auto';p.style.aspectRatio='1'}
   function disc(value,cls){return node('span','piece fx-disc '+cls+' '+(value>0?'white':'black')+(Math.abs(value)===2?' king':''))}
   const ghost=disc(old,'fx-moving');place(ghost,m.from);layer.append(ghost);
   const taken=new Map();for(let i of m.cap){if(!oldBoard[i])continue;let victim=disc(oldBoard[i],'fx-victim');place(victim,i);layer.append(victim);taken.set(i,victim)}
@@ -85,7 +89,7 @@ window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   try{
     let previous=m.from;
     for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=Math.min(1200,540+distance*130);let captured=taken.get(m.cap[k]);
-      let frames=[{left:from.x+'px',top:from.y+'px',transform:'translate(-50%,-50%) scale(1)',offset:0},{left:(from.x+dx*.5)+'px',top:(from.y+dy*.5)+'px',transform:'translate(-50%,-50%) scale(1.06)',offset:.5},{left:end.x+'px',top:end.y+'px',transform:'translate(-50%,-50%) scale(1)',offset:1}];
+      let frames=[{left:from.u+'%',top:from.v+'%',transform:'translate(-50%,-50%) scale(1)',offset:0},{left:(from.u+end.u)/2+'%',top:(from.v+end.v)/2+'%',transform:'translate(-50%,-50%) scale(1.06)',offset:.5},{left:end.u+'%',top:end.v+'%',transform:'translate(-50%,-50%) scale(1)',offset:1}];
       await animate(ghost,frames,{duration,easing:'cubic-bezier(.35,.08,.65,.92)',fill:'forwards'});if(fx.cancelled)return;
       place(ghost,target);ghost.getAnimations().forEach(a=>a.cancel());
       if(captured){window.themeMove?.(layer,pos(m.cap[k]),'capture');await animate(captured,[{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) translateY(12px) rotate(22deg) scale(.45)',opacity:0}],{duration:240,easing:'ease-in',fill:'forwards'});captured.remove()}previous=target;
@@ -93,7 +97,7 @@ window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
     if(promoted&&!fx.cancelled){window.themeMove?.(layer,pos(to),'promotion');ghost.classList.add('king');let ring=node('span','fx-promotion');place(ring,to);layer.append(ring);await Promise.all([animate(ghost,[{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.2)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:420,easing:'ease-out'}),animate(ring,[{transform:'translate(-50%,-50%) scale(.6)',opacity:1},{transform:'translate(-50%,-50%) scale(1.5)',opacity:0}],{duration:480,fill:'forwards'})])}
   }finally{if(moveEffect===fx)window.cancelClubMoveFX()}
 };
-window.addEventListener('resize',()=>window.cancelClubMoveFX());window.addEventListener('scroll',()=>window.cancelClubMoveFX(),{passive:true});
+// Scrolling and resizing no longer cancel a move; the layer follows the board.
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){close('cluboverlay');close('clubmenu');close('clubnotificationoverlay');close('matchoverlay');close('replayoverlay');if(!accountBusy){close('accountoverlay');close('myprofileoverlay')}}});
 let saved=localStorage.getItem('damas-name');show('clubwelcome');if(cleanName(saved)){E('welcomename').value=saved;register(saved)}else if(localStorage.getItem('damas-profile-token')?.startsWith('acc_')){accountNeedsLogin=true;E('welcomeerror').textContent='Entre na sua conta ou escolha um nome para continuar como visitante.'}window.clubRefreshNow=poll;setInterval(poll,3000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});window.addEventListener('focus',poll);
 })();
