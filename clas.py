@@ -99,8 +99,8 @@ def report_views(db,sql,c,pid):
     for rid,author,target,status,history,decision,note,created,updated in rows:
         if target==pid or (rank==1 and author!=pid):continue
         a=stats(db,sql,author);t=stats(db,sql,target)
-        can_reply=status=='returned' and rank!=3 and (rank==2 or (author==pid and not vice_ids(db,sql,c['id'])))
-        out.append(dict(id=rid,author=author,author_name=a['name'] if a else 'Ex-membro',target=target,target_name=t['name'] if t else 'Ex-membro',status=status,history=json.loads(history),decision=decision,note=note,created_at=created,updated_at=updated,can_reply=can_reply,can_decide=rank==3 and status=='open'))
+        can_reply=status=='returned' and rank!=3 and (rank==2 or (author==pid and not [v for v in vice_ids(db,sql,c['id']) if v!=target]))
+        out.append(dict(id=rid,author=author,author_name=a['name'] if a else 'Ex-membro',target=target,target_name=t['name'] if t else 'Ex-membro',status=status,history=json.loads(history),decision=decision,note=note,created_at=created,updated_at=updated,can_reply=can_reply,can_decide=rank==3 and status=='open',can_reopen=rank==3 and status=='returned'))
     return out
 def own_decisions(db,sql,pid):
     return [dict(id=r[0],clan_name=r[1],decision=r[2],note=r[3],updated_at=r[4]) for r in sql(db,"SELECT r.id,c.name,r.decision,r.note,r.updated_at FROM clan_reports r JOIN clans c ON c.id=r.clan_id WHERE r.target=? AND r.status='resolved' ORDER BY r.updated_at DESC LIMIT 30",(pid,)).fetchall()]
@@ -197,7 +197,7 @@ def action(s,path,d,pid):
             sql(db,'UPDATE clan_requests SET status=?,updated_at=? WHERE id=?',('accepted' if d['accept'] else 'declined',now,d['id']))
             # Inform the other party; the actionable request itself is separate.
             s.notify(db,target if r[2]=='apply' else c['owner'],pid,'clan_accepted' if d['accept'] else 'clan_declined')
-        elif op in ('report','report-return','report-reply','report-decide','promote'):
+        elif op in ('report','report-return','report-reply','report-decide','report-reopen','promote'):
             if not mine:return err('Você não pertence a um clã.',409)
             rank=ROLE_RANK[role(db,sql,mine,pid)]
             if rank<1:return err('Somente oficiais podem administrar denúncias.',403)
@@ -224,7 +224,7 @@ def action(s,path,d,pid):
                 rid,author,target,status,raw=r;history=json.loads(raw)
                 if target==pid:return err('Você não pode analisar sua própria denúncia.',403)
                 if op=='report-reply':
-                    if status!='returned' or not (rank==2 or (rank==1 and author==pid and not vice_ids(db,sql,cid))):return err('Somente o Vice-capitão responsável pode responder uma devolução.',403)
+                    if status!='returned' or not (rank==2 or (rank==1 and author==pid and not [v for v in vice_ids(db,sql,cid) if v!=target])):return err('Somente o Vice-capitão responsável pode responder uma devolução.',403)
                     try:message=report_text(d.get('message'))
                     except ValueError as e:return err(str(e))
                     history.append(dict(actor=pid,name=stats(db,sql,pid)['name'],kind='reply',text=message,at=now))
@@ -232,6 +232,13 @@ def action(s,path,d,pid):
                     s.notify(db,mine['owner'],pid,'clan_report_reply')
                 else:
                     if rank!=3:return err('Somente o Rei decide denúncias.',403)
+                    if op=='report-reopen':
+                        if status!='returned':return err('Denúncia não está devolvida.',409)
+                        try:message=report_text(d.get('message'))
+                        except ValueError as e:return err(str(e))
+                        history.append(dict(actor=pid,name=stats(db,sql,pid)['name'],kind='reopen',text=message,at=now))
+                        sql(db,"UPDATE clan_reports SET status='open',history=?,updated_at=? WHERE id=?",(json.dumps(history),now,rid))
+                        return 200,state(db,sql,pid)
                     if status!='open':return err('Denúncia não está aguardando decisão.',409)
                     if op=='report-return':
                         try:message=report_text(d.get('message'))
