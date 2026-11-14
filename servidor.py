@@ -804,6 +804,7 @@ def journey_action(path,d,pid,now):
             sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(pair[0],pid))
             sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(pair[1],pid))
             ensure_cosmetics(db,pid);sql(db,'UPDATE cosmetics SET frame=? WHERE player_id=?',('last-king',pid))
+            if key is None:sql(db,"UPDATE cosmetics SET title='last_king' WHERE player_id=? AND title='visitor'",(pid,))
             return 200,wallet_state(db,pid)
         if action=='start':
             chapter=d.get('chapter')

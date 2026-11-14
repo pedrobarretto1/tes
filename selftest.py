@@ -411,12 +411,16 @@ def run(s):
             status,_=s.social_action('/api/social/journey/claim',dict(a,path='shadow'),1000);assert status==403
             status,_=s.social_action('/api/social/journey/equip',dict(hero,path='divine'),1000);assert status==403
             chosen=call('journey/claim',hero,path='shadow');assert chosen['paths']==['shadow']
+            assert 'king_shadow' in call('state',hero)['me']['achievements']
+            assert call('customize',hero,name=hero['name'],title='king_shadow')['me']['title']=='king_shadow'
+            status,_=s.social_action('/api/social/customize',dict(hero,title='king_divine'),1000);assert status==403
             status,_=s.social_action('/api/social/journey/claim',dict(hero,path='divine'),1000);assert status==403
             equipped=call('journey/equip',hero,path='shadow');assert equipped['theme']=='relic-shadow' and equipped['skin']=='skin-relic-shadow'
             status,_=s.social_action('/api/social/school/buy',dict(hero,item='relic-divine'),1000);assert status==403
             trial=call('journey/start',hero,chapter=4,path='divine')['run'];assert trial['path']=='divine'
             assert call('journey/start',hero,chapter=4,path='divine')['run']['id']==trial['id']
             lost=call('journey/resign',hero,id=trial['id']);assert lost['paths']==['shadow']
+            assert 'king_divine' not in call('state',hero)['me']['achievements']
             for path in ('divine','infinite'):
                 trial=call('journey/start',hero,chapter=4,path=path,restart=True)['run']
                 trial.update(board=final_board[:],sequence=20,quiet=0,repeats={s.position_key(final_board,1,'official'):1},last=[],moves=[])
@@ -425,6 +429,9 @@ def run(s):
                 assert earned['run']['pathUnlocked']==path and path in earned['paths']
                 equipped=call('journey/equip',hero,path=path);assert equipped['theme']=='relic-'+path and equipped['skin']=='skin-relic-'+path
             assert set(call('journey/state',hero)['paths'])=={'shadow','divine','infinite'}
+            me=call('state',hero)['me'];assert {'king_shadow','king_divine','king_cosmos'}<=set(me['achievements']) and me['title']=='king_shadow'
+            assert call('customize',hero,name=hero['name'],title='king_cosmos')['me']['title']=='king_cosmos'
+            assert call('player',a,target=hero_id)['player']['title']=='king_cosmos'
             assert call('school/state',hero)['coins']==wallet['coins']
             assert call('state',hero)['me']['points']==1000
             # A guest keeps their identifier, points, history and friends after linking.
