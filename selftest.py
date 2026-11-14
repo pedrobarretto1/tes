@@ -299,43 +299,45 @@ def run(s):
                 assert status==403
             status,_=s.social_action('/api/social/customize',dict(b,name='Teste B',frame='halloween'),1000)
             assert status==403
-            # Endgame proof: no guess based on material or evaluation.
-            def endboard(pieces,n=64):
-                board=[0]*n
-                for at,piece in pieces.items():board[at]=piece
-                return board
-            forced=endboard({19:1,1:-1,3:-1})
-            k=s.position_key(forced,1,'official')
-            assert len(s.legal(forced,1,'official'))==2
-            assert s.inevitable_result(forced,1,'official',0,{k:1},12)=={'winner':-1,'plies':2}
-            assert s.inevitable_result(forced,1,'giveaway',0,{},12)=={'winner':1,'plies':2}
-            assert s.inevitable_result(forced,1,'official',0,{k:1},11) is None
-            assert s.inevitable_result(forced,1,'official',0,{k:1},12,{1:15,-1:100}) is None
-            assert s.inevitable_result(forced,1,'official',0,{k:3},12) is None
-            assert s.inevitable_result(forced,1,'free',0,{},12) is None
-            assert s.inevitable_result(endboard({3:1,10:-1,12:-1}),1,'official',0,{},12) is None
-            assert s.inevitable_result(endboard({1:2,62:-2}),1,'official',0,{},20) is None
-            # Repetition on even one branch blocks the proof.
-            alternative=forced.copy();alternative[19]=0;alternative[12]=1
-            branch=s.position_key(alternative,-1,'official')
-            assert s.inevitable_result(forced,1,'official',0,{k:1,branch:2},12) is None
-            # The actual authoritative move ends a late game, with normal loss and proof metadata.
-            room=dict(rule='official',ranked=False,profiles={1:None,-1:None},minutes=0,tokens={1:'a',-1:'b'})
-            s.reset_match(room)
-            room.update(board=endboard({19:1,1:-1,14:-1}),turn=-1,sequence=11)
-            room['repeats']={s.boardkey(room):1}
-            m={'from':14,'path':[21],'cap':[]}
-            assert m in s.legal(room['board'],-1,'official')
-            assert s.process(room,-1,dict(type='move',sequence=12,before=s.boardkey(room),move=m))
-            assert room['winner']==-1 and room['result']['reason']=='inevitable'
-            assert room['result']['proof']=={'winner':-1,'plies':2}
-            assert len(room['result']['moves'])==1 and room['result']['sequence']==12
-            # A normal terminal capture still has priority over proof adjudication.
-            room.update(winner=None,result=None,proof=None,board=endboard({42:1,35:-1}),turn=1,sequence=12,quiet=0)
-            room['repeats']={s.boardkey(room):1}
-            m=s.legal(room['board'],1,'official')[0]
-            assert s.process(room,1,dict(type='move',sequence=13,before=s.boardkey(room),move=m))
-            assert room['winner']==1 and room['result']['reason']=='normal'
+            # Deterministic correctness tests: runtime still has its real 25 ms deadline.
+            with patch.object(s.time,'monotonic',return_value=1000.0):
+                # Endgame proof: no guess based on material or evaluation.
+                def endboard(pieces,n=64):
+                    board=[0]*n
+                    for at,piece in pieces.items():board[at]=piece
+                    return board
+                forced=endboard({19:1,1:-1,3:-1})
+                k=s.position_key(forced,1,'official')
+                assert len(s.legal(forced,1,'official'))==2
+                assert s.inevitable_result(forced,1,'official',0,{k:1},12)=={'winner':-1,'plies':2}
+                assert s.inevitable_result(forced,1,'giveaway',0,{},12)=={'winner':1,'plies':2}
+                assert s.inevitable_result(forced,1,'official',0,{k:1},11) is None
+                assert s.inevitable_result(forced,1,'official',0,{k:1},12,{1:15,-1:100}) is None
+                assert s.inevitable_result(forced,1,'official',0,{k:3},12) is None
+                assert s.inevitable_result(forced,1,'free',0,{},12) is None
+                assert s.inevitable_result(endboard({3:1,10:-1,12:-1}),1,'official',0,{},12) is None
+                assert s.inevitable_result(endboard({1:2,62:-2}),1,'official',0,{},20) is None
+                # Repetition on even one branch blocks the proof.
+                alternative=forced.copy();alternative[19]=0;alternative[12]=1
+                branch=s.position_key(alternative,-1,'official')
+                assert s.inevitable_result(forced,1,'official',0,{k:1,branch:2},12) is None
+                # The actual authoritative move ends a late game, with normal loss and proof metadata.
+                room=dict(rule='official',ranked=False,profiles={1:None,-1:None},minutes=0,tokens={1:'a',-1:'b'})
+                s.reset_match(room)
+                room.update(board=endboard({19:1,1:-1,14:-1}),turn=-1,sequence=11)
+                room['repeats']={s.boardkey(room):1}
+                m={'from':14,'path':[21],'cap':[]}
+                assert m in s.legal(room['board'],-1,'official')
+                assert s.process(room,-1,dict(type='move',sequence=12,before=s.boardkey(room),move=m))
+                assert room['winner']==-1 and room['result']['reason']=='inevitable'
+                assert room['result']['proof']=={'winner':-1,'plies':2}
+                assert len(room['result']['moves'])==1 and room['result']['sequence']==12
+                # A normal terminal capture still has priority over proof adjudication.
+                room.update(winner=None,result=None,proof=None,board=endboard({42:1,35:-1}),turn=1,sequence=12,quiet=0)
+                room['repeats']={s.boardkey(room):1}
+                m=s.legal(room['board'],1,'official')[0]
+                assert s.process(room,1,dict(type='move',sequence=13,before=s.boardkey(room),move=m))
+                assert room['winner']==1 and room['result']['reason']=='normal'
             # 8-player cup: simulate seven confirmed wins, verify champion once.
             now=s.time.monotonic()
             competitors=[{'name':'Copa '+str(i),'profileToken':('cup'+str(i))*16} for i in range(8)]
@@ -411,7 +413,8 @@ def run(s):
             trap=[0]*64
             for i,p in ((24,1),(40,1),(42,-1),(51,-1)):trap[i]=p
             original=trap[:];stats={}
-            choice=s.journey_ai(trap,2,stats=stats)
+            with patch.object(s.time,'monotonic',return_value=1000.0):
+                choice=s.journey_ai(trap,2,stats=stats)
             assert choice in s.legal(trap,-1,'official') and trap==original and stats['depth']>=1
             assert not any(m['cap'] for m in s.legal(s.journey_apply(trap,choice),1,'official'))
             for level,path in ((0,None),(1,None),(2,None),(3,None),(4,None),(4,'shadow'),(4,'divine'),(4,'infinite')):
@@ -489,7 +492,8 @@ def run(s):
             # Dark has a legal move, but every reply permits immediate capture.
             forced=[0]*64;forced[1]=2;forced[39]=-1
             forced_run=dict(board=forced,sequence=20,quiet=0,repeats={})
-            assert s.legal(forced,-1,'official') and s.journey_bot_lost(forced_run)
+            with patch.object(s.time,'monotonic',return_value=1000.0):
+                assert s.legal(forced,-1,'official') and s.journey_bot_lost(forced_run)
             # Material advantage alone is not a proof.
             lead_test=dict(board=lead[:],sequence=20,quiet=0,repeats={})
             s.journey_draw_clock(lead_test);assert not s.journey_bot_lost(lead_test)
