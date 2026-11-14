@@ -5,6 +5,21 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Recrutamento por recomendação
+- Pedido adicional: demais cargos recomendam jogador; apenas Capitão e Rei
+  recebem, com estatísticas públicas e requisitos.
+- clas.py: tabela aditiva clan_recommendations, estados, unicidade, validade,
+  limite de 5/dia por autor e 30 pendentes/clã. recommend, recommend-review,
+  recommend-decide. Capitão registra parecer, sem autoavaliação; Rei encerra
+  ou cria Convite Real em transação. Recomendado precisa aceitar. Nenhum
+  requisito bloqueia recomendação; vaga/conta/único clã continuam obrigatórios.
+- clube.js: botão no perfil e membros, aba Recomendações exclusiva Rei/Capitão,
+  aviso com acesso ao painel e cartões com stats e comparação dos requisitos.
+  Vice pode recomendar mas não vê fila. Sem alterações na economia.
+- Testes test_clas.py e test_clas_ui.js para privacidade, duplicidade,
+  parecer, aceite e acesso por cargo. CI/publicação pendentes na PR #11.
+- Rollback preserva a nova tabela. Nenhuma exclusão de dados existentes.
+
 ## 14/11/2026 — Insígnias de cargo e Convite Real
 - Pedido: cargo abaixo do nome de todos os membros; Rei pode convidar
   independentemente dos requisitos.
