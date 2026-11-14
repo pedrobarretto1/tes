@@ -21,8 +21,8 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   padrão derivado do símbolo; sem reset. Torneios internos ainda pendentes.
 - Testes: test_clas.py cobre criação, persistência, reedição, legado, permissões,
   cores iguais, dados preservados e dissolução. test_clas_ui.js cobre seis
-  geometrias, paletas e administração em 375/758/1280 px. CI pendente.
-- Branch clas-brasoes-personalizados; publicação pendente. Rollback: reverter
+  geometrias, paletas e administração em 375/758/1280 px. CI 43634204285 aprovado: 19 testes Python, Chromium nas três larguras, SELFTEST e regressão Torre.
+- PR #7 integrada: 2f5719b0ab84a75abd0b75e865ab9b0cfb6378cb. Render live dep-dbsbn8ek1f9s738rakc0. Rollback: reverter
   código mantendo tabela e design salvo; não excluir dados.
 
 ## 14/11/2026 — Clãs: identidade de honra, busca e fundação ao vivo
