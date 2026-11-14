@@ -17,7 +17,10 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   aviso com acesso ao painel e cartões com stats e comparação dos requisitos.
   Vice pode recomendar mas não vê fila. Sem alterações na economia.
 - Testes test_clas.py e test_clas_ui.js para privacidade, duplicidade,
-  parecer, aceite e acesso por cargo. CI/publicação pendentes na PR #11.
+  parecer, aceite e acesso por cargo. Refinamento solicitado: parecer favorável
+  nunca cria convite ou autoriza ingresso; Capitão não avalia indicação própria,
+  não pode chamar API de convite/decisão nem após parecer favorável. UI usa
+  'Parecer favorável', sem botão de aprovação. CI/publicação pendentes na PR #11.
 - Rollback preserva a nova tabela. Nenhuma exclusão de dados existentes.
 
 ## 14/11/2026 — Insígnias de cargo e Convite Real
