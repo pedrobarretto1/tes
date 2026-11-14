@@ -26,10 +26,16 @@ class TowerTests(unittest.TestCase):
             finish_match(r,"b","win")
     def test_first_domain(self):
         r=new_run()
-        for n in range(1,11):
+        for n in range(1,31):
             r=play(r,str(n),"win")
-        self.assertEqual((r.floor,r.highest,r.status),(10,10,"completed"))
-        self.assertEqual(public_state(r)["domain"]["boss"],"O Cavaleiro Sem Nome")
+        self.assertEqual((r.floor,r.highest,r.status),(30,30,"completed"))
+        self.assertEqual(public_state(r)["domain"]["boss"],"O Imperador de Ouro")
+    def test_domain_checkpoint(self):
+        r=new_run()
+        for n in range(1,11):r=play(r,str(n),"win")
+        self.assertEqual((r.floor,r.checkpoint,r.lives),(11,11,3))
+        for n in range(11,14):r=play(r,str(n),"loss")
+        self.assertEqual((r.floor,r.highest,r.lives),(11,10,3))
     def test_routes_and_domains(self):
         with self.assertRaises(ValueError):
             choose(new_run(),"invalid")
