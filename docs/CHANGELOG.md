@@ -21,9 +21,11 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
 - selftest.py: troca Livre→Brasileira, escolha inválida, usuário remetente
   não autorizado, resposta duplicada, sincronização, Internacional 100 casas
   sem PH e escolha Inglesa elegível preservando ranking. Teste JS de sintaxe
-  aprovado; suíte completa será verificada no startup do Render.
+  aprovado; SELFTEST geral e 8 testes da Torre passaram no startup do Render.
 - Commits a2575e28, 84a0e9d0, c4e29856, c9452fe4. Sem alteração de banco,
-  Torre, Jornada ou matchmaking. Publicação a confirmar.
+  Torre, Jornada ou matchmaking. Render live: dep-dbs9i6c9v7es73c3g0ag,
+  commit 4e12bd13966e2d5f7671919871dad91e7a7ff156; Neon conectado.
+  Não houve teste visual entre dois navegadores reais; validar no próximo teste do criador.
 - Rollback: reverter commits desta mudança mantendo as outras funcionalidades.
 
 ## 14/11/2026 — Detalhamento do Castelo Esquecido (opção B)
