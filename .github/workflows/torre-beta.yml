@@ -1,0 +1,18 @@
+name: Torre beta checks
+on:
+  pull_request:
+  push:
+    branches: [torre-dos-reis-base]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile servidor.py torre.py
+      - run: python -m unittest test_torre.py test_torre_api.py -v
+      - run: python -c "import servidor,selftest; selftest.run(servidor)"
+      - run: python -c "import re,pathlib; pathlib.Path('/tmp/tower.js').write_text(re.findall(r'<script>(.*?)</script>',pathlib.Path('torre.html').read_text(),re.S)[-1])"
+      - run: node --check /tmp/tower.js

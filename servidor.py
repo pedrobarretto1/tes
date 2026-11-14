@@ -78,6 +78,7 @@ def sql(db,query,args=()):
     return db.execute(query.replace('?', '%s') if DATABASE_URL else query,args)
 def setup():
     with database() as db:
+        sql(db,"CREATE TABLE IF NOT EXISTS tower_runs (player_id TEXT NOT NULL, mode TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', PRIMARY KEY(player_id,mode))")
         sql(db,'CREATE TABLE IF NOT EXISTS journey (player_id TEXT PRIMARY KEY, completed INTEGER NOT NULL DEFAULT 0, payload TEXT NOT NULL DEFAULT \'\', unlocked_at TEXT NOT NULL DEFAULT \'\')')
         sql(db,'CREATE TABLE IF NOT EXISTS players (id TEXT PRIMARY KEY, name TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 1000, wins INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0)')
         sql(db,'CREATE TABLE IF NOT EXISTS results (id TEXT PRIMARY KEY)')
@@ -1081,6 +1082,80 @@ def journey_action(path,d,pid,now):
         sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
         return 200,journey_public(completed,run,unlocked,db,pid)
 
+
+# Tower beta: isolated per-account progression; official server engine, no PH or wallet rewards.
+def tower_action(path,d,pid,now):
+    from torre import Run,new_run,choose,start_match,finish_match,public_state,MODES,ROUTES
+    from dataclasses import asdict
+    mode=d.get('mode','ascensao')
+    if mode not in MODES:return 400,{'error':'Modo inválido.'}
+    action=path.rsplit('/',1)[-1]
+    with database() as db:
+        sql(db,'INSERT INTO tower_runs(player_id,mode) VALUES(?,?) ON CONFLICT(player_id,mode) DO NOTHING',(pid,mode))
+        sql(db,'UPDATE tower_runs SET payload=payload WHERE player_id=? AND mode=?',(pid,mode))
+        raw=sql(db,'SELECT payload FROM tower_runs WHERE player_id=? AND mode=?',(pid,mode)).fetchone()[0]
+        data=json.loads(raw) if raw else {'progress':asdict(new_run(mode)),'game':None}
+        p=Run(**data['progress']);game=data.get('game')
+        def response():
+            w=wallet_state(db,pid)
+            return 200,{'progress':public_state(p),'game':({**game,'legal':legal(game['board'],1,'official') if game['outcome'] is None else []} if game else None),'theme':w.get('theme','classic'),'skin':w.get('skin','skin-classic')}
+        if action=='state':
+            if not raw:sql(db,'UPDATE tower_runs SET payload=? WHERE player_id=? AND mode=?',(json.dumps(data),pid,mode))
+            return response()
+        if active_room(pid,now):return 409,{'error':'Saia da sala online antes de entrar na Torre.'}
+        if action=='restart':
+            if p.status not in ('ended','completed'):return 409,{'error':'Conclua sua tentativa atual.'}
+            p=new_run(mode);game=None
+        elif action=='start':
+            if p.status=='playing' and game:return response()
+            route=d.get('route')
+            if p.status!='choose' or route not in ROUTES:return 409,{'error':'Caminho indisponível.'}
+            if type(d.get('version')) is not int or d['version']!=p.version:return 409,{'error':'Progresso desatualizado. Atualize a Torre.'}
+            p=choose(p,route)
+            match=secrets.token_hex(12);p=start_match(p,match)
+            board=initial_for('official')
+            # Gradual search strength; bosses and dangerous routes push one tier.
+            tier=min(4,(p.floor-1)//6)
+            if p.floor%10==0 or route=='executioner':tier=min(4,tier+1)
+            if route=='unknown':tier=max(0,min(4,tier+secrets.choice((-1,0,1))))
+            game=dict(id=match,chapter=tier,floor=p.floor,route=route,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
+            journey_draw_clock(game)
+        elif action in ('move','resign','draw'):
+            if p.status!='playing' or not game or game['outcome'] is not None or d.get('id')!=game['id'] or type(d.get('sequence')) is not int or d['sequence']!=game['sequence']:return 409,{'error':'Partida desatualizada. Atualize a Torre.'}
+            if action=='resign':
+                game['outcome']='loss';game['reason']='resign'
+            elif action=='draw':
+                if not game.get('botOffer') or type(d.get('accept')) is not bool:return 409,{'error':'Proposta de empate indisponível.'}
+                game.pop('botOffer',None)
+                if d['accept']:game['outcome']='draw';game['reason']='agreement'
+            else:
+                m=d.get('move')
+                if m not in legal(game['board'],1,'official'):return 400,{'error':'Lance inválido.'}
+                game.pop('botOffer',None)
+                def play(m,side):
+                    b=game['board'];piece=b[m['from']];game['board']=journey_apply(b,m);game['sequence']+=1
+                    game['quiet']=game['quiet']+1 if not m['cap'] and abs(piece)==2 else 0
+                    game['moves'].append(dict(m,side=side,promotion=abs(piece)==1 and abs(game['board'][m['path'][-1]])==2))
+                    game['last']=[m['from']]+m['path'];k=position_key(game['board'],-side,'official');game['repeats'][k]=game['repeats'].get(k,0)+1
+                    if not legal(game['board'],-side,'official'):game['outcome']='win' if side==1 else 'loss'
+                    else:
+                        reason=journey_draw_reason(game,k)
+                        if reason:game['outcome']='draw';game['reason']=reason
+                play(m,1)
+                if game['outcome'] is None:
+                    if journey_bot_lost(game):
+                        game['outcome']='win';game['reason']='bot_resign'
+                    else:
+                        ai=journey_ai(game['board'],game['chapter'],None,game)
+                        if ai:play(ai,-1)
+                        else:game['outcome']='win'
+                if game['outcome'] is None:journey_bot_offer(game)
+            if game['outcome'] is not None:
+                p=finish_match(p,game['id'],game['outcome'])
+        else:return 404,{'error':'Ação desconhecida.'}
+        sql(db,'UPDATE tower_runs SET payload=? WHERE player_id=? AND mode=?',(json.dumps({'progress':asdict(p),'game':game}),pid,mode))
+        return response()
+
 def progress_snapshot(pid):
     # Read the authenticated player's durable state only. No client save data is trusted.
     with database() as db:
@@ -1104,6 +1179,7 @@ def social_action(path,d,now):
     PRESENCE[pid]=now
     if path=='/api/social/save/state':return 200,progress_snapshot(pid)
     if path.startswith('/api/social/save/'):return 404,{'error':'Ação de salvamento inválida.'}
+    if path.startswith('/api/social/tower/'):return tower_action(path,d,pid,now)
     if path.startswith('/api/social/journey/'):return journey_action(path,d,pid,now)
     if path.startswith('/api/social/school/'):return school_action(path,d,pid,now)
     if path.startswith('/api/social/live/'):return live_action(path,d,pid,now)
@@ -1203,6 +1279,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
+        elif self.path.split('?')[0]=='/torre.html':
+            self.reply(200,(BASE/'torre.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/royal-demo.html':
             self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js'):
@@ -1323,6 +1401,12 @@ class Handler(BaseHTTPRequestHandler):
 if __name__=='__main__':
     from selftest import run
     run(sys.modules[__name__])
+    # Run Tower integration tests on a temporary SQLite database, never Neon.
+    import unittest
+    sys.modules.setdefault('servidor',sys.modules[__name__])
+    suite=unittest.defaultTestLoader.loadTestsFromNames(['test_torre','test_torre_api'])
+    if not unittest.TextTestRunner(verbosity=1).run(suite).wasSuccessful():
+        raise RuntimeError('Tower beta checks failed')
     setup()
     print('DATABASE READY: '+database_provider(),flush=True)
     port=int(os.environ.get('PORT','8765'))
