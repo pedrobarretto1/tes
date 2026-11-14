@@ -1085,7 +1085,7 @@ def journey_action(path,d,pid,now):
 
 # Tower beta: isolated per-account progression; official server engine, no PH or wallet rewards.
 def tower_action(path,d,pid,now):
-    from torre import Run,new_run,choose,start_match,finish_match,public_state,MODES,ROUTES
+    from torre import Run,new_run,choose,start_match,finish_match,public_state,encounter,MODES,ROUTES
     from dataclasses import asdict
     mode=d.get('mode','ascensao')
     if mode not in MODES:return 400,{'error':'Modo inválido.'}
@@ -1111,14 +1111,16 @@ def tower_action(path,d,pid,now):
             route=d.get('route')
             if p.status!='choose' or route not in ROUTES:return 409,{'error':'Caminho indisponível.'}
             if type(d.get('version')) is not int or d['version']!=p.version:return 409,{'error':'Progresso desatualizado. Atualize a Torre.'}
+            meta=encounter(p.floor)
+            if meta['fixed'] and route!='guardian':return 409,{'error':'Este encontro tem adversário fixo.'}
             p=choose(p,route)
             match=secrets.token_hex(12);p=start_match(p,match)
             board=initial_for('official')
-            # Gradual search strength; bosses and dangerous routes push one tier.
-            tier=min(4,(p.floor-1)//6)
-            if p.floor%10==0 or route=='executioner':tier=min(4,tier+1)
+            # Persist exact opponent/tier for ongoing matches; routes only on normal floors.
+            tier=meta['tier']
+            if route=='executioner':tier=min(4,tier+1)
             if route=='unknown':tier=max(0,min(4,tier+secrets.choice((-1,0,1))))
-            game=dict(id=match,chapter=tier,floor=p.floor,route=route,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
+            game=dict(id=match,chapter=tier,encounter=meta,floor=p.floor,route=route,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
             journey_draw_clock(game)
         elif action in ('move','resign','draw'):
             if p.status!='playing' or not game or game['outcome'] is not None or d.get('id')!=game['id'] or type(d.get('sequence')) is not int or d['sequence']!=game['sequence']:return 409,{'error':'Partida desatualizada. Atualize a Torre.'}
