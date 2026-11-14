@@ -514,7 +514,7 @@ def social_state(pid,now):
             other=v['receiver'] if pid==v['sender'] else v['sender']
             if v['state']=='pending' and now-v['time']<60:
                 p=sql(db,'SELECT name FROM players WHERE id=?',(other,)).fetchone()
-                challenges.append(dict(id=key,name=p[0] if p else 'Jogador',incoming=pid==v['receiver'],ranked=v['ranked'],rule=v['rule'],minutes=v.get('minutes',0)))
+                challenges.append(dict(id=key,name=p[0] if p else 'Jogador',incoming=pid==v['receiver'],ranked=v['ranked'],ranked_requested=v.get('ranked_requested',v['ranked']),rule=v['rule'],minutes=v.get('minutes',0)))
             elif v['state']=='accepted' and now-v['time']<100:
                 r=ROOMS.get(v['code'])
                 if r and not r['closed'] and r['winner'] is None and not session:
@@ -1243,7 +1243,7 @@ def social_action(path,d,now):
         if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
         key=secrets.token_urlsafe(16); rule=d.get('rule','free')
         if not valid_rule(rule): return 400,{'error':'Regra inválida.'}
-        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),rule=rule,minutes=clock_value(d),public=d.get('public') is True)
+        INVITES[key]=dict(sender=pid,receiver=target,state='pending',time=now,ranked=d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),ranked_requested=d.get('ranked') is not False,rule=rule,minutes=clock_value(d),public=d.get('public') is True)
         return 200,social_state(pid,now)
     if path=='/api/social/challenge/respond':
         v=INVITES.get(str(d.get('invite','')))
@@ -1255,11 +1255,15 @@ def social_action(path,d,now):
         if active_room(pid,now) or active_room(v['sender'],now): return 409,{'error':'Um jogador está em outra sala.'}
         if now-PRESENCE.get(v['sender'],-1000)>25: return 409,{'error':'Adversário desconectado.'}
         if len(ROOMS)>=1000: return 503,{'error':'Servidor cheio.'}
+        # The invited player selects the final rule; legacy clients keep the suggestion.
+        rule=d.get('rule',v['rule'])
+        if not valid_rule(rule): return 400,{'error':'Modalidade inválida.'}
+        ranked=v.get('ranked_requested',v['ranked']) and not rule.startswith('custom-') and rule not in ('kings','international','canadian')
         code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
         while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
         host_side=secrets.choice((1,-1))
-        r=dict(last=now,host=host_side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={host_side:v['sender'],-host_side:pid},rule=v['rule'],ranked=v['ranked'],minutes=v.get('minutes',0),public=v.get('public') is True and d.get('public') is True)
-        reset_match(r);ROOMS[code]=r;MATCH_QUEUE.pop(pid,None);MATCH_QUEUE.pop(v['sender'],None);v.update(state='accepted',code=code,time=now)
+        r=dict(last=now,host=host_side,tokens={1:secrets.token_urlsafe(24),-1:secrets.token_urlsafe(24)},queues={1:[],-1:[]},seen={1:now,-1:now},closed=False,profiles={host_side:v['sender'],-host_side:pid},rule=rule,ranked=ranked,minutes=v.get('minutes',0),public=v.get('public') is True and d.get('public') is True)
+        reset_match(r);ROOMS[code]=r;MATCH_QUEUE.pop(pid,None);MATCH_QUEUE.pop(v['sender'],None);v.update(state='accepted',code=code,time=now,rule=rule,ranked=ranked)
         return 200,social_state(pid,now)
     return 404,{'error':'Ação inexistente.'}
 
