@@ -74,5 +74,79 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 /* Actionable notifications: unified toast cards and notification centre. */
 .club-snacks{max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain;align-content:start}.club-snack.actionable{align-items:flex-start;border-left-color:#efd18b}.club-snack-actions{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0 0}.club-snack-actions button{flex:1;min-width:78px;padding:8px 9px;font:700 11px Arial;min-height:36px}.club-snack .club-snack-close{width:26px;flex:none;line-height:1;padding:2px}.club-action-status{display:block;color:#ffcf9a!important;letter-spacing:0!important;font:11px/1.4 Arial!important;margin-top:5px}.club-action-status:empty{display:none}.club-notice-content{flex:1;min-width:0}.club-notice-row .club-snack-actions{max-width:260px}@media(max-width:520px){.club-snacks{max-height:calc(100dvh - 20px)}.club-snack{padding:10px;gap:8px}.club-snack-actions button{min-height:40px}}@media(prefers-reduced-motion:reduce){.club-snack{animation:none}}
 
-/* Salão dos Clãs — shield, iron and aged gold, responsive. */
-.clan-shell{width:min(760px,100%);max-height:92dvh;overflow:auto}.clan-banner{display:flex;align-items:center;gap:14px;background:linear-gradient(125deg,#3c3830,#23282a);border:1px solid #a38757;border-radius:8px;padding:14px;margin:12px 0}.clan-banner>span,.clan-emblem{display:grid;place-items:center;flex:none;width:54px;height:61px;background:linear-gradient(145deg,#424b4b,#22282b);border:1px solid #c5a66d;clip-path:polygon(0 0,100% 0,100% 75%,50% 100%,0 75%);font-size:30px;color:#e3c389}.clan-banner strong,.clan-card-head strong{font:700 20px Georgia;color:#f1d9a7;display:block}.clan-banner small,.clan-card-head small{display:block;color:#cbb99a;font:12px/1.5 Arial}.clan-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.clan-tabs button{font-size:12px;padding:8px 10px}.clan-card{border:1px solid #806a4c;background:linear-gradient(145deg,#362a20,#241d18);border-radius:8px;padding:14px;margin:10px 0}.clan-card-head{display:flex;align-items:center;gap:12px}.clan-card p{overflow-wrap:anywhere;font:13px/1.5 Arial}.clan-card .sub{color:#d0b994;font-size:12px}.clan-field{display:flex;flex-direction:column;gap:5px;font:700 12px Arial;color:#dfc397;margin:9px 0;min-width:0}.clan-field input{width:100%;box-sizing:border-box;min-width:0}.clan-requirements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin:10px 0}.clan-search{display:flex;align-items:end;gap:8px}.clan-search .clan-field{flex:1}.clan-search button{margin-bottom:9px;min-height:38px}.clan-warning{border-left:3px solid #c5a66d;background:#352a1d;padding:10px;font:13px/1.5 Arial}.clan-chat-log{min-height:200px;max-height:48dvh;overflow:auto;background:#191c20;border:1px solid #6f624c;border-radius:8px;padding:12px}.clan-message{border-bottom:1px solid #484238;padding:8px 0}.clan-message strong{color:#e4c895;font:700 13px Arial}.clan-message small{float:right;color:#aaa08c;font:10px Arial}.clan-message p{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0;font:14px/1.4 Arial}.clan-shell #clanstatus:empty{display:none}.clan-shell #clanrefresh{margin-top:10px}@media(max-width:460px){.clan-requirements{grid-template-columns:1fr}.clan-shell{padding:12px}.clan-tabs button{padding:8px 6px;font-size:11px}.clan-card{padding:10px}}
+/* Salão dos Clãs — scoped controls, heraldic ironwork and aged gold. */
+#clanoverlay{padding:clamp(8px,2vw,20px)}
+#clanoverlay .clan-shell{width:min(960px,100%);max-width:100%;max-height:calc(100dvh - 2 * clamp(8px,2vw,20px));box-sizing:border-box;overflow:auto;padding:clamp(16px,2.5vw,28px);border:1px solid #b29666;border-radius:12px;background:radial-gradient(ellipse at 50% 0,#3d3930 0,transparent 52%),repeating-linear-gradient(0deg,#d0b27a07 0 1px,transparent 1px 6px),linear-gradient(145deg,#252728,#171d20);box-shadow:inset 0 0 0 4px #1b1d1e,inset 0 0 0 5px #78664c,0 24px 80px #000b;scrollbar-width:thin;scrollbar-color:#8e744d #202426}
+#clanoverlay .club-head{padding-bottom:14px;border-bottom:1px solid #aa8e5c50}
+#clanoverlay .club-head h2{font-size:clamp(24px,4vw,36px);margin-bottom:0;color:#f2d7a2}
+#clanoverlay .club-head .secondary{flex:none;width:auto}
+#clanoverlay .clan-banner{position:relative;display:flex;align-items:center;gap:16px;isolation:isolate;background:linear-gradient(110deg,#422829,#302928 42%,#20292c);border:1px solid #b18f5c;border-radius:5px;padding:clamp(15px,3vw,24px);margin:16px 0;overflow:hidden;box-shadow:inset 0 0 0 4px #15191c66}
+#clanoverlay .clan-banner::before{content:"";position:absolute;inset:6px;border:1px solid #b18f5c35;pointer-events:none;z-index:-1}
+#clanoverlay .clan-banner-copy{flex:1;min-width:0}
+#clanoverlay .clan-banner strong{display:block;color:#f1dbb0;font:700 clamp(18px,3vw,25px)/1.2 Georgia,serif;margin:5px 0}
+#clanoverlay .clan-banner small{display:block;color:#c4b9a4;font:12px/1.5 Arial}
+#clanoverlay .clan-banner-seal{color:#c2a26b;font-size:24px;opacity:.65}
+#clanoverlay .clan-kicker{display:block;color:#cfb17d;font:700 10px/1.5 Arial;letter-spacing:1.8px;text-transform:uppercase}
+#clanoverlay .clan-banner-crest,#clanoverlay .clan-crest{position:relative;display:grid;place-items:center;flex:none;width:56px;height:65px;background:linear-gradient(145deg,#ebce92,#725437 45%,#c9a773);clip-path:polygon(0 0,100% 0,100% 63%,90% 81%,50% 100%,10% 81%,0 63%);isolation:isolate;color:#f5d7a0;font:34px Georgia,serif}
+#clanoverlay .clan-banner-crest::before,#clanoverlay .clan-crest::before{content:"";position:absolute;inset:3px;background:linear-gradient(145deg,#526064,#202a30 75%);clip-path:inherit;z-index:-1}
+#clanoverlay .clan-crest[data-emblem=crown]::before{background:linear-gradient(145deg,#82603a,#34261a)}
+#clanoverlay .clan-crest[data-emblem=knight]::before{background:linear-gradient(145deg,#783d37,#2b2025)}
+#clanoverlay .clan-crest[data-emblem=star]::before,#clanoverlay .clan-crest[data-emblem=moon]::before{background:linear-gradient(145deg,#4a5676,#202333)}
+#clanoverlay .clan-crest-glyph,#clanoverlay .clan-banner-crest span{padding-bottom:8px;text-shadow:0 2px 2px #000}
+#clanoverlay .clan-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:15px 0;padding:5px;background:#151b1e;border:1px solid #72634a;border-radius:7px}
+#clanoverlay .clan-tab{flex:1 1 auto;width:auto;min-width:90px;padding:10px 12px;border:1px solid transparent;background:transparent;color:#c8bcaa;border-radius:4px;font:700 12px Arial;white-space:normal}
+#clanoverlay .clan-tab:hover{background:#343432;color:#f1d9ad}
+#clanoverlay .clan-tab.active{background:#3d3529;border-color:#bda06a;color:#f2d39b;box-shadow:inset 0 -2px #bd995e}
+#clanoverlay #clanbody{min-width:0}
+#clanoverlay .clan-section-heading{margin:17px 0 12px}
+#clanoverlay .clan-section-heading h3{color:#efdbb3;font:700 23px/1.25 Georgia;margin:5px 0}
+#clanoverlay .clan-section-heading p{color:#c3b9a8;margin:5px 0;font:13px/1.5 Arial}
+#clanoverlay .clan-card{min-width:0;border:1px solid #7b694d;background:linear-gradient(145deg,#303536,#202426);border-radius:6px;padding:16px;margin:10px 0;box-shadow:inset 0 0 0 3px #1a1e20}
+#clanoverlay .clan-card-head{display:flex;align-items:center;gap:12px}
+#clanoverlay .clan-card-head>div{min-width:0}
+#clanoverlay .clan-card-head strong{display:block;font:700 21px/1.2 Georgia;color:#f0d9ac;overflow-wrap:anywhere}
+#clanoverlay .clan-card-head small{display:block;font:12px/1.6 Arial;color:#c1b59d}
+#clanoverlay .clan-card p{overflow-wrap:anywhere;font:13px/1.5 Arial;color:#d5c8b5}
+#clanoverlay .clan-card .sub{color:#bfb49e;font-size:12px}
+#clanoverlay .clan-field{display:flex;flex-direction:column;gap:6px;min-width:0;margin:10px 0;color:#dfc59d;font:700 12px/1.35 Arial}
+#clanoverlay .clan-field-label{display:block;white-space:normal;overflow-wrap:normal}
+#clanoverlay .clan-field input,#clanoverlay .clan-field textarea,#clanoverlay .clan-field select{display:block;width:100%;min-width:0;box-sizing:border-box;min-height:43px;padding:10px 12px;border:1px solid #887451;border-radius:5px;background:#141a1d;color:#f4e4c7;font:14px/1.4 Arial;letter-spacing:normal;text-transform:none;color-scheme:dark}
+#clanoverlay .clan-field input::placeholder,#clanoverlay .clan-field textarea::placeholder{color:#a69b88;opacity:1}
+#clanoverlay .clan-field textarea{resize:vertical;min-height:84px}
+#clanoverlay .clan-field input:focus,#clanoverlay .clan-field textarea:focus,#clanoverlay .clan-field select:focus{outline:2px solid #c8a46b;outline-offset:1px}
+#clanoverlay .clan-requirements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;margin:8px 0}
+#clanoverlay .clan-search{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;padding:12px;border:1px solid #75664e;border-radius:6px;background:#191f22;margin:10px 0 16px}
+#clanoverlay .clan-search .clan-field{margin:0}
+#clanoverlay .clan-search>button{width:auto;min-width:100px;margin:0;min-height:43px}
+#clanoverlay .clan-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#clanoverlay .clan-result-grid .clan-card{margin:0;display:flex;flex-direction:column}
+#clanoverlay .clan-recruit{margin-top:auto;border-top:1px solid #73644d66;padding-top:8px}
+#clanoverlay .clan-empty{display:grid;justify-items:center;text-align:center;padding:28px 20px;border:1px dashed #806c4b;border-radius:6px;background:#171c2080}
+#clanoverlay .clan-empty h3{font:700 21px Georgia;color:#e9d5af;margin:15px 0 0}
+#clanoverlay .clan-empty p{max-width:420px;margin:8px 0 16px}
+#clanoverlay .clan-empty button{width:auto;min-width:180px}
+#clanoverlay .clan-pagination button{width:auto}
+#clanoverlay .clan-foundation{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+#clanoverlay .clan-foundation-form{margin:0}
+#clanoverlay .clan-foundation-preview{position:sticky;top:0;display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;padding:26px 16px 24px;border:1px solid #b69a64;border-radius:5px;background:radial-gradient(ellipse at 50% 18%,#694b3333,transparent 55%),repeating-linear-gradient(45deg,#c3aa7908 0 1px,transparent 1px 6px),linear-gradient(160deg,#382d2b,#1a2226);box-shadow:inset 0 0 0 5px #1b2124,inset 0 0 0 6px #9e8257;overflow-wrap:anywhere}
+#clanoverlay .clan-foundation-preview .clan-crest{width:105px;height:121px;margin:22px 0 16px;font-size:60px}
+#clanoverlay .clan-foundation-preview .clan-crest::before{inset:5px}
+#clanoverlay .clan-preview-tag{font:700 11px Arial;letter-spacing:2px;color:#d0b47f}
+#clanoverlay .clan-preview-name{font:700 clamp(22px,3vw,31px)/1.16 Georgia;color:#f4dca8;margin:9px 0;max-width:100%}
+#clanoverlay .clan-preview-description{white-space:pre-wrap;color:#d2c3ac;font:italic 15px/1.6 Georgia;max-width:100%;min-height:48px}
+#clanoverlay .clan-preview-seal{border-block:1px solid #977b5266;margin:12px 0 2px;padding:12px 4px;width:100%;font:700 10px Arial;letter-spacing:1.5px;color:#d6b77c}
+#clanoverlay .clan-preview-founder{margin:8px 0;color:#cbb99d}
+#clanoverlay .clan-preview-stats{font:12px Arial;color:#e6d2ad}
+#clanoverlay .clan-creation-hint{color:#d6ad87;font-size:12px;margin:6px 0}
+#clanoverlay .clan-creation-hint[data-valid=yes]{color:#a9c49b}
+#clanoverlay .clan-foundation-submit{margin-top:12px;min-height:44px}
+#clanoverlay .clan-warning{border-left:3px solid #c5a66d;background:#352a1d;padding:10px;font:13px/1.5 Arial}
+#clanoverlay .clan-chat-log{min-height:200px;max-height:48dvh;overflow:auto;background:#191c20;border:1px solid #6f624c;border-radius:8px;padding:12px}
+#clanoverlay .clan-message{border-bottom:1px solid #484238;padding:8px 0}
+#clanoverlay .clan-message strong{color:#e4c895;font:700 13px Arial}
+#clanoverlay .clan-message small{float:right;color:#aaa08c;font:10px Arial}
+#clanoverlay .clan-message p{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0;font:14px/1.4 Arial}
+#clanoverlay #clanstatus:empty{display:none}
+#clanoverlay #clanrefresh{width:auto;margin-top:14px}
+@media(max-width:650px){#clanoverlay .clan-foundation{grid-template-columns:minmax(0,1fr)}#clanoverlay .clan-foundation-preview{position:static;grid-row:1;padding:20px 15px}#clanoverlay .clan-foundation-preview .clan-crest{width:76px;height:88px;font-size:43px;margin:12px 0}#clanoverlay .clan-preview-description{min-height:0;margin:6px 0}#clanoverlay .clan-result-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:420px){#clanoverlay .clan-requirements{grid-template-columns:minmax(0,1fr)}#clanoverlay .clan-tabs{gap:4px}#clanoverlay .clan-tab{min-width:78px;font-size:11px;padding:9px 5px}#clanoverlay .clan-banner{gap:10px;padding:13px}#clanoverlay .clan-banner-seal{display:none}#clanoverlay .clan-search>button{min-width:70px;padding:10px 8px}#clanoverlay .clan-search{gap:8px;padding:9px}}
