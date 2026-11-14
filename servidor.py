@@ -529,8 +529,9 @@ def social_state(pid,now):
         account=sql(db,'SELECT username FROM accounts WHERE player_id=?',(pid,)).fetchone()
         import clas
         clan_notices=clas.notices(db,sql,pid);level=clas.stats(db,sql,pid)['level']
+        clan_owner=bool(sql(db,'SELECT 1 FROM clans WHERE owner=?',(pid,)).fetchone())
     people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
-    return dict(me=dict(zip(('name','points','wins','losses','draws'),me),**cosmetics,level=level,account=account[0] if account else None),clan_requests=clan_notices,persistent=bool(DATABASE_URL),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at','match_id'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread,matchmaking=pid in MATCH_QUEUE)
+    return dict(me=dict(zip(('name','points','wins','losses','draws'),me),**cosmetics,level=level,account=account[0] if account else None),clan_requests=clan_notices,clan_owner=clan_owner,persistent=bool(DATABASE_URL),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at','match_id'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread,matchmaking=pid in MATCH_QUEUE)
 def search_key(value):
     return ''.join(c for c in unicodedata.normalize('NFKD',str(value).casefold()) if not unicodedata.combining(c))
 def public_player(db,pid,row,now):
@@ -558,6 +559,9 @@ def social_lookup(path,d,pid,now):
         p=player
         p['rank']=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND (wins>? OR (wins=? AND (name<? OR (name=? AND id<?)))))',(p['points'],p['points'],p['wins'],p['wins'],p['name'],p['name'],p['id'])).fetchone()[0]+1
         p.update(cosmetics_for(db,target,True))
+        import clas
+        p['level']=clas.stats(db,sql,target)['level']
+        p['clan_member']=bool(clas.member(db,sql,target))
         return 200,{'player':p}
 
 PUZZLES=[
