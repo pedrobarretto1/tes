@@ -45,3 +45,27 @@ html[data-skin^="skin-relic-"]:not([data-skin="skin-relic-throne"]) .piece.king:
 .royal-preview .shop-square .piece:before{border-width:.5px}
 .royal-path-card .royal-preview{max-width:190px}
 @media(max-width:520px){.royal-path-card .royal-preview{grid-column:1/-1;grid-row:auto;max-width:180px}.royal-path-card .royal-path-icon{grid-row:auto}.royal-path-card p,.royal-path-card button{grid-column:1/-1}.royal-path-card{grid-template-columns:36px 1fr}.royal-path-card strong{align-self:center}}
+
+/* Preserve the SVG's 540 x 610 coordinate system on every viewport.
+   No percentage padding relative to a wider parent, including match-focus. */
+html[data-theme^="relic-"]:not([data-theme="relic-throne"]) .boardframe,
+html[data-theme^="relic-"]:not([data-theme="relic-throne"]) .match-focus .boardframe{
+  position:relative;width:100%;max-width:100%;aspect-ratio:540/610;padding:0!important;border:0;border-radius:0;box-shadow:none;margin-inline:auto;overflow:visible;
+}
+html[data-theme^="relic-"]:not([data-theme="relic-throne"]) .boardframe>.board{
+ position:absolute;left:12.963%;top:19.1803%;width:74.074%;height:65.5738%;margin:0;aspect-ratio:1;min-width:0;min-height:0;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));
+}
+.royal-preview{min-width:0;flex:none;align-self:center}
+.royal-preview .royal-preview-grid{grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));max-width:none;min-width:0;max-height:none}
+.royal-preview .shop-square{width:100%;height:100%;aspect-ratio:auto;overflow:hidden}
+.royal-shop-grid .shop-item{min-width:0;overflow:hidden}
+.royal-shop-grid .shop-item>button{margin-top:0;white-space:normal;line-height:1.25}
+.royal-shop-grid .shop-item>button:last-child{margin-top:auto}
+.royal-demo-dialog{width:min(730px,96vw);max-width:96vw;height:min(940px,94dvh);max-height:94dvh;padding:0;border:1px solid #9f8057;border-radius:14px;background:#17151d;color:#f6e7c9;overflow:hidden;box-shadow:0 20px 80px #000b}
+.royal-demo-dialog::backdrop{background:#08070dd9;backdrop-filter:blur(4px)}
+.royal-demo-dialog[open]{display:flex;flex-direction:column}
+.royal-demo-dialog>header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;background:#242027;border-bottom:1px solid #695643}
+.royal-demo-dialog>header strong{font:18px Georgia,serif}
+.royal-demo-dialog>header button{width:auto;flex:none;font:12px Arial,sans-serif;padding:9px 12px}
+.royal-demo-dialog iframe{border:0;width:100%;flex:1;min-height:0;background:#101018}
+@media(max-width:520px){.royal-demo-dialog{width:98vw;max-width:98vw;height:96dvh;max-height:96dvh}.royal-demo-dialog>header strong{font-size:15px}}

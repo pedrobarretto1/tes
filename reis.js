@@ -39,6 +39,14 @@ window.royalPreview=key=>{if(!names.includes(key))return null;let el=document.cr
 let ids=[...markup.matchAll(/id="([^"]+)"/g)].map(m=>m[1]);for(let id of ids){markup=markup.replaceAll('id="'+id+'"','id="'+uid+id+'"').replaceAll('url(#'+id+')','url(#'+uid+id+')').replaceAll('href="#'+id+'"','href="#'+uid+id+'"')}
 let a=document.createElement('div');a.className='royal-preview-arch';a.innerHTML=markup;el.append(a);let grid=document.createElement('div');grid.className='shop-preview royal-preview-grid';grid.dataset.theme=el.dataset.theme;grid.dataset.skin=el.dataset.skin;
 for(let i=0;i<64;i++){let r=Math.floor(i/8),c=i%8,dark=(r+c)%2===1,sq=document.createElement('span');sq.className='shop-square '+(dark?'dark':'light');sq.style.backgroundImage=tile(i,key,dark)+','+(dark?'var(--shop-dark)':'var(--shop-light)');if(dark&&(r<3||r>=5)){let p=document.createElement('span');p.className='piece '+(r<3?'black':'white');sq.append(p)}grid.append(sq)}el.append(grid);el.setAttribute('aria-hidden','true');return el};
+// The laboratory runs in an isolated document, sharing this exact animation engine.
+window.openRoyalDemo=key=>{if(!names.includes(key))return;let old=document.getElementById('royalDemoDialog');if(old?.open)old.close();old?.remove();
+let dialog=document.createElement('dialog');dialog.id='royalDemoDialog';dialog.className='royal-demo-dialog';dialog.setAttribute('aria-label','Experimentar relíquia');
+let bar=document.createElement('header'),title=document.createElement('strong'),close=document.createElement('button'),iframe=document.createElement('iframe');
+title.textContent='Laboratório de Relíquias';close.type='button';close.className='secondary';close.textContent='Fechar prévia';close.onclick=()=>dialog.close();bar.append(title,close);
+iframe.title='Prévia interativa do tabuleiro';iframe.setAttribute('sandbox','allow-scripts');iframe.src='/royal-demo.html?king='+encodeURIComponent(key);dialog.append(bar,iframe);document.body.append(dialog);
+let onMessage=e=>{if(e.source===iframe.contentWindow&&e.data?.type==='royal-demo-close')dialog.close()};window.addEventListener('message',onMessage);
+dialog.addEventListener('close',()=>{window.removeEventListener('message',onMessage);iframe.remove();dialog.remove()},{once:true});dialog.showModal()};
 let host,canvas,ctx,theme=null,raf=0,last=0,clock=0,eye={x:0,y:0},target={x:50,y:50},angle=0,phase=[0,2.2,4.1],emotion=null,ending=null,timer=0,epoch=0,particles=[],tiles=new Map();
 const clamp=x=>Math.max(0,Math.min(1,x)),smooth=x=>{x=clamp(x);return x*x*(3-2*x)},mix=(a,b,t)=>a+(b-a)*t;
 const attr=(id,k,v)=>host?.querySelector('#'+id)?.setAttribute(k,String(v));
