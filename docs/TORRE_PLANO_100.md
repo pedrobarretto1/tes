@@ -6,6 +6,15 @@ o cenário SVG em tela cheia e a independência entre ambiente e cosméticos.
 Os detalhes de balanceamento, narrativa e recompensas abaixo são propostas para
 teste e aprovação, não funcionalidades já publicadas.
 
+## Detalhamento por reino
+
+- [Castelo Esquecido — 25 andares](TORRE_CASTELO_25.md): catálogo individual de inimigos,
+  classes, dificuldades, cinco estágios visuais, HUD e mapa 5×5.
+- Catacumbas, Império e Trono do Fim: detalhamento individual futuro.
+
+Decisão posterior do criador: o mapa mostra exclusivamente os 25 andares do
+reino atual, com ícones de inimigos e chefes; HUD tematizado por reino.
+
 ## 1. Distribuição definitiva
 
 | Andares | Domínio (ID existente) | Chefe | Identidade |
@@ -61,7 +70,7 @@ profundidade real. O quadro cobre os 100 andares; os nomes são propostas.
 | 6–10 | Muralhas / Capitão | Centro, capturas simples | 1–2 | Bandeiras, tochas acesas |
 | 11–15 | Salão das armas / Carrasco | Trocas e capturas múltiplas | 2 | Armaduras, brasões |
 | 16–20 | Salão da guarda / Estrategista | Proteção, promoção | 2–3 | Luz nos vitrais |
-| 21–25 | Trono abandonado / Cavaleiro Sem Nome | Defesa, contra-ataque | 3–4 | Trono e portões revelados |
+| 21–25 | Trono abandonado / Cavaleiro Sem Nome | Defesa, contra-ataque | 3,3–4,5 | Trono e portões revelados |
 | 26–30 | Entrada da cripta / Guardião das Tumbas | Contra-ataque e segurança | 3–4 | Névoa rente ao chão |
 | 31–35 | Galeria dos nomes / Vigia das Almas | Armadilhas de captura | 4 | Inscrições iluminadas |
 | 36–40 | Sepulcros / Carrasco Espectral | Combinações de sacrifício | 4–5 | Estátuas e nichos ativos |
