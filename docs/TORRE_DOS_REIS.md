@@ -53,6 +53,13 @@ de setup Neon. A camada full-screen teve simulação JS de troca de reino,
 64 casas e pausa de animação; o criador aprovou visualmente. Testes reais
 de FPS e de todos os 100 andares ainda não existem.
 
+## Reinício da mesa entre partidas
+A interface usa o tabuleiro salvo somente durante progress.status=playing sem
+resultado. Nos demais estados mostra a posição inicial completa, limpa seleção
+e marcas, sai do modo concentração e aguarda escolha de rota/nova tentativa.
+O último resultado e histórico permanecem no payload para exibição, sem
+reiniciar coroas ou recorde. Teste de regressão: node test_torre_ui.js.
+
 ## Balanceamento revisado
 A Torre usa tower_ai e ai_balance, independentes da IA da Jornada. Andar 1
 sem busca minimax e com oportunidades de captura; chance de busca e força
