@@ -5,6 +5,29 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Rebalanceamento da Torre e pedidos sem timer
+- Pedido: andar 1 muito difícil; suavizar cada nível, retirar fechamento automático de 30 s.
+- torre.py: ai_balance e TOWER_SEARCH_CHANCE, curva exclusiva 1–30, chance de busca
+  zero no andar 1 em todas as rotas, aumento gradual com picos leves nos elites,
+  perfis de busca limitados no início. Metas, não Elo nem taxas de vitória.
+- servidor.py: tower_ai escolhe lances legais com erros posicionais deliberados
+  no início, oferece oportunidades de captura, reduz preferência por promoção,
+  respeita captura obrigatória e lei da maioria. A chance de usar busca cresce.
+  Partidas salvas adotam nova política no próximo lance da IA, mantendo tabuleiro,
+  sequência, coroas e recorde. Jornada e online usam motor original.
+- torre.html: dificuldade real em texto, sem confundir profundidade com força;
+  rotas do andar 1 explicitamente muito fáceis.
+- clube.js: pedidos de amizade/desafio sem timer local, permanecem até resposta,
+  X ou pedido deixar de estar válido; avisos informativos mantêm 7/10 s.
+  index.html cache v69. Convites ainda expiram no servidor em 60 s.
+- Testes: sintaxe JS; testes de curva, partida legada, 12 simulações com
+  jogador heurístico e legalidade. Resultados CI/publicação a confirmar.
+- Commits bcf0198f, 1c3c40e2, 2f2b1306, 5c8f3b76, 23387e38, 59cd69af.
+  Sem reset de dados, sem alterar recompensas ou regras. Não excluir Pedro 2
+  sem a confirmação solicitada.
+- Próximo: validar com jogador real, ajustar chance de busca por feedback.
+  Rollback: reverter commits de balanceamento/UI; dados permanecem compatíveis.
+
 ## 14/11/2026 — Notificações interativas de desafio e amizade
 - Pedido: aceitar/recusar direto no aviso, X e duração conforme o tipo.
 - clube.js: pendingRequests, requestActions, snack, syncRequestSnacks e
