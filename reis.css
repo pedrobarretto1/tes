@@ -69,3 +69,23 @@ html[data-theme^="relic-"]:not([data-theme="relic-throne"]) .boardframe>.board{
 .royal-demo-dialog>header button{width:auto;flex:none;font:12px Arial,sans-serif;padding:9px 12px}
 .royal-demo-dialog iframe{border:0;width:100%;flex:1;min-height:0;background:#101018}
 @media(max-width:520px){.royal-demo-dialog{width:98vw;max-width:98vw;height:96dvh;max-height:96dvh}.royal-demo-dialog>header strong{font-size:15px}}
+
+/* Static previews keep their full silhouettes without animating behind menus. */
+.royal-preview{contain:layout paint;overflow:hidden;min-height:0}
+.royal-preview:not([data-ready="1"]){background:linear-gradient(145deg,var(--royal-bg,#24212b),#131016);border:1px solid #ae91665c;border-radius:8px}
+.royal-preview :is(.piece,.shop-square,svg,svg *){animation:none!important;transition:none!important}
+.royal-preview .royal-preview-grid{background:none}
+.royal-preview .shop-square .piece{filter:none;box-shadow:0 1px 2px #0006}
+#schooloverlay:not(.hidden),#journeyoverlay:not(.hidden){backdrop-filter:none;background:#130e0bef}
+.relic-ceremony::backdrop,.royal-demo-dialog::backdrop{backdrop-filter:none}
+@media(max-width:650px),(pointer:coarse){
+ #schooloverlay,#journeyoverlay{padding:8px;align-items:center}
+ #schooloverlay .club-card,#journeyoverlay .club-card{width:100%;max-width:100%;max-height:calc(100dvh - 16px);padding:12px;min-width:0;overflow-x:hidden}
+ .royal-shop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .royal-shop-grid .shop-item{min-width:0;padding:8px}
+ .royal-shop-grid .shop-item>button{font-size:12px;padding:8px 5px}
+ .royal-path-card .royal-preview{max-width:190px}
+ .royal-preview .shop-square .piece::before{box-shadow:none}
+ .royal-architecture{filter:none}
+}
+@media(max-width:370px){.royal-shop-grid{grid-template-columns:minmax(0,1fr)}}

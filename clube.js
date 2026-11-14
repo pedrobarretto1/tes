@@ -115,8 +115,8 @@ window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
         const a=pos(fromSquare),z=pos(toSquare);
         if(!a||!z||a.w<=0){frameId=requestAnimationFrame(draw);return}
         elapsed=Math.min(duration,elapsed+delta);
-        const p=elapsed/duration,q=p*p*(3-2*p),dx=(z.x-a.x)*q,dy=(z.y-a.y)*q;
-        ghost.style.transform='translate3d(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px),0) scale('+(1+.025*Math.sin(Math.PI*p))+')';
+        const p=elapsed/duration,q=window.damasMoveMotion?.ease(p)??p*p*(3-2*p),dx=(z.x-a.x)*q,dy=(z.y-a.y)*q;
+        ghost.style.transform='translate3d(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px),0) scale('+(window.damasMoveMotion?.scale(p)??1+.025*Math.sin(Math.PI*p))+')';
         window.royalTrack?.(a.u+(z.u-a.u)*q,a.v+(z.v-a.v)*q,Math.sign(oldBoard[m.from]||old));
         if(p>=1){finish();return}
         frameId=requestAnimationFrame(draw);
@@ -126,7 +126,7 @@ window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   }
   try{
     let previous=m.from;
-    for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=Math.min(600,240+distance*65);let captured=taken.get(m.cap[k]);
+    for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=window.damasMoveMotion?.duration(distance)??Math.min(600,240+distance*65);let captured=taken.get(m.cap[k]);
       await slide(previous,target,duration);if(fx.cancelled)return;
       place(ghost,target);ghost.style.transform='translate3d(-50%,-50%,0) scale(1)';
       if(captured){{let r=pos(m.cap[k]);window.royalCapture?.(oldBoard[m.cap[k]],mySide,r.u,r.v)}window.themeMove?.(layer,pos(m.cap[k]),'capture');await animate(captured,[{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) translateY(12px) rotate(22deg) scale(.45)',opacity:0}],{duration:150,easing:'ease-in',fill:'forwards'});anchors.delete(captured);captured.remove()}previous=target;
