@@ -68,7 +68,7 @@ E('clubnavopen').onclick=()=>openClub();E('clubnavprofile').onclick=openMyProfil
 
 let moveEffect=null;
 window.clubFXDestination=null;
-window.cancelClubMoveFX=()=>{let fx=moveEffect;if(!fx)return;moveEffect=null;fx.cancelled=true;fx.observer?.disconnect();for(let animation of fx.animations)animation.cancel();fx.layer.remove();E('board').classList.remove('board-fx-active');window.clubFXDestination=null;E('board').querySelectorAll('.fx-hidden').forEach(p=>p.classList.remove('fx-hidden'))};
+window.cancelClubMoveFX=()=>{let fx=moveEffect;if(!fx)return;moveEffect=null;fx.cancelled=true;fx.stopFrame?.();fx.observer?.disconnect();for(let animation of fx.animations)animation.cancel();fx.layer.remove();E('board').classList.remove('board-fx-active');window.clubFXDestination=null;E('board').querySelectorAll('.fx-hidden').forEach(p=>p.classList.remove('fx-hidden'))};
 window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   window.cancelClubMoveFX();
   let board=E('board'),frame=board.parentElement,to=m.path.at(-1),dest=board.querySelector('[data-square="'+to+'"]'),piece=dest?.querySelector('.piece'),source=board.querySelector('[data-square="'+m.from+'"]');
@@ -86,12 +86,39 @@ window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   const ghost=disc(old,'fx-moving');place(ghost,m.from);layer.append(ghost);
   const taken=new Map();for(let i of m.cap){if(!oldBoard[i])continue;let victim=disc(oldBoard[i],'fx-victim');place(victim,i);layer.append(victim);taken.set(i,victim)}
   async function animate(el,frames,options){let anim=el.animate(frames,options);fx.animations.push(anim);try{await anim.finished}catch(e){}}
+  // V5.8: one visual stone, one frame clock. CSS left/top animations may
+  // be interrupted or re-evaluated when the board redraws or the layout changes.
+  // Never advance more than 34 ms of animation on a single painted frame.
+  function slide(fromSquare,toSquare,duration){
+    return new Promise(resolve=>{
+      let frameId=0,lastTime=null,elapsed=0,done=false;
+      function finish(){if(done)return;done=true;cancelAnimationFrame(frameId);fx.stopFrame=null;resolve()}
+      fx.stopFrame=finish;
+      function draw(t){
+        if(fx.cancelled){finish();return}
+        if(lastTime===null)lastTime=t;
+        let delta=Math.max(0,Math.min(34,t-lastTime));lastTime=t;
+        // Pause rather than skipping to the end when the tab is hidden.
+        if(document.hidden){frameId=requestAnimationFrame(draw);return}
+        let a=pos(fromSquare),z=pos(toSquare);
+        if(!Number.isFinite(a.u+a.v+z.u+z.v+a.size)||a.size<=0){frameId=requestAnimationFrame(draw);return}
+        elapsed=Math.min(duration,elapsed+delta);
+        let p=elapsed/duration,q=p*p*(3-2*p);
+        ghost.style.left=(a.u+(z.u-a.u)*q)+'%';
+        ghost.style.top=(a.v+(z.v-a.v)*q)+'%';
+        ghost.style.width=(a.size+(z.size-a.size)*q)+'%';
+        ghost.style.transform='translate(-50%,-50%) scale('+(1+.035*Math.sin(Math.PI*p))+')';
+        if(p>=1){finish();return}
+        frameId=requestAnimationFrame(draw);
+      }
+      frameId=requestAnimationFrame(draw);
+    });
+  }
   try{
     let previous=m.from;
     for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=Math.min(1200,540+distance*130);let captured=taken.get(m.cap[k]);
-      let frames=[{left:from.u+'%',top:from.v+'%',transform:'translate(-50%,-50%) scale(1)',offset:0},{left:(from.u+end.u)/2+'%',top:(from.v+end.v)/2+'%',transform:'translate(-50%,-50%) scale(1.06)',offset:.5},{left:end.u+'%',top:end.v+'%',transform:'translate(-50%,-50%) scale(1)',offset:1}];
-      await animate(ghost,frames,{duration,easing:'cubic-bezier(.35,.08,.65,.92)',fill:'forwards'});if(fx.cancelled)return;
-      place(ghost,target);ghost.getAnimations().forEach(a=>a.cancel());
+      await slide(previous,target,duration);if(fx.cancelled)return;
+      place(ghost,target);ghost.style.transform='translate(-50%,-50%) scale(1)';
       if(captured){window.themeMove?.(layer,pos(m.cap[k]),'capture');await animate(captured,[{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) translateY(12px) rotate(22deg) scale(.45)',opacity:0}],{duration:240,easing:'ease-in',fill:'forwards'});captured.remove()}previous=target;
     }
     if(promoted&&!fx.cancelled){window.themeMove?.(layer,pos(to),'promotion');ghost.classList.add('king');let ring=node('span','fx-promotion');place(ring,to);layer.append(ring);await Promise.all([animate(ghost,[{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.2)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:420,easing:'ease-out'}),animate(ring,[{transform:'translate(-50%,-50%) scale(.6)',opacity:1},{transform:'translate(-50%,-50%) scale(1.5)',opacity:0}],{duration:480,fill:'forwards'})])}
