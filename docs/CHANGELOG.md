@@ -20,9 +20,9 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   beta permanece no 30 até a próxima expansão. Metas D não são Elo;
   IA ainda usa cinco perfis existentes, estilos são descrições planejadas.
 - Testes: catálogo/fronteira 25→26, elites, rota fixa, estado legado, API
-  e sintaxe JS. Resultados de execução a registrar após CI.
+  e sintaxe JS: 12 testes da Torre aprovados, simulação 25 casas e troca 25→26 aprovada, CI geral e Node OK. Corrigido relógio simulado de selftest.py (501728c).
 - Commits 482f7a95, f27d13cd, be7dea8f, c452e75f, 1ae97a96.
-  Branch torre-castelo-25; publicação pendente.
+  PR #2 integrada: bc68ac387a5992c6e806e03e5a87b01d969ddf6f. Render live dep-dbsa9pjm8hqs73c6ukb0; SELFTEST geral e 12 testes da Torre aprovados, Neon pronto. Validação visual real pendente.
 - Pendências: validação visual, calibragem real de IA, Catacumbas 31–50,
   demais reinos, cerimônias/recompensas e migração futura do completed.
 - Rollback: manter main anterior até validar; sem migração destrutiva.
