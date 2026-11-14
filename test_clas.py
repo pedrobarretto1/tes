@@ -225,4 +225,39 @@ class ClanTest(unittest.TestCase):
         self.call('owner','kick',target='alice')
         self.assertIsNone(self.call('owner','chat')[1]['messages'][0]['role'])
         with s.database() as db:self.assertIsNone(clas.public_identity(db,s.sql,'alice'))
+    def test_recommendations_private_and_royal_decision(self):
+        cid=self.create()
+        for p in ('alice','bob'):self.admit(cid,p)
+        self.call('owner','promote',target='alice',role='captain')
+        self.call('owner','promote',target='bob',role='vice')
+        self.call('owner','edit',requirements={'points':2000,'wins':30})
+        self.assertEqual(self.call('bob','recommend',target='other')[0],200)
+        self.assertEqual(self.call('alice','recommend',target='other')[0],409)
+        self.assertNotIn('recommendations',self.call('bob','state')[1]['mine'])
+        self.assertIsNone(self.call('other','state')[1]['mine'])
+        self.assertEqual(self.call('other','state')[1]['requests'],[])
+        r=self.call('alice','state')[1]['mine']['recommendations'][0]
+        self.assertEqual(r['profile']['id'],'other')
+        self.assertTrue(any(not c['ok'] for c in r['checks']))
+        self.assertEqual(self.call('bob','recommend-review',id=r['id'],opinion='support')[0],403)
+        self.assertEqual(self.call('alice','recommend-decide',id=r['id'],accept=True)[0],403)
+        self.assertEqual(self.call('alice','recommend-review',id=r['id'],opinion='support')[0],200)
+        rr=self.call('owner','state')[1]['mine']['recommendations'][0]
+        self.assertEqual(rr['opinion'],'support')
+        with s.database() as db:
+            recipients=[x[0] for x in s.sql(db,"SELECT recipient FROM notifications WHERE kind='clan_recommend'").fetchall()]
+            self.assertEqual(set(recipients),{'owner','alice'})
+        self.assertEqual(self.call('owner','recommend-decide',id=r['id'],accept=True)[0],200)
+        self.assertEqual(self.call('owner','recommend-decide',id=r['id'],accept=True)[0],409)
+        request=self.call('other','state')[1]['requests'][0]
+        self.assertTrue(request['royal'])
+        self.assertEqual(self.call('other','respond',id=request['id'],accept=True)[0],200)
+        self.assertEqual(self.call('other','state')[1]['mine']['role'],'member')
+        self.assertEqual(self.call('other','recommend',target='guest')[0],400)
+        self.call('owner','kick',target='other')
+        self.assertEqual(self.call('alice','recommend',target='other')[0],200)
+        rid=self.call('owner','state')[1]['mine']['recommendations'][0]['id']
+        self.assertEqual(self.call('alice','recommend-review',id=rid,opinion='support')[0],403)
+        self.assertEqual(self.call('owner','recommend-decide',id=rid,accept=False)[0],200)
+        self.assertEqual(self.call('other','state')[1]['requests'],[])
 if __name__=='__main__':unittest.main()
