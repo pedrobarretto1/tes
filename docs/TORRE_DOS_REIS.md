@@ -2,16 +2,11 @@
 
 Atualizado em 14/11/2026. Ver [plano dos 100 andares](TORRE_PLANO_100.md)
 para a expansão e [histórico](CHANGELOG.md) para as correções.
-O catálogo v2 está implementado na branch torre-castelo-25; consultar o changelog para confirmação da publicação.
+O catálogo v2 está publicado em produção.
 
 ## Produção confirmada
 - Site: https://casa-de-damas.onrender.com/torre.html
-- Última revisão funcional confirmada: af974ab8498538e9151c8b15fc32d2db421d4037
-  (Render dep-dbs8ap3bc2fs73as9log, live). O criador aprovou cenário em
-  tela cheia, mesa grande e layout tradicional.
-- Beta 1–30: Castelo 1–10 / Catacumbas 11–20 / Império 21–30.
-  Chefes: Cavaleiro Sem Nome, Rei Esquecido, Imperador de Ouro.
-  Trono do Fim (cosmos) está no SVG, mas não é jogável.
+- Última revisão funcional confirmada: bc68ac387a5992c6e806e03e5a87b01d969ddf6f (Render dep-dbsa9pjm8hqs73c6ukb0, live). O layout tradicional em tela cheia foi preservado.
 - Revisão v2: Castelo 1–25, Catacumbas 26–50, Império 51–75, Trono do Fim 76–100. Limite jogável 30; Castelo completo e entrada das Catacumbas 26–30. Andares 31–100 visíveis no catálogo, não liberados.
 
 ## Arquivos e contratos
@@ -53,8 +48,7 @@ python -m py_compile servidor.py torre.py
 python -m unittest test_torre.py test_torre_api.py -v
 python -c "import servidor,selftest; selftest.run(servidor)"
 
-Os oito testes Torre e o SELFTEST geral passaram na publicação da beta e
-reformulação. O startup executa a suíte Torre em SQLite temporário antes
+Os 12 testes Torre, o SELFTEST geral, a compilação Python e a sintaxe JS passaram no CI e/ou na publicação do catálogo v2. A simulação da interface verificou mapa de 25 casas e troca do reino no 26. Validação visual real pendente. O startup executa a suíte Torre em SQLite temporário antes
 de setup Neon. A camada full-screen teve simulação JS de troca de reino,
 64 casas e pausa de animação; o criador aprovou visualmente. Testes reais
 de FPS e de todos os 100 andares ainda não existem.
