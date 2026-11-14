@@ -20,7 +20,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   parecer, aceite e acesso por cargo. Refinamento solicitado: parecer favorável
   nunca cria convite ou autoriza ingresso; Capitão não avalia indicação própria,
   não pode chamar API de convite/decisão nem após parecer favorável. UI usa
-  'Parecer favorável', sem botão de aprovação. CI/publicação pendentes na PR #11.
+  'Parecer favorável', sem botão de aprovação. CI 43637988986 aprovado: 25 testes Python, SELFTEST, regressão Torre e Chromium 375/758/1280 px. PR #11 integrada: dfdf874592b647a2925b35a804397090169ef4f3. Render dep-dbscblbrjlhs73dq038g em publicação.
 - Rollback preserva a nova tabela. Nenhuma exclusão de dados existentes.
 
 ## 14/11/2026 — Insígnias de cargo e Convite Real
@@ -41,7 +41,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
 - test_clas.py: exceção real, bloqueio de aplicação, aceite autorizado,
   recusa, capacidade, cargos no chat/perfil e ex-membro; test_clas_ui.js:
   quatro insígnias abaixo do nome e controle exclusivo do Rei.
-  CI/publicação pendentes. Branch clas-cargos-convite-real.
+  CI 43637988986 aprovado, PR #11 integrada (dfdf874592b647a2925b35a804397090169ef4f3); Render dep-dbscblbrjlhs73dq038g em publicação. Primeiro CI falhou por delimitadores SQL na consulta do chat; corrigido antes da integração.
 - Rollback: reverter código; sem alteração de dados ou migração.
 
 ## 14/11/2026 — Conselho Real: hierarquia, administração e denúncias
