@@ -5,6 +5,28 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Castelo 1–25: catálogo e mapa da campanha
+- Pedido: continuar a Torre e corrigir mapa antigo de 10 níveis.
+- torre.py: catálogo v2, 4 reinos de 25, 25 inimigos do Castelo, classes,
+  capítulos, estágios, metas D e checkpoints; mantém release 30 para preservar
+  jogadores da beta. Catacumbas 26–30 jogáveis; 31–100 não liberados.
+- servidor.py: metadados autoritativos por encontro, rota fixa nos especiais,
+  perfil de busca persistido na partida; sem alteração de schema ou reset.
+- torre.html: mapa 5×5 por reino, símbolos e estados, nomes, capítulo, HUD
+  medieval, cinco estágios SVG aditivos; Catacumbas usa nichos e pedra
+  espectral. Mantém mesa tradicional e skins. index.html: texto do menu.
+- Decisões: números de andares/recorde/coroas/checkpoint e partida ativa
+  preservados; reinos antigos remapeados pelo número atual. Conclusão da
+  beta permanece no 30 até a próxima expansão. Metas D não são Elo;
+  IA ainda usa cinco perfis existentes, estilos são descrições planejadas.
+- Testes: catálogo/fronteira 25→26, elites, rota fixa, estado legado, API
+  e sintaxe JS. Resultados de execução a registrar após CI.
+- Commits 482f7a95, f27d13cd, be7dea8f, c452e75f, 1ae97a96.
+  Branch torre-castelo-25; publicação pendente.
+- Pendências: validação visual, calibragem real de IA, Catacumbas 31–50,
+  demais reinos, cerimônias/recompensas e migração futura do completed.
+- Rollback: manter main anterior até validar; sem migração destrutiva.
+
 ## 14/11/2026 — Pedido de empate em janela do jogo
 - Pedido: destacar a oferta de empate na tela do adversário, sem aviso genérico
   do navegador, com foco visual e decisões dentro do jogo.

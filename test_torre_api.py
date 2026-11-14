@@ -33,4 +33,20 @@ class TowerAPI(unittest.TestCase):
     def test_no_client_result(self):
         self.assertEqual(self.api('finish',outcome='win')[0],404)
         self.assertEqual(self.api('state')[1]['progress']['floor'],1)
+    def test_fixed_encounter_and_legacy_resume(self):
+        import json
+        from dataclasses import asdict
+        from torre import Run
+        run=Run(id='legacy',mode='ascensao',floor=25,highest=24,checkpoint=21,lives=2)
+        with s.database() as db:
+            s.sql(db,'INSERT INTO tower_runs(player_id,mode,payload) VALUES(?,?,?)',(self.pid,'ascensao',json.dumps({'progress':asdict(run),'game':None})))
+        code,a=self.api('state')
+        self.assertEqual((a['progress']['id'],a['progress']['lives']),('legacy',2))
+        self.assertEqual(a['progress']['encounter']['kind'],'boss')
+        self.assertEqual(self.api('start',route='unknown',version=0)[0],409)
+        code,a=self.api('start',route='guardian',version=0)
+        self.assertEqual(code,200)
+        self.assertEqual(a['game']['encounter']['name'],'O Cavaleiro Sem Nome')
+        self.assertEqual(a['game']['chapter'],3)
+        self.assertEqual(self.api('state')[1]['game']['id'],a['game']['id'])
 if __name__=='__main__':unittest.main()
