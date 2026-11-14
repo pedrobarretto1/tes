@@ -54,3 +54,5 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 
 /* V5.7: the motion plane follows the board, not the viewport. */
 .boardframe>.board-fx-layer{position:absolute;inset:auto;z-index:5;pointer-events:none;overflow:visible;isolation:isolate;box-sizing:border-box}.boardframe>.board-fx-layer .fx-disc{height:auto;aspect-ratio:1;transition:none;animation:none}.boardframe>.board-fx-layer .fx-promotion{height:auto;aspect-ratio:1}
+
+.royal-player-title{display:block;font-weight:700;font-size:11px;line-height:1.35;letter-spacing:.035em;color:#d8bf91}.royal-player-title[hidden]{display:none!important}[data-title="king_shadow"]{color:#e2a16a!important;text-shadow:0 0 9px #f4773145}[data-title="king_divine"]{color:#ffe4a0!important;text-shadow:0 0 9px #ffda7160}[data-title="king_cosmos"]{color:#c2bbff!important;text-shadow:0 0 9px #ad93ff75}.royal-reward-title{color:#e3cfa8;font-weight:700}

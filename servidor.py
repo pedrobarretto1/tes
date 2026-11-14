@@ -113,7 +113,8 @@ def profile(d):
         else:sql(db,'INSERT INTO players(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',(pid,name))
     return pid
 AVATARS={'crown','knight','shield','oak','rook','star'}
-TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion','last_king'}
+ROYAL_TITLES={'shadow':'king_shadow','divine':'king_divine','infinite':'king_cosmos'}
+TITLES={'visitor','first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion','last_king'} | set(ROYAL_TITLES.values())
 THEMATIC_FRAMES={'halloween':'haunted-night','christmas':'winter-feast','horror':'midnight-crypt','romance':'rose-garden','last-king':'relic-throne'}
 FRAMES={'wood','bronze','silver','gold'} | set(THEMATIC_FRAMES)
 ACHIEVEMENTS={
@@ -142,6 +143,9 @@ def cosmetics_for(db,pid,refresh=False):
     if cups and 'cup_champion' not in earned:
         unlock(db,pid,'cup_champion');earned.append('cup_champion')
     purchased={row[0] for row in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()}
+    for path,title in ROYAL_TITLES.items():
+        if 'relic-'+path in purchased and title not in earned:
+            unlock(db,pid,title);earned.append(title)
     thematic_frames=[frame for frame,board in THEMATIC_FRAMES.items() if board in purchased]
     relic=sql(db,'SELECT unlocked_at FROM journey WHERE player_id=? AND completed>=5',(pid,)).fetchone()
     return dict(relics=[dict(id='last-king',date=relic[0])] if relic else [],avatar=x[0],title=x[1],frame=x[2],streak=x[3],bestStreak=x[4],completed=x[5],achievements=earned,cups=cups,thematicFrames=thematic_frames)
@@ -381,7 +385,14 @@ def room_snapshot(r,seat,now):
                     row=sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()
                     if row: cached[seat]=row[0]
     names={str(game_side(r,seat)):name for seat,name in cached.items()}
-    return dict(match=r['match'],side=game_side(r,seat),board=r['board'],turn=r['turn'],sequence=r['sequence'],rule=r['rule'],names=names,moves=r.get('moves',[]),quiet=r['quiet'],repeats=r['repeats'],minutes=r.get('minutes',0),remaining=r['remaining'],drawOffer=r.get('draw_offer'),chat=r.get('chat',[]),stats=match_stats(r),opponentOffline=now-r['seen'].get(-seat,now)>10,grace=max(0,90-int(now-r['seen'].get(-seat,now))),connected=len(r['tokens'])==2)
+    titles=r.setdefault('title_by_seat',{})
+    if any(pid and s not in titles for s,pid in r['profiles'].items()):
+        with database() as db:
+            for s,pid in r['profiles'].items():
+                if pid and s not in titles:
+                    row=sql(db,'SELECT title FROM cosmetics WHERE player_id=?',(pid,)).fetchone()
+                    titles[s]=row[0] if row else 'visitor'
+    return dict(titles={str(game_side(r,s)):title for s,title in titles.items()},match=r['match'],side=game_side(r,seat),board=r['board'],turn=r['turn'],sequence=r['sequence'],rule=r['rule'],names=names,moves=r.get('moves',[]),quiet=r['quiet'],repeats=r['repeats'],minutes=r.get('minutes',0),remaining=r['remaining'],drawOffer=r.get('draw_offer'),chat=r.get('chat',[]),stats=match_stats(r),opponentOffline=now-r['seen'].get(-seat,now)>10,grace=max(0,90-int(now-r['seen'].get(-seat,now))),connected=len(r['tokens'])==2)
 def process(r,seat,msg):
     side=game_side(r,seat)
     t=msg.get('type')
@@ -781,6 +792,7 @@ def journey_action(path,d,pid,now):
             owned=wallet_state(db,pid)['owned']
             if any(pair[0] in owned for pair in ROYAL_PATHS.values()):return 403,{'error':'Conquiste os outros caminhos em duelo.'}
             for item in ROYAL_PATHS[key]:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+            unlock(db,pid,ROYAL_TITLES[key])
             return 200,journey_public(completed,run,unlocked,db,pid)
         if action=='equip':
             if completed<5:return 403,{'error':'Conclua a Jornada do Mestre primeiro.'}
@@ -791,7 +803,7 @@ def journey_action(path,d,pid,now):
             if any(item not in w['owned'] for item in pair):return 403,{'error':'Conquiste esta relíquia primeiro.'}
             sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(pair[0],pid))
             sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(pair[1],pid))
-            ensure_cosmetics(db,pid);sql(db,'UPDATE cosmetics SET title=?,frame=? WHERE player_id=?',('last_king','last-king',pid))
+            ensure_cosmetics(db,pid);sql(db,'UPDATE cosmetics SET frame=? WHERE player_id=?',('last-king',pid))
             return 200,wallet_state(db,pid)
         if action=='start':
             chapter=d.get('chapter')
@@ -830,6 +842,7 @@ def journey_action(path,d,pid,now):
                     unlock(db,pid,'last_king');run['relicUnlocked']=True
             if run['outcome']=='win' and run.get('path') in ROYAL_PATHS and completed==5:
                 for item in ROYAL_PATHS[run['path']]:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+                unlock(db,pid,ROYAL_TITLES[run['path']])
                 run['pathUnlocked']=run['path']
         else:return 404,{'error':'Ação desconhecida.'}
         sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
@@ -960,8 +973,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == '/api/ranking':
             try:
                 with database() as db:
-                    rows=sql(db,'SELECT name,points,wins,losses,draws FROM players ORDER BY points DESC,wins DESC,name,id LIMIT 100').fetchall()
-                self.reply(200,{'players':[dict(zip(('name','points','wins','losses','draws'),x)) for x in rows],'persistent':bool(DATABASE_URL)})
+                    rows=sql(db,"SELECT p.name,p.points,p.wins,p.losses,p.draws,COALESCE(c.title,'visitor') FROM players p LEFT JOIN cosmetics c ON c.player_id=p.id ORDER BY p.points DESC,p.wins DESC,p.name,p.id LIMIT 100").fetchall()
+                self.reply(200,{'players':[dict(zip(('name','points','wins','losses','draws','title'),x)) for x in rows],'persistent':bool(DATABASE_URL)})
             except Exception: self.reply(503,{'error':'Banco de dados indisponível.'})
         else: self.reply(404, {'error':'Página inexistente.'})
     def do_POST(self):
@@ -980,7 +993,8 @@ class Handler(BaseHTTPRequestHandler):
                 p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
                 if not p: return self.reply(200,{'found':False})
                 rank=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND (wins>? OR (wins=? AND (name<? OR (name=? AND id<?)))))',(p[1],p[1],p[2],p[2],p[0],p[0],pid)).fetchone()[0]+1
-            return self.reply(200,dict(zip(('name','points','wins','losses','draws'),p),found=True,rank=rank))
+                title=cosmetics_for(db,pid)['title']
+            return self.reply(200,dict(zip(('name','points','wins','losses','draws'),p),found=True,rank=rank,title=title))
         with LOCK:
             if path.startswith('/api/social/'):
                 try: status,result=social_action(path,d,now);return self.reply(status,result)
