@@ -81,4 +81,32 @@ class ClanTest(unittest.TestCase):
         self.assertEqual(len(d['clan_requests']),1)
         self.assertEqual(d['me']['level'],1)
         self.assertEqual(s.social_action('/api/social/clans/state',dict(profileToken='invalid'),time.monotonic())[0],400)
+    def test_crest_persistence_permissions_and_legacy(self):
+        design=dict(symbol='knight',symbol_color='violet',frame_style='ornate',frame_color='silver',background_color='wine')
+        code,d=self.call('owner','create',name='Chama Eterna',tag='CE',crest=design,requirements={'points':1000})
+        self.assertEqual(code,200,d)
+        cid=d['mine']['id']
+        self.assertEqual(d['mine']['crest'],design)
+        self.assertEqual(d['mine']['emblem'],'knight')
+        self.assertEqual(self.call('alice','state')[1]['clans'][0]['crest'],design)
+        self.assertEqual(self.call('alice','apply',clan=cid)[0],200)
+        self.assertEqual(self.call('owner','state')[1]['requests'][0]['crest'],design)
+        same=dict(symbol='moon',symbol_color='gold',frame_style='dark',frame_color='gold',background_color='gold')
+        self.assertEqual(self.call('alice','crest',crest=same)[0],409)
+        r=self.call('owner','state')[1]['requests'][0]
+        self.assertEqual(self.call('owner','respond',id=r['id'],accept=True)[0],200)
+        self.assertEqual(self.call('alice','crest',crest=same)[0],403)
+        self.assertEqual(self.call('owner','crest',crest={**same,'frame_style':'bad'})[0],400)
+        self.assertEqual(self.call('owner','crest',crest=same)[0],200)
+        self.assertEqual(self.call('owner','state')[1]['mine']['crest'],same)
+        self.assertEqual(self.call('alice','state')[1]['mine']['crest'],same)
+        self.assertEqual(self.call('owner','state')[1]['mine']['requirements']['points'],1000)
+        with s.database() as db:
+            s.sql(db,'DELETE FROM clan_crests WHERE clan_id=?',(cid,))
+        self.assertEqual(self.call('owner','state')[1]['mine']['crest'],clas.default_crest('moon'))
+        self.assertEqual(self.call('owner','crest',crest=design)[0],200)
+        self.assertEqual(self.call('owner','kick',target='alice')[0],200)
+        self.assertEqual(self.call('owner','dissolve')[0],200)
+        with s.database() as db:
+            self.assertIsNone(s.sql(db,'SELECT 1 FROM clan_crests WHERE clan_id=?',(cid,)).fetchone())
 if __name__=='__main__':unittest.main()

@@ -6,11 +6,30 @@ TTL=7*86400
 FIELDS={'points':1000000,'wins':1000000,'losses':1000000,'rate':100,'level':10000,'max_losses':1000000,'games':1000000}
 LABELS={'points':'PH mínimo','wins':'Vitórias mínimas','losses':'Derrotas mínimas','rate':'Taxa de vitória (%)','level':'Nível mínimo','max_losses':'Derrotas máximas','games':'Partidas mínimas'}
 EMBLEMS=('crown','shield','knight','rook','star','moon')
+CREST_COLORS=('gold','silver','bronze','crimson','sapphire','emerald','ivory','obsidian','violet','copper','wine','steel')
+CREST_STYLES=('royal','fortress','dark','sacred','ancient','ornate')
+def default_crest(emblem='shield'):
+    return dict(symbol=emblem,symbol_color='gold',frame_style='royal',frame_color='gold',background_color={'crown':'bronze','knight':'wine','star':'sapphire','moon':'sapphire'}.get(emblem,'steel'))
+def validate_crest(raw):
+    if not isinstance(raw,dict) or set(raw)!=set(default_crest()):raise ValueError('Configuração do brasão inválida.')
+    for k,allowed in (('symbol',EMBLEMS),('symbol_color',CREST_COLORS),('frame_style',CREST_STYLES),('frame_color',CREST_COLORS),('background_color',CREST_COLORS)):
+        if raw[k] not in allowed:raise ValueError('Opção de brasão inválida: '+k)
+    return dict(raw)
+def saved_crest(db,sql,cid,emblem):
+    row=sql(db,'SELECT design FROM clan_crests WHERE clan_id=?',(cid,)).fetchone()
+    if row:
+        try:return validate_crest(json.loads(row[0]))
+        except (ValueError,TypeError):pass
+    return default_crest(emblem)
+def save_crest(db,sql,cid,design):
+    sql(db,'INSERT INTO clan_crests(clan_id,design) VALUES(?,?) ON CONFLICT(clan_id) DO UPDATE SET design=excluded.design',(cid,json.dumps(design)))
+    sql(db,'UPDATE clans SET emblem=? WHERE id=?',(design['symbol'],cid))
 ACHIEVEMENTS=('first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion')
 def setup(db,sql):
     for q in (
         "CREATE TABLE IF NOT EXISTS clan_guard (id INTEGER PRIMARY KEY)",
         "CREATE TABLE IF NOT EXISTS clans (id TEXT PRIMARY KEY, name TEXT NOT NULL, name_key TEXT NOT NULL UNIQUE, tag TEXT NOT NULL, tag_key TEXT NOT NULL UNIQUE, description TEXT NOT NULL, emblem TEXT NOT NULL, owner TEXT NOT NULL, requirements TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS clan_crests (clan_id TEXT PRIMARY KEY REFERENCES clans(id) ON DELETE CASCADE, design TEXT NOT NULL)",
         "CREATE TABLE IF NOT EXISTS clan_members (player_id TEXT PRIMARY KEY, clan_id TEXT NOT NULL REFERENCES clans(id), joined_at DOUBLE PRECISION NOT NULL)",
         "CREATE TABLE IF NOT EXISTS clan_requests (id TEXT PRIMARY KEY, clan_id TEXT NOT NULL REFERENCES clans(id), player_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL, updated_at DOUBLE PRECISION NOT NULL)",
         "CREATE TABLE IF NOT EXISTS clan_messages (id TEXT PRIMARY KEY, clan_id TEXT NOT NULL REFERENCES clans(id), author TEXT NOT NULL, body TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL)",
@@ -50,7 +69,7 @@ def clan(db,sql,cid):
     r=sql(db,'SELECT id,name,tag,description,emblem,owner,requirements,created_at FROM clans WHERE id=?',(cid,)).fetchone()
     if not r:return None
     d=dict(zip(('id','name','tag','description','emblem','owner','requirements','created_at'),r))
-    d['requirements']=json.loads(d['requirements']);return d
+    d['requirements']=json.loads(d['requirements']);d['crest']=saved_crest(db,sql,cid,d['emblem']);return d
 def members(db,sql,cid):
     return [stat_row(r) for r in sql(db,STATS_SQL+' JOIN clan_members m ON m.player_id=p.id WHERE m.clan_id=? ORDER BY m.joined_at,p.id',(cid,)).fetchall()]
 def summary(db,sql,c,pid,full=False):
@@ -66,7 +85,7 @@ def notices(db,sql,pid):
     result=[]
     for rid,kind,target,cid,created,name,owner in rows:
         p=stats(db,sql,target);c=clan(db,sql,cid)
-        if p and c:result.append(dict(id=rid,kind=kind,clan_id=cid,clan_name=name,profile=p,checks=check(p,c['requirements']),created_at=created))
+        if p and c:result.append(dict(id=rid,kind=kind,clan_id=cid,clan_name=name,crest=c['crest'],profile=p,checks=check(p,c['requirements']),created_at=created))
     return result
 def account(db,sql,pid):
     return bool(sql(db,'SELECT 1 FROM accounts WHERE player_id=?',(pid,)).fetchone())
@@ -93,11 +112,14 @@ def action(s,path,d,pid):
             name=' '.join(str(d.get('name','')).split());tag=str(d.get('tag','')).strip().upper()
             desc=str(d.get('description','')).strip();emblem=d.get('emblem','shield')
             if not 3<=len(name)<=40 or not re.fullmatch(r'[A-Z0-9]{2,6}',tag) or len(desc)>300 or emblem not in EMBLEMS:return err('Nome (3–40), sigla (2–6 letras/números), descrição ou brasão inválido.')
-            try:req=requirements(d.get('requirements',{}))
+            try:
+                req=requirements(d.get('requirements',{}))
+                design=validate_crest(d['crest']) if 'crest' in d else default_crest(emblem)
             except ValueError as e:return err(str(e))
             if sql(db,'SELECT 1 FROM clans WHERE name_key=? OR tag_key=?',(name.casefold(),tag.casefold())).fetchone():return err('Nome ou sigla já utilizados.',409)
             cid=secrets.token_hex(12)
             sql(db,'INSERT INTO clans VALUES(?,?,?,?,?,?,?,?,?,?)',(cid,name,name.casefold(),tag,tag.casefold(),desc,emblem,pid,json.dumps(req),now))
+            save_crest(db,sql,cid,design)
             sql(db,'INSERT INTO clan_members VALUES(?,?,?)',(pid,cid,now))
             sql(db,"UPDATE clan_requests SET status='closed',updated_at=? WHERE player_id=? AND status='pending'",(now,pid))
         elif op in ('apply','invite'):
@@ -129,11 +151,15 @@ def action(s,path,d,pid):
             sql(db,'UPDATE clan_requests SET status=?,updated_at=? WHERE id=?',('accepted' if d['accept'] else 'declined',now,d['id']))
             # Inform the other party; the actionable request itself is separate.
             s.notify(db,target if r[2]=='apply' else c['owner'],pid,'clan_accepted' if d['accept'] else 'clan_declined')
-        elif op in ('edit','kick','transfer','dissolve','leave'):
+        elif op in ('edit','crest','kick','transfer','dissolve','leave'):
             if not mine:return err('Você não pertence a um clã.',409)
             owner=mine['owner']==pid
             if op!='leave' and not owner:return err('Somente o dono pode administrar.',403)
-            if op=='edit':
+            if op=='crest':
+                try:design=validate_crest(d.get('crest'))
+                except ValueError as e:return err(str(e))
+                save_crest(db,sql,cid,design)
+            elif op=='edit':
                 try:req=requirements(d.get('requirements',{}))
                 except ValueError as e:return err(str(e))
                 desc=str(d.get('description',mine['description'])).strip()
@@ -150,7 +176,7 @@ def action(s,path,d,pid):
             else:
                 # Explicit owner action; only an empty (owner-only) clan can dissolve.
                 if len(members(db,sql,cid))!=1:return err('Transfira a liderança ou remova os membros primeiro.',409)
-                for table in ('clan_messages','clan_requests','clan_members'):sql(db,'DELETE FROM '+table+' WHERE clan_id=?',(cid,))
+                for table in ('clan_messages','clan_requests','clan_members','clan_crests'):sql(db,'DELETE FROM '+table+' WHERE clan_id=?',(cid,))
                 sql(db,'DELETE FROM clans WHERE id=?',(cid,))
         elif op in ('chat','send'):
             if not mine:return err('Somente membros podem acessar o chat.',403)

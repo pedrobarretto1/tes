@@ -23,7 +23,7 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
         function button(l,fn,primary){let b=node('button',primary?'primary':'secondary',l);b.type='button';b.onclick=fn;return b}
         const show=id=>{document.querySelectorAll('.club-overlay').forEach(el=>el.classList.add('hidden'));E(id).classList.remove('hidden')};
         const api=new Function('E','S','node','button','profileToken','request','poll','show','status','confirm',ui+';return {renderClan,set:(d,t)=>{clanData=d;clanTab=t}}')(E,S,node,button,()=>'token',async()=>data,()=>{},show,()=>{},()=>true);
-        show('clanoverlay');api.set(data,'browse');api.renderClan();
+        window.clanTest={api,data};show('clanoverlay');api.set(data,'browse');api.renderClan();
       },{ui,data});
       const search=page.locator('.clan-directory-search input'),label=page.locator('.clan-directory-search .clan-field-label'),btn=page.locator('.clan-directory-search button');
       const [a,b,c]=await Promise.all([search.boundingBox(),label.boundingBox(),btn.boundingBox()]);
@@ -43,9 +43,32 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert.equal(await page.locator('.clan-preview-tag').textContent(),'[ CE ]');
       assert.equal(await page.locator('.clan-preview-description').textContent(),'Honra, lealdade e glória.');
       assert.equal(await page.locator('.clan-foundation-preview .clan-crest').getAttribute('data-emblem'),'knight');
+      const crest=page.locator('.clan-foundation-preview .clan-crest');
+      await page.getByLabel('Estilo da moldura').selectOption('ornate');
+      await page.getByRole('button',{name:'Cor do símbolo · Rubi',exact:true}).click();
+      await page.getByRole('button',{name:'Cor da moldura · Prata',exact:true}).click();
+      await page.getByRole('button',{name:'Cor do fundo · Vinho',exact:true}).click();
+      assert.equal(await crest.getAttribute('data-frame'),'ornate');
+      assert.equal(await crest.getAttribute('data-symbol-color'),'crimson');
+      assert.equal(await crest.getAttribute('data-frame-color'),'silver');
+      assert.equal(await crest.getAttribute('data-background-color'),'wine');
+      const shapes=new Set();
+      for(const style of ['royal','fortress','dark','sacred','ancient','ornate']){
+        await page.getByLabel('Estilo da moldura').selectOption(style);
+        shapes.add(await crest.evaluate(el=>getComputedStyle(el).clipPath));
+      }
+      assert.equal(shapes.size,6);
+      for(const label of ['Cor do símbolo','Cor da moldura','Cor do fundo'])await page.getByRole('button',{name:label+' · Ouro',exact:true}).click();
       assert(!(await page.getByRole('button',{name:'Fundar ordem',exact:true}).isDisabled()));
       assert.equal(await page.locator('.clan-foundation-form input[type=number]').count(),7);
       assert(await page.locator('#clanoverlay .clan-shell').evaluate(el=>el.scrollWidth<=el.clientWidth+2),'creation horizontal overflow');
+      await page.evaluate(()=>{const {api,data}=window.clanTest;api.set({...data,mine:{id:'c',name:'Chama Eterna',tag:'CE',owner:'me',description:'Teste',emblem:'knight',crest:{symbol:'knight',symbol_color:'violet',frame_style:'dark',frame_color:'silver',background_color:'wine'},count:1,capacity:30,level:5,requirements:{},checks:[],members:[data.me]}},'manage');api.renderClan()});
+      const admin=page.locator('.clan-crest-admin-preview .clan-crest');
+      assert.equal(await admin.getAttribute('data-frame'),'dark');
+      assert.equal(await admin.getAttribute('data-symbol-color'),'violet');
+      await page.getByLabel('Estilo da moldura').selectOption('sacred');
+      assert.equal(await admin.getAttribute('data-frame'),'sacred');
+      assert(await page.getByRole('button',{name:'Salvar brasão',exact:true}).isVisible());
       console.log('CLAN UI OK:',width,'px; search, live preview, validation, responsive layout');
       await page.close();
     }
