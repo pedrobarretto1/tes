@@ -955,7 +955,7 @@ def journey_action(path,d,pid,now):
                 if not any(pair[0] in owned for pair in ROYAL_PATHS.values()):return 403,{'error':'Escolha sua primeira relíquia.'}
             if run and run.get('version')==2 and run['outcome'] is None and run['chapter']==chapter and run.get('path')==path_key and d.get('restart') is not True:return 200,journey_public(completed,run,unlocked,db,pid)
             board=journey_board(chapter);run=dict(id=secrets.token_hex(12),version=2,chapter=chapter,path=path_key,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
-        elif action=='draw/respond':
+        elif path=='/api/social/journey/draw/respond':
             if not run or run['outcome'] is not None or d.get('id')!=run['id'] or not run.get('botOffer') or d.get('sequence')!=run['sequence'] or type(d.get('accept')) is not bool:return 409,{'error':'Proposta de empate indisponível.'}
             run.pop('botOffer',None)
             if d['accept']:run['outcome']='draw';run['reason']='agreement'

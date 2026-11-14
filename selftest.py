@@ -471,9 +471,11 @@ def run(s):
             accepted=call('journey/draw/respond',hero,id='bot-offer',sequence=20,accept=True)
             assert accepted['run']['outcome']=='draw' and accepted['run']['reason']=='agreement' and accepted['completed']==4
             status,_=s.social_action('/api/social/journey/draw/respond',dict(hero,id='bot-offer',sequence=20,accept=True),1000);assert status==409
-            # Forced loss: dark must move into an unavoidable capture.
-            # Enumerate a small set of positions and verify a proof never
-            # treats material superiority alone as a forced win.
+            # Dark has a legal move, but every reply permits immediate capture.
+            forced=[0]*64;forced[1]=2;forced[39]=-1
+            forced_run=dict(board=forced,sequence=20,quiet=0,repeats={})
+            assert s.legal(forced,-1,'official') and s.journey_bot_lost(forced_run)
+            # Material advantage alone is not a proof.
             lead_test=dict(board=lead[:],sequence=20,quiet=0,repeats={})
             s.journey_draw_clock(lead_test);assert not s.journey_bot_lost(lead_test)
             # Test fixture only: simulate a late-game position in the final chapter.
