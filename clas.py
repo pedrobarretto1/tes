@@ -36,6 +36,9 @@ def setup(db,sql):
         "CREATE TABLE IF NOT EXISTS clan_penalties (clan_id TEXT NOT NULL REFERENCES clans(id) ON DELETE CASCADE, player_id TEXT NOT NULL, until_at DOUBLE PRECISION NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(clan_id,player_id))",
         "CREATE INDEX IF NOT EXISTS clan_reports_clan_idx ON clan_reports(clan_id,status,updated_at)",
         "CREATE INDEX IF NOT EXISTS clan_reports_target_idx ON clan_reports(target,updated_at)",
+        "CREATE TABLE IF NOT EXISTS clan_recommendations (id TEXT PRIMARY KEY, clan_id TEXT NOT NULL REFERENCES clans(id) ON DELETE CASCADE, author TEXT NOT NULL, target TEXT NOT NULL, status TEXT NOT NULL, reviewer TEXT, opinion TEXT, created_at DOUBLE PRECISION NOT NULL, updated_at DOUBLE PRECISION NOT NULL)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS clan_recommendation_pending ON clan_recommendations(clan_id,target) WHERE status='pending'",
+        "CREATE INDEX IF NOT EXISTS clan_recommendation_clan_idx ON clan_recommendations(clan_id,status,created_at)",
         "CREATE TABLE IF NOT EXISTS clan_requests (id TEXT PRIMARY KEY, clan_id TEXT NOT NULL REFERENCES clans(id), player_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL, updated_at DOUBLE PRECISION NOT NULL)",
         "CREATE TABLE IF NOT EXISTS clan_messages (id TEXT PRIMARY KEY, clan_id TEXT NOT NULL REFERENCES clans(id), author TEXT NOT NULL, body TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL)",
         "CREATE INDEX IF NOT EXISTS clan_members_clan_idx ON clan_members(clan_id)",
@@ -113,6 +116,23 @@ def remove_member(db,sql,cid,pid):
 def report_text(value,required=True):
     if not isinstance(value,str) or len(value.strip())>1000 or (required and not value.strip()):raise ValueError('Escreva uma mensagem de 1 a 1000 caracteres.')
     return value.strip()
+def recommendation_views(db,sql,c,pid):
+    if role(db,sql,c,pid) not in ('king','captain'):return []
+    rows=sql(db,"SELECT id,author,target,status,reviewer,opinion,created_at FROM clan_recommendations WHERE clan_id=? AND (status<>'pending' OR created_at>?) ORDER BY created_at DESC LIMIT 100",(c['id'],time.time()-TTL)).fetchall()
+    out=[]
+    for rid,author,target,status,reviewer,opinion,created in rows:
+        p=stats(db,sql,target);a=stats(db,sql,author);v=stats(db,sql,reviewer) if reviewer else None
+        if p:out.append(dict(id=rid,profile=p,author_name=a['name'] if a else 'Ex-membro',status=status,reviewer_name=v['name'] if v else None,opinion=opinion,checks=check(p,c['requirements']),created_at=created,available=bool(account(db,sql,target) and not member(db,sql,target))))
+    return out
+def invite_error(db,sql,c,target,now):
+    if not account(db,sql,target):return 'O jogador precisa de uma conta registrada.'
+    if member(db,sql,target):return 'O jogador já pertence a um clã.'
+    if len(members(db,sql,c['id']))>=LIMIT:return 'Clã lotado.'
+    old=sql(db,"SELECT status,updated_at FROM clan_requests WHERE clan_id=? AND player_id=? ORDER BY updated_at DESC LIMIT 1",(c['id'],target)).fetchone()
+    if old and old[0]=='pending':return 'Já existe um pedido pendente. Consulte a aba Pedidos.'
+    if old and old[0]=='declined' and now-old[1]<300:return 'Aguarde cinco minutos após uma recusa.'
+    if sql(db,"SELECT COUNT(*) FROM clan_requests WHERE player_id=? AND status='pending'",(target,)).fetchone()[0]>=10:return 'Limite de pedidos pendentes.'
+    return None
 def summary(db,sql,c,pid,full=False):
     m=members(db,sql,c['id']);p=stats(db,sql,pid)
     d=dict(c,count=len(m),level=round(sum(x['level'] for x in m)/len(m),1) if m else 0,checks=check(p,c['requirements']),capacity=LIMIT)
@@ -125,6 +145,7 @@ def summary(db,sql,c,pid,full=False):
         d['members']=m
         d['role']=role(db,sql,c,pid)
         d['penalty']=tournament_block(db,sql,c['id'],pid)
+        if d['role'] in ('king','captain'):d['recommendations']=recommendation_views(db,sql,c,pid)
         if ROLE_RANK[d['role']]>=1:
             d['reports']=report_views(db,sql,c,pid)
     return d
@@ -155,6 +176,7 @@ def action(s,path,d,pid):
         # Serialize membership/capacity/owner transitions across processes.
         sql(db,'UPDATE clan_guard SET id=id WHERE id=1')
         sql(db,"UPDATE clan_requests SET status='expired',updated_at=? WHERE status='pending' AND created_at<=?",(now,now-TTL))
+        sql(db,"UPDATE clan_recommendations SET status='expired',updated_at=? WHERE status='pending' AND created_at<=?",(now,now-TTL))
         cid=member(db,sql,pid);mine=clan(db,sql,cid) if cid else None
         if op=='create':
             if cid:return err('Você já pertence a um clã.',409)
@@ -186,6 +208,38 @@ def action(s,path,d,pid):
             if old and old[0]=='declined' and now-old[1]<300:return err('Aguarde cinco minutos após uma recusa.',409)
             if sql(db,"SELECT COUNT(*) FROM clan_requests WHERE player_id=? AND status='pending'",(target,)).fetchone()[0]>=10:return err('Limite de pedidos pendentes.',409)
             sql(db,'INSERT INTO clan_requests VALUES(?,?,?,?,?,?,?)',(secrets.token_hex(12),c['id'],target,op,'pending',now,now))
+        elif op in ('recommend','recommend-review','recommend-decide'):
+            if not mine:return err('Você não pertence a um clã.',403)
+            current_role=role(db,sql,mine,pid)
+            if op=='recommend':
+                target=str(d.get('target',''))
+                if current_role=='king':return err('O Rei pode enviar um Convite Real diretamente.')
+                if not stats(db,sql,target) or not account(db,sql,target):return err('O jogador precisa de uma conta registrada.')
+                if member(db,sql,target):return err('O jogador já pertence a um clã.',409)
+                if sql(db,"SELECT 1 FROM clan_recommendations WHERE clan_id=? AND target=? AND status='pending'",(cid,target)).fetchone():return err('Já existe uma recomendação em análise.',409)
+                if sql(db,'SELECT COUNT(*) FROM clan_recommendations WHERE author=? AND created_at>?',(pid,now-86400)).fetchone()[0]>=5:return err('Limite de cinco recomendações por dia.',429)
+                if sql(db,"SELECT COUNT(*) FROM clan_recommendations WHERE clan_id=? AND status='pending'",(cid,)).fetchone()[0]>=30:return err('O Conselho tem 30 recomendações pendentes.',409)
+                sql(db,'INSERT INTO clan_recommendations VALUES(?,?,?,?,?,?,?,?,?)',(secrets.token_hex(12),cid,pid,target,'pending',None,None,now,now))
+                recipients=[r[0] for r in sql(db,"SELECT m.player_id FROM clan_members m JOIN clan_roles r ON r.player_id=m.player_id WHERE m.clan_id=? AND r.role='captain'",(cid,)).fetchall()]
+                for v in set(recipients+[mine['owner']])-{pid}:s.notify(db,v,pid,'clan_recommend')
+            else:
+                if current_role!=('captain' if op=='recommend-review' else 'king'):return err('Ação exclusiva do cargo responsável.',403)
+                r=sql(db,"SELECT target,author,reviewer FROM clan_recommendations WHERE id=? AND clan_id=? AND status='pending'",(str(d.get('id','')),cid)).fetchone()
+                if not r:return err('Recomendação indisponível.',409)
+                target,author,reviewer=r
+                if op=='recommend-review':
+                    if reviewer:return err('Já existe um parecer do Capitão.',409)
+                    if pid==author:return err('Outro Capitão deve avaliar sua recomendação.',403)
+                    if d.get('opinion') not in ('support','oppose'):return err('Parecer inválido.')
+                    sql(db,'UPDATE clan_recommendations SET reviewer=?,opinion=?,updated_at=? WHERE id=?',(pid,d['opinion'],now,d['id']))
+                    s.notify(db,mine['owner'],pid,'clan_recommend_review')
+                else:
+                    if type(d.get('accept')) is not bool:return err('Decisão inválida.')
+                    if d['accept']:
+                        problem=invite_error(db,sql,mine,target,now)
+                        if problem:return err(problem,409)
+                        sql(db,'INSERT INTO clan_requests VALUES(?,?,?,?,?,?,?)',(secrets.token_hex(12),cid,target,'invite','pending',now,now))
+                    sql(db,'UPDATE clan_recommendations SET status=?,updated_at=? WHERE id=?',('invited' if d['accept'] else 'declined',now,d['id']))
         elif op=='respond':
             r=sql(db,"SELECT clan_id,player_id,kind FROM clan_requests WHERE id=? AND status='pending'",(str(d.get('id','')),)).fetchone()
             if not r:return err('Pedido indisponível.',409)
@@ -295,7 +349,7 @@ def action(s,path,d,pid):
             else:
                 # Explicit owner action; only an empty (owner-only) clan can dissolve.
                 if len(members(db,sql,cid))!=1:return err('Transfira a liderança ou remova os membros primeiro.',409)
-                for table in ('clan_messages','clan_requests','clan_reports','clan_penalties','clan_members','clan_crests'):sql(db,'DELETE FROM '+table+' WHERE clan_id=?',(cid,))
+                for table in ('clan_messages','clan_requests','clan_reports','clan_penalties','clan_recommendations','clan_members','clan_crests'):sql(db,'DELETE FROM '+table+' WHERE clan_id=?',(cid,))
                 sql(db,'DELETE FROM clans WHERE id=?',(cid,))
         elif op in ('chat','send'):
             if not mine:return err('Somente membros podem acessar o chat.',403)
