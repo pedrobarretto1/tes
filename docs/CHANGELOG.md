@@ -5,6 +5,24 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Reinício visual do tabuleiro após resultado da Torre
+- Pedido: reiniciar a mesa após vitória, derrota, empate e desistência em ambos
+  os modos. Causa: render() exibia game.board do duelo encerrado, ainda mantido
+  pelo servidor para histórico/resultado, mesmo quando progress.status não era playing.
+- torre.html: render usa posição inicial de 24 peças sempre que não existe partida
+  ativa; limpa seleção, alvos e marcações de último lance, sai do modo concentração,
+  mantém o resultado e histórico identificado como última partida. Rótulo distingue
+  próximo andar, nova partida e retorno ao santuário; nova tentativa disponível
+  após fim da Expedição ou beta. A partida ativa continua a partir do estado salvo.
+- Regras, persistência, coroas, IA, animação dos lances e skins não alteradas.
+  A mesa reiniciada aguarda escolha de rota, sem iniciar automaticamente ou
+  gastar coroas adicionais. Demais modalidades fora da Torre não modificadas.
+- test_torre_ui.js: regressão com DOM simulado para 12 cenários terminais,
+  ambos modos, atualização/reabertura, foco, contadores e 64 casas; workflow
+  torre-beta.yml executa o teste. Sintaxe JS validada; CI/publicação a confirmar.
+- Commits f6dd5585, 4f3e40ce, 03c549eb. Rollback: reverter alterações de UI/testes,
+  sem migração ou alteração de banco.
+
 ## 14/11/2026 — Rebalanceamento da Torre e pedidos sem timer
 - Pedido: andar 1 muito difícil; suavizar cada nível, retirar fechamento automático de 30 s.
 - torre.py: ai_balance e TOWER_SEARCH_CHANCE, curva exclusiva 1–30, chance de busca

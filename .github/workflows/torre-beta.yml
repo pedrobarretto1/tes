@@ -16,3 +16,4 @@ jobs:
       - run: python -c "import servidor,selftest; selftest.run(servidor)"
       - run: python -c "import re,pathlib; pathlib.Path('/tmp/tower.js').write_text(re.findall(r'<script>(.*?)</script>',pathlib.Path('torre.html').read_text(),re.S)[-1])"
       - run: node --check /tmp/tower.js
+      - run: node test_torre_ui.js
