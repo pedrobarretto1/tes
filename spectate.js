@@ -2,7 +2,7 @@
 const E=id=>document.getElementById(id),check=E('livepermission'),focus=E('focuslive');
 let enabled=localStorage.getItem('damas-live-optin')==='yes',match=crypto.randomUUID(),sent='',lastSent=0,inflight=false,revision=0,dirty=false,stopPending=false,finalAt=0,ownerToken='';
 window.liveEnabled=()=>enabled;
-async function request(action,data={},token=profileToken()){if(!token)return;let res=await fetch('/api/social/live/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,profileToken:token})});if(!res.ok)throw Error('Transmissão indisponível');return res.json()}
+async function request(action,data={},token=profileToken()){if(!token)return;let ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),8000);try{let res=await fetch('/api/social/live/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,profileToken:token}),signal:ctl.signal});if(!res.ok)throw Error('Transmissão indisponível');return await res.json()}finally{clearTimeout(timer)}}
 function paint(){check.checked=enabled;focus.setAttribute('aria-pressed',String(enabled));focus.textContent=enabled?'◉ Transmitindo':'◉ Transmitir';focus.hidden=mode==='online';}
 function eligible(){return enabled&&mode!=='online'&&offlineStarted}
 function stop(){revision++;sent='';lastSent=0;finalAt=0;stopPending=true;dirty=true;flush()}

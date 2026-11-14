@@ -229,7 +229,7 @@ def run(s):
             assert any(p['id']==bid and p['live']['code']==code for p in call('state',viewer)['players'])
             assert call('player',viewer,target=bid)['player']['live']['mode']=='ai'
             watched=call('live/watch',viewer,target=bid);assert watched['code']==code and watched['board']==payload['board'] and 'token' not in watched
-            move=s.legal(payload['board'],1,'official')[0];payload.update(board=s.apply(payload['board'],move,'official'),sequence=1,turn=-1,last=[move['from'],*move['path']])
+            move=s.legal(payload['board'],1,'official')[0];payload.update(board=s.journey_apply(payload['board'],move),sequence=1,turn=-1,last=[move['from'],*move['path']])
             assert call('live/publish',broadcaster,**payload)['code']==code
             assert call('live/watch',viewer,code=code)['sequence']==1
             payload['result']=1;call('live/publish',broadcaster,**payload)
