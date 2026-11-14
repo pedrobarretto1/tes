@@ -103,7 +103,7 @@ def report_views(db,sql,c,pid):
         out.append(dict(id=rid,author=author,author_name=a['name'] if a else 'Ex-membro',target=target,target_name=t['name'] if t else 'Ex-membro',status=status,history=json.loads(history),decision=decision,note=note,created_at=created,updated_at=updated,can_reply=can_reply,can_decide=rank==3 and status=='open',can_reopen=rank==3 and status=='returned'))
     return out
 def own_decisions(db,sql,pid):
-    return [dict(id=r[0],clan_name=r[1],decision=r[2],note=r[3],updated_at=r[4]) for r in sql(db,"SELECT r.id,c.name,r.decision,r.note,r.updated_at FROM clan_reports r JOIN clans c ON c.id=r.clan_id WHERE r.target=? AND r.status='resolved' ORDER BY r.updated_at DESC LIMIT 30",(pid,)).fetchall()]
+    return [dict(id=r[0],clan_name=r[1],decision=r[2],note=r[3],updated_at=r[4],until=json.loads(r[5])[-1].get('until')) for r in sql(db,"SELECT r.id,c.name,r.decision,r.note,r.updated_at,r.history FROM clan_reports r JOIN clans c ON c.id=r.clan_id WHERE r.target=? AND r.status='resolved' ORDER BY r.updated_at DESC LIMIT 30",(pid,)).fetchall()]
 def remove_member(db,sql,cid,pid):
     sql(db,'DELETE FROM clan_roles WHERE player_id=?',(pid,))
     sql(db,'DELETE FROM clan_members WHERE player_id=? AND clan_id=?',(pid,cid))
@@ -261,7 +261,7 @@ def action(s,path,d,pid):
                             until=now+amount*(86400 if unit=='days' else 3600)
                             sql(db,'INSERT INTO clan_penalties(clan_id,player_id,until_at,reason) VALUES(?,?,?,?) ON CONFLICT(clan_id,player_id) DO UPDATE SET until_at=excluded.until_at,reason=excluded.reason',(cid,target,until,note))
                         if decision=='expel':remove_member(db,sql,cid,target)
-                        history.append(dict(actor=pid,name=stats(db,sql,pid)['name'],kind=decision,text=note,at=now))
+                        history.append(dict(actor=pid,name=stats(db,sql,pid)['name'],kind=decision,text=note,at=now,until=until if decision=='suspend' else None))
                         sql(db,"UPDATE clan_reports SET status='resolved',history=?,decision=?,note=?,updated_at=? WHERE id=?",(json.dumps(history),decision,note,now,rid))
                         s.notify(db,target,pid,'clan_report_decision')
         elif op in ('edit','crest','kick','transfer','dissolve','leave'):
