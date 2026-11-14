@@ -21,8 +21,11 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   cabeçalho fixo dentro da borda e corpo rolável, preview com margem interna;
   renderClan/openClan reiniciam rolagem ao trocar aba. Teste Chromium confere
   limites do topo/rodapé durante rolagem e viewport baixo de 540 px.
-- Sem alteração de servidor, schema, economia ou dados. CI/publicação pendentes.
-  Rollback: reverter renderer e CSS; designs salvos continuam compatíveis.
+- Sem alteração de servidor, schema, economia ou dados. CI 43634927016 aprovado:
+  20 testes Python, SELFTEST, regressão Torre, Chromium 375/758/1280 px e altura
+  540 px. PR #9 integrada: 42502eaf096e53baf2773577056f4d200f1eda63.
+  Render dep-dbsbr23m8hqs73camacg, publicação iniciada; confirmar live.
+  Rollback: reverter renderer, HTML e CSS; designs salvos continuam compatíveis.
 
 ## 14/11/2026 — Cruz de Jerusalém nos brasões
 - Pedido: incluir o símbolo da imagem enviada, com cruz central e quatro menores.
@@ -35,7 +38,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   cinco paths, cor, troca para símbolo anterior e editor administrativo.
   CI 43634566062 aprovado: 20 testes Python e Chromium 375/758/1280 px.
 - Sem alteração de schema, dados existentes, economia ou requisitos.
-  PR #8 integrada: 8d8c245e94fe79390e10d46a8ead64c1a2eb79f9. Render dep-dbsbp5ec6qcc738o7o2g. Rollback: reverter UI e manter ID no catálogo
+  PR #8 integrada: 8d8c245e94fe79390e10d46a8ead64c1a2eb79f9. Render dep-dbsbp5ec6qcc738o7o2g live (confirmado). Rollback: reverter UI e manter ID no catálogo
   para não invalidar brasões já salvos.
 
 ## 14/11/2026 — Brasões personalizados dos Clãs
