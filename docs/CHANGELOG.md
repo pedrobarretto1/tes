@@ -5,6 +5,20 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Detalhamento do Castelo Esquecido (opção B)
+- Pedido: planejar os 25 níveis individualmente; mapa 5×5 do reino atual,
+  ícones de guardiões, elites, pré-boss e boss; HUD próprio por cenário.
+- Arquivos: docs/TORRE_CASTELO_25.md (novo), docs/TORRE_PLANO_100.md e este
+  histórico. Catálogo 1–25 com nomes, classes, estilos e D proposto, cinco
+  estágios visuais, narrativa, santuários, rotas e prêmio proposto.
+- Decisões de UI confirmadas; nomes, balanceamento, narrativa, chefes fixos
+  sem rota e recompensas são propostas. Elites 5/10/15/20, pré-boss 24,
+  Cavaleiro Sem Nome 25. Refinamento de meta D4,5 no boss, a calibrar.
+- Sem alteração em código/Neon/produção; testes de execução não aplicáveis.
+  Commit do catálogo: 41ce92d9f813bd6f85013f8089118c56f534d9d6.
+- Próximo passo: implementação em branch de teste, catálogo versionado,
+  migração preservando beta 1–30, HUD e estágios, testes antes de publicar.
+
 ## 14/11/2026 — Planejamento dos 100 andares e guia de continuidade
 - Pedido: manter layout aprovado, 4 cenários × 25 andares, identidade de cada
   reino, registrar toda mudança/correção no Git.
