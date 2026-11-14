@@ -819,6 +819,30 @@ def journey_ai(b,chapter,path=None):
             best=choice;moves=[best]+[m for m in moves if m!=best]
         except TimeoutError:break
     return best
+def journey_material(board):
+    # Campaign-only adjudication: a king is worth three ordinary stones.
+    return sum((3 if abs(p)==2 else 1)*(1 if p>0 else -1) for p in board if p)
+
+def journey_adjudicate(run,reason):
+    balance=journey_material(run['board'])
+    run['outcome']='win' if balance>0 else 'loss' if balance<0 else 'draw'
+    run['reason']='material' if balance else reason
+    run['drawTrigger']=reason
+    run['materialBalance']=balance
+
+def journey_award(db,pid,run,completed,unlocked):
+    if run['outcome']=='win' and run['chapter']==completed:
+        completed+=1;run['reward']=25*completed;wallet_add(db,pid,run['reward'])
+        if completed==5:
+            unlocked=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+            for item in ('relic-throne','skin-relic-throne'):sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+            unlock(db,pid,'last_king');run['relicUnlocked']=True
+    if run['outcome']=='win' and run.get('path') in ROYAL_PATHS and completed==5:
+        for item in ROYAL_PATHS[run['path']]:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
+        unlock(db,pid,ROYAL_TITLES[run['path']])
+        run['pathUnlocked']=run['path']
+    return completed,unlocked
+
 def journey_public(completed,run,unlocked,db,pid):
     owned={x[0] for x in sql(db,'SELECT item FROM purchases WHERE player_id=?',(pid,)).fetchall()}
     return dict(paths=[key for key,pair in ROYAL_PATHS.items() if pair[0] in owned],completed=completed,chapters=JOURNEY,unlocked=unlocked,run=({**run,'legal':legal(run['board'],1,'official') if run['outcome'] is None else []} if run else None))
@@ -826,9 +850,17 @@ def journey_action(path,d,pid,now):
     action=path.rsplit('/',1)[-1]
     with database() as db:
         sql(db,'INSERT INTO journey(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
-        if action!='state':sql(db,'UPDATE journey SET completed=completed WHERE player_id=?',(pid,))
+        sql(db,'UPDATE journey SET completed=completed WHERE player_id=?',(pid,))
         completed,payload,unlocked=sql(db,'SELECT completed,payload,unlocked_at FROM journey WHERE player_id=?',(pid,)).fetchone()
         run=json.loads(payload) if payload else None
+        # Recover only the still-stored, server-recorded favorable draw from
+        # the old campaign rule. Never accept a client board or award twice.
+        if run and run.get('outcome')=='draw' and not run.get('drawTrigger') and journey_material(run['board'])>0:
+            trigger='quiet' if run.get('quiet',0)>=40 else 'repetition' if max(run.get('repeats',{}).values(),default=0)>=3 else 'limit' if run.get('sequence',0)>=500 else None
+            if trigger:
+                journey_adjudicate(run,trigger);run['recoveredDraw']=True
+                completed,unlocked=journey_award(db,pid,run,completed,unlocked)
+                sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
         if action=='state':return 200,journey_public(completed,run,unlocked,db,pid)
         if active_room(pid,now):return 409,{'error':'Saia da sala online antes de jogar a jornada.'}
         if action=='claim':
@@ -874,22 +906,15 @@ def journey_action(path,d,pid,now):
                 run.setdefault('moves',[]).append(dict(m,side=side,promotion=abs(piece)==1 and abs(run['board'][m['path'][-1]])==2))
                 run['last']=[m['from']]+m['path'];k=position_key(run['board'],-side,'official');run['repeats'][k]=run['repeats'].get(k,0)+1
                 if not legal(run['board'],-side,'official'):run['outcome']='win' if side==1 else 'loss'
-                elif run['quiet']>=40 or run['repeats'][k]>=3 or run['sequence']>=500:run['outcome']='draw'
+                elif run['quiet']>=40:journey_adjudicate(run,'quiet')
+                elif run['repeats'][k]>=3:journey_adjudicate(run,'repetition')
+                elif run['sequence']>=500:journey_adjudicate(run,'limit')
             play(m,1)
             if run['outcome'] is None:
                 ai=journey_ai(run['board'],run['chapter'],run.get('path'))
                 if ai:play(ai,-1)
                 else:run['outcome']='win'
-            if run['outcome']=='win' and run['chapter']==completed:
-                completed+=1;run['reward']=25*completed;wallet_add(db,pid,run['reward'])
-                if completed==5:
-                    unlocked=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
-                    for item in ('relic-throne','skin-relic-throne'):sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
-                    unlock(db,pid,'last_king');run['relicUnlocked']=True
-            if run['outcome']=='win' and run.get('path') in ROYAL_PATHS and completed==5:
-                for item in ROYAL_PATHS[run['path']]:sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?) ON CONFLICT(player_id,item) DO NOTHING',(pid,item))
-                unlock(db,pid,ROYAL_TITLES[run['path']])
-                run['pathUnlocked']=run['path']
+            completed,unlocked=journey_award(db,pid,run,completed,unlocked)
         else:return 404,{'error':'Ação desconhecida.'}
         sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
         return 200,journey_public(completed,run,unlocked,db,pid)

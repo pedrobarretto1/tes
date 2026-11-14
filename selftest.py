@@ -419,6 +419,23 @@ def run(s):
             reply=call('journey/move',hero,id=second['id'],sequence=0,move=second['legal'][0])['run']
             assert reply['sequence']==2 and call('journey/state',hero)['run']['board']==reply['board']
             assert call('journey/start',hero,chapter=1)['run']['id']==reply['id']
+            # Campaign-only draw adjudication: a lead is not an immediate win.
+            lead=[0]*64;lead[40]=2;lead[42]=2;lead[7]=-2
+            assert s.journey_material(lead)==3
+            for trigger in ('quiet','repetition','limit'):
+                trial={'board':lead[:]}
+                s.journey_adjudicate(trial,trigger);assert trial['outcome']=='win' and trial['reason']=='material' and trial['drawTrigger']==trigger
+                trial={'board':[-p for p in lead]}
+                s.journey_adjudicate(trial,trigger);assert trial['outcome']=='loss'
+                equal=[0]*64;equal[40]=2;equal[7]=-2
+                trial={'board':equal};s.journey_adjudicate(trial,trigger);assert trial['outcome']=='draw' and trial['reason']==trigger
+            # Recover an old stored draw at level 4 and grant the reward exactly once.
+            old_draw=dict(id='old-draw',version=2,chapter=3,board=lead,sequence=40,quiet=40,repeats={},outcome='draw',last=[],moves=[],reward=0)
+            with s.database() as db:s.sql(db,'UPDATE journey SET completed=3,payload=? WHERE player_id=?',(json.dumps(old_draw),hero_id))
+            before=call('school/state',hero)['coins']
+            recovered=call('journey/state',hero);assert recovered['completed']==4 and recovered['run']['outcome']=='win' and recovered['run']['recoveredDraw']
+            assert call('school/state',hero)['coins']==before+100
+            assert call('journey/state',hero)['completed']==4 and call('school/state',hero)['coins']==before+100
             # Test fixture only: simulate a late-game position in the final chapter.
             final_board=[0]*64;final_board[42]=1;final_board[35]=-1
             final_run=dict(id='test-final',chapter=4,board=final_board,sequence=20,quiet=0,repeats={s.position_key(final_board,1,'official'):1},outcome=None,last=[],reward=0)
