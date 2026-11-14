@@ -2,7 +2,7 @@
 
 Atualizado em 14/11/2026. Ver [plano dos 100 andares](TORRE_PLANO_100.md)
 para a expansão e [histórico](CHANGELOG.md) para as correções.
-O plano novo NÃO é a versão em produção.
+O catálogo v2 está implementado na branch torre-castelo-25; consultar o changelog para confirmação da publicação.
 
 ## Produção confirmada
 - Site: https://casa-de-damas.onrender.com/torre.html
@@ -12,8 +12,7 @@ O plano novo NÃO é a versão em produção.
 - Beta 1–30: Castelo 1–10 / Catacumbas 11–20 / Império 21–30.
   Chefes: Cavaleiro Sem Nome, Rei Esquecido, Imperador de Ouro.
   Trono do Fim (cosmos) está no SVG, mas não é jogável.
-- Nova decisão: 4 reinos de 25 andares, ainda por implementar. Não
-  confundir mapa de produção com o plano futuro.
+- Revisão v2: Castelo 1–25, Catacumbas 26–50, Império 51–75, Trono do Fim 76–100. Limite jogável 30; Castelo completo e entrada das Catacumbas 26–30. Andares 31–100 visíveis no catálogo, não liberados.
 
 ## Arquivos e contratos
 | Arquivo | Função |
@@ -30,12 +29,10 @@ O plano novo NÃO é a versão em produção.
 
 ## Regras atuais
 - Ascensão: 3 coroas; vitória avança; derrota/desistência perde uma coroa;
-  empate não avança nem perde; ao zerar, volta ao checkpoint (1/11/21)
+  empate não avança nem perde; ao zerar, volta ao checkpoint (1/11/21/26)
   e restaura três, preservando recorde. Santuário restaura coroas.
 - Expedição: 3 coroas, sem retorno; fim ao zerar. Tentativas independentes.
-- Rotas guardião/carrasco/desconhecido: força da IA base por blocos de seis
-  andares; chefe/Carrasco sobem um perfil, Desconhecido varia um perfil.
-  Cinco perfis de busca (3/5/7/9/11 máximos). Finais/caminhos narrativos
+- Catálogo v2: encounter, realm_map, total_floors e catalog_version no payload. Rotas guardião/carrasco/desconhecido nos andares normais; elites, pré-boss e boss fixos. Perfil da IA derivado da meta D, Carrasco sobe um perfil, Desconhecido varia um perfil. Cinco perfis de busca (3/5/7/9/11 máximos). Estilos ainda são metas, não IA especializada. Finais/caminhos narrativos
   e recompensas cosméticas não implementados.
 - Partida completa, brasileira (lei da maioria), 8×8, claras humanas,
   sem limite de tempo geral, com contagem oficial de finais.
@@ -45,7 +42,7 @@ O plano novo NÃO é a versão em produção.
   versão e resultado idempotente. Não há concessão de PH, moedas ou ranking.
 - Ambiente independente da skin/tema. .tower-world fixo ocupa viewport;
   .shell e .arena possuem layout tradicional, cartas, 64 casas, lateral
-  com mapa, informações e histórico. Sincronizar data-realm/data-fx;
+  com mapa 5×5 do reino atual, capítulos, ícones, inimigo e histórico. Cinco estágios SVG aditivos do Castelo. Sincronizar data-realm/data-stage/data-fx;
   efeitos pausados em aba oculta e respeitam redução de movimento.
   Variáveis de material da mesa vêm também de escola.css.
 - A mesa não deve ser miniaturizada dentro do SVG; não reintroduzir
@@ -63,8 +60,4 @@ de setup Neon. A camada full-screen teve simulação JS de troca de reino,
 de FPS e de todos os 100 andares ainda não existem.
 
 ## Próximo passo
-Migrar catálogo para 4×25 em branch de teste, preservar os estados salvos
-da beta e eliminar constantes de 10/30 duplicadas no frontend. Implementar
-os cinco estágios visuais do Castelo, calibrar IA, testar e publicar por
-etapas. Recompensa do 100 deve ser diferente do tabuleiro do Rei Cósmico.
-Antes de qualquer mudança consultar AGENTS.md.
+Validar visualmente os cinco estágios do Castelo e a nova grade; calibrar IA em partidas reais. Detalhar Catacumbas 31–50 antes de ampliar o limite. Conservar runs legadas (inclusive 26–30 e completed), sem reset. Recompensas e cerimônias ainda pendentes. Recompensa do 100 diferente do tabuleiro do Rei Cósmico.
