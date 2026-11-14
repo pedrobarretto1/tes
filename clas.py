@@ -122,7 +122,7 @@ def recommendation_views(db,sql,c,pid):
     out=[]
     for rid,author,target,status,reviewer,opinion,created in rows:
         p=stats(db,sql,target);a=stats(db,sql,author);v=stats(db,sql,reviewer) if reviewer else None
-        if p:out.append(dict(id=rid,profile=p,author_name=a['name'] if a else 'Ex-membro',status=status,reviewer_name=v['name'] if v else None,opinion=opinion,checks=check(p,c['requirements']),created_at=created,available=bool(account(db,sql,target) and not member(db,sql,target))))
+        if p:out.append(dict(id=rid,profile=p,author=author,author_name=a['name'] if a else 'Ex-membro',status=status,reviewer_name=v['name'] if v else None,opinion=opinion,checks=check(p,c['requirements']),created_at=created,available=bool(account(db,sql,target) and not member(db,sql,target))))
     return out
 def invite_error(db,sql,c,target,now):
     if not account(db,sql,target):return 'O jogador precisa de uma conta registrada.'
