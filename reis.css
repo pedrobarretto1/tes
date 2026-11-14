@@ -91,3 +91,9 @@ html[data-theme^="relic-"]:not([data-theme="relic-throne"]) .boardframe>.board{
 @media(max-width:370px){.royal-shop-grid{grid-template-columns:minmax(0,1fr)}}
 
 html[data-visual-paused="1"] :is(.theme-ambient-particle,.theme-floating,.theme-mist){animation-play-state:paused!important}
+
+/* The cards use cached vector surfaces instead of hundreds of DOM nodes. */
+.royal-preview-image{display:block;width:100%;height:100%;object-fit:contain;aspect-ratio:540/610}
+.royal-architecture{filter:none}
+.royal-architecture::before{content:"";position:absolute;inset:7% 3% 2%;background:radial-gradient(ellipse at 50% 58%,#0007,transparent 73%);z-index:-1;pointer-events:none}
+.royal-preview{contain:strict;aspect-ratio:540/610;height:auto}
