@@ -5,6 +5,20 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Cruz de Jerusalém nos brasões
+- Pedido: incluir o símbolo da imagem enviada, com cruz central e quatro menores.
+- clas.py: novo ID jerusalem no catálogo EMBLEMS, compatível com create/crest.
+- clube.js: opção Cruz de Jerusalém, paintCrestSymbol desenha cinco paths SVG
+  conforme a referência, usando currentColor e sem depender de fonte; todos os
+  usos do brasão compartilham o renderer. clube.css dimensiona o SVG em 1em.
+  Cache JS v73/CSS v68. Todas as cores e molduras continuam livres.
+- Testes: test_clas.py cria/edita/recarrega o design; test_clas_ui.js confere
+  cinco paths, cor, troca para símbolo anterior e editor administrativo.
+  CI e publicação pendentes.
+- Sem alteração de schema, dados existentes, economia ou requisitos.
+  Branch clas-cruz-jerusalem. Rollback: reverter UI e manter ID no catálogo
+  para não invalidar brasões já salvos.
+
 ## 14/11/2026 — Brasões personalizados dos Clãs
 - Pedido: símbolo, cor do símbolo, seis molduras, cor da moldura e fundo,
   prévia ao vivo e edição pelo dono, sem contraste mínimo.
