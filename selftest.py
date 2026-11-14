@@ -406,6 +406,26 @@ def run(s):
             assert call('school/equip',hero,item='classic')['skin']=='skin-relic-throne'
             assert call('school/equip',hero,item='relic-throne')['theme']=='relic-throne'
             assert call('school/state',hero)['coins']==wallet['coins']
+            # Three paths: first choice, locked collection, loss without reward, then verified victory.
+            assert final['paths']==[]
+            status,_=s.social_action('/api/social/journey/claim',dict(a,path='shadow'),1000);assert status==403
+            status,_=s.social_action('/api/social/journey/equip',dict(hero,path='divine'),1000);assert status==403
+            chosen=call('journey/claim',hero,path='shadow');assert chosen['paths']==['shadow']
+            status,_=s.social_action('/api/social/journey/claim',dict(hero,path='divine'),1000);assert status==403
+            equipped=call('journey/equip',hero,path='shadow');assert equipped['theme']=='relic-shadow' and equipped['skin']=='skin-relic-shadow'
+            status,_=s.social_action('/api/social/school/buy',dict(hero,item='relic-divine'),1000);assert status==403
+            trial=call('journey/start',hero,chapter=4,path='divine')['run'];assert trial['path']=='divine'
+            assert call('journey/start',hero,chapter=4,path='divine')['run']['id']==trial['id']
+            lost=call('journey/resign',hero,id=trial['id']);assert lost['paths']==['shadow']
+            for path in ('divine','infinite'):
+                trial=call('journey/start',hero,chapter=4,path=path,restart=True)['run']
+                trial.update(board=final_board[:],sequence=20,quiet=0,repeats={s.position_key(final_board,1,'official'):1},last=[],moves=[])
+                with s.database() as db:s.sql(db,'UPDATE journey SET payload=? WHERE player_id=?',(json.dumps(trial),hero_id))
+                earned=call('journey/move',hero,id=trial['id'],sequence=20,move=s.legal(final_board,1,'official')[0])
+                assert earned['run']['pathUnlocked']==path and path in earned['paths']
+                equipped=call('journey/equip',hero,path=path);assert equipped['theme']=='relic-'+path and equipped['skin']=='skin-relic-'+path
+            assert set(call('journey/state',hero)['paths'])=={'shadow','divine','infinite'}
+            assert call('school/state',hero)['coins']==wallet['coins']
             assert call('state',hero)['me']['points']==1000
             # A guest keeps their identifier, points, history and friends after linking.
             call('friend/request',a,target=bid);call('friend/accept',b,target=aid)

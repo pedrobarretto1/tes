@@ -724,7 +724,7 @@ def journey_apply(b,m):
     for v in m['cap']:x[v]=0
     x[to]=p*2 if abs(p)==1 and to//8==(0 if p>0 else 7) else p
     return x
-def journey_ai(b,chapter):
+def journey_ai(b,chapter,path=None):
     moves=legal(b,-1,'official')
     if not moves:return None
     deadline=time.monotonic()+.12;nodes=0;best=moves[0]
@@ -736,6 +736,9 @@ def journey_ai(b,chapter):
                 v=330 if abs(p)==2 else 100+5*(7-r if sign==1 else r)
                 v+=3*min(r,7-r,c,7-c)
                 if chapter==1 and abs(p)==1 and r==(7 if sign==1 else 0):v+=12
+                if path=='shadow':v+=7*min(r,7-r,c,7-c)+ (9*(7-r if sign==1 else r) if abs(p)==1 else 0)
+                elif path=='divine':v+=12 if abs(p)==1 and r==(7 if sign==1 else 0) else 0
+                elif path=='infinite':v+=24 if abs(p)==2 else 3*(7-r if sign==1 else r)
                 value+=sign*side*v
         return value
     def search(x,side,depth,alpha,beta,ply):
@@ -816,7 +819,7 @@ def journey_action(path,d,pid,now):
                 elif run['quiet']>=40 or run['repeats'][k]>=3 or run['sequence']>=500:run['outcome']='draw'
             play(m,1)
             if run['outcome'] is None:
-                ai=journey_ai(run['board'],run['chapter'])
+                ai=journey_ai(run['board'],run['chapter'],run.get('path'))
                 if ai:play(ai,-1)
                 else:run['outcome']='win'
             if run['outcome']=='win' and run['chapter']==completed:

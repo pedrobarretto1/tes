@@ -31,7 +31,7 @@ html[data-skin^="skin-relic-"]:not([data-skin="skin-relic-throne"]) .piece.king:
 #victory[data-royal="divine"]>div{border:4px double #ead69c;border-radius:45% 45% 16px 16px / 15% 15% 16px 16px}
 #victory[data-royal="infinite"]>div{border-radius:30px;border:3px double #c0baff}
 #victory[data-royal] .crown{background:transparent;box-shadow:none;color:var(--royal-accent);animation:none}
-#victory[data-royal] .spark{display:none}
+#victory[data-royal] .spark{display:none} #victory[data-royal] .crown svg{max-width:100%;height:auto;filter:drop-shadow(0 0 8px var(--royal-energy))}
 #victory[data-royal] .royal-quote{font:italic 15px Georgia;color:var(--royal-accent);margin:10px 0}
 .royal-ending .board{transition:filter 1.5s}
 .royal-ending[data-outcome="defeat"] .board,.royal-ending[data-outcome="resign"] .board{filter:brightness(.55) saturate(.5)}
