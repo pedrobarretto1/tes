@@ -13,6 +13,9 @@ Validação: CI final 43632355617, 18 testes aprovados, SELFTEST e regressão UI
 ## Refinamento visual publicado
 PR #6, commit e522bf09430b3a6eb7ec94dcb4df6f27dd5cb588, Render dep-dbsbidu1egvs73dculog live. Salão de ferro/dourado, abas compactas, busca em grid, campos legíveis e carta de fundação com prévia em tempo real do nome, sigla, descrição e brasão. Menu Clãs usa secondary. Sigla preserva regra 2–6 letras/números, sem pontos; aviso antes do envio. CI 43633284488 aprovou Chromium em 375/758/1280 px, 18 testes Python e SELFTEST. Teste de ingresso entre duas contas reais ainda pendente. Nenhuma mudança em banco, requisitos ou economia.
 
+## Brasões personalizados
+Editor na fundação e Administração, com símbolo, symbol_color, frame_style, frame_color e background_color. Seis símbolos, seis molduras (Real, Militar, Sombria, Sagrada, Antiga, Mística), doze cores independentes, sem regra de contraste e sem cobrança. Tabela clan_crests (clan_id, design JSON); clãs antigos recebem padrão derivado do emblem. API create aceita crest; clans/crest altera apenas design, exclusivamente pelo dono. Brasão compartilhado nas listas, sede, chat e pedidos. Testes de persistência e Chromium; publicação a confirmar.
+
 ## Produto
 - Clube → Clãs: busca por nome/sigla, lista paginada, criar clã, Meu clã.
 - Clã: nome único normalizado, sigla, brasão, descrição, dono, membros, data, nível, chat e torneios.
