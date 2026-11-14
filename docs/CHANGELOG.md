@@ -5,6 +5,26 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Brasões personalizados dos Clãs
+- Pedido: símbolo, cor do símbolo, seis molduras, cor da moldura e fundo,
+  prévia ao vivo e edição pelo dono, sem contraste mínimo.
+- clas.py: tabela aditiva clan_crests, validação por IDs de catálogo, leitura
+  compatível com clãs legados e gravação transacional. Nova ação clans/crest
+  exclusiva do dono; não altera requisitos. Criação aceita design ou padrão.
+- clube.js: editor reutilizável com paletas de 12 cores, seis símbolos, seis
+  estilos, restauração de padrão, preview ao vivo; brasão aplicado a cartões,
+  Meu clã, cabeçalho do chat e pedidos/convites. clube.css: geometria distinta
+  por moldura e variáveis de cor independentes. Cache JS v72/CSS v67.
+- Decisões: gratuito, sem contraste obrigatório ou aviso, inclusive três cores
+  iguais; catálogo fechado de valores seguros. Sem alterações na economia,
+  requisitos, membros, chat persistido, Torre ou Jornada. Clãs antigos usam
+  padrão derivado do símbolo; sem reset. Torneios internos ainda pendentes.
+- Testes: test_clas.py cobre criação, persistência, reedição, legado, permissões,
+  cores iguais, dados preservados e dissolução. test_clas_ui.js cobre seis
+  geometrias, paletas e administração em 375/758/1280 px. CI pendente.
+- Branch clas-brasoes-personalizados; publicação pendente. Rollback: reverter
+  código mantendo tabela e design salvo; não excluir dados.
+
 ## 14/11/2026 — Clãs: identidade de honra, busca e fundação ao vivo
 - Pedido: corrigir letras espremidas na busca (print), dar mais identidade
   às telas de busca/criação, atualizar prévia durante digitação e harmonizar menu.
