@@ -767,6 +767,7 @@ def journey_action(path,d,pid,now):
     action=path.rsplit('/',1)[-1]
     with database() as db:
         sql(db,'INSERT INTO journey(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
+        if action!='state':sql(db,'UPDATE journey SET completed=completed WHERE player_id=?',(pid,))
         completed,payload,unlocked=sql(db,'SELECT completed,payload,unlocked_at FROM journey WHERE player_id=?',(pid,)).fetchone()
         run=json.loads(payload) if payload else None
         if action=='state':return 200,journey_public(completed,run,unlocked,db,pid)
