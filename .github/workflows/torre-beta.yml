@@ -23,3 +23,4 @@ jobs:
       - run: npm install --no-save --no-package-lock playwright@1.51.1
       - run: npx playwright install chromium --with-deps
       - run: node test_clas_ui.js
+      - run: node test_bot_ui.js
