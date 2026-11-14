@@ -9,6 +9,8 @@ não uma lembrança isolada da conversa.
    de docs/CHANGELOG.md. Não confundir código integrado com publicação confirmada.
 2. Ler docs/TORRE_DOS_REIS.md para a implementação atual e
    docs/TORRE_PLANO_100.md para o planejamento da campanha completa.
+   Para Clãs, ler docs/CLAS_PLANO.md: recrutamento, nível, chat, torneios e
+   cofre de prêmios. Não liberar PH transferível sem decisão de economia.
 3. Verificar os arquivos reais afetados; distinguir decisões aprovadas pelo
    criador de propostas ainda em discussão. Não substituir trabalho aprovado
    sem necessidade. Pedir confirmação para mudanças de escopo importantes.
