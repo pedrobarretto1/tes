@@ -1099,7 +1099,9 @@ def tower_action(path,d,pid,now):
         def response():
             w=wallet_state(db,pid)
             return 200,{'progress':public_state(p),'game':({**game,'legal':legal(game['board'],1,'official') if game['outcome'] is None else []} if game else None),'theme':w.get('theme','classic'),'skin':w.get('skin','skin-classic')}
-        if action=='state':return response()
+        if action=='state':
+            if not raw:sql(db,'UPDATE tower_runs SET payload=? WHERE player_id=? AND mode=?',(json.dumps(data),pid,mode))
+            return response()
         if active_room(pid,now):return 409,{'error':'Saia da sala online antes de entrar na Torre.'}
         if action=='restart':
             if p.status not in ('ended','completed'):return 409,{'error':'Conclua sua tentativa atual.'}
