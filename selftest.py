@@ -457,6 +457,11 @@ def run(s):
             me=call('state',hero)['me'];assert {'king_shadow','king_divine','king_cosmos'}<=set(me['achievements']) and me['title']=='king_shadow'
             assert call('customize',hero,name=hero['name'],title='king_cosmos')['me']['title']=='king_cosmos'
             assert call('player',a,target=hero_id)['player']['title']=='king_cosmos'
+            saved=call('save/state',hero);assert saved['version']==1 and saved['me']['title']=='king_cosmos' and set(saved['journey']['paths'])=={'shadow','divine','infinite'}
+            assert saved['wallet']['coins']==wallet['coins'] and 'relic-infinite' in saved['wallet']['owned'] and saved['journey']['completed']==5
+            assert 'profileToken' not in saved and 'password' not in saved['me']
+            other_save=call('save/state',a);assert other_save['me']['name']!=saved['me']['name'] and other_save['journey']['completed']==0
+            status,_=s.social_action('/api/social/save/write',dict(hero,coins=999999),1000);assert status==404
             assert call('school/state',hero)['coins']==wallet['coins']
             assert call('state',hero)['me']['points']==1000
             # A guest keeps their identifier, points, history and friends after linking.

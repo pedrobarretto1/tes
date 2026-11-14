@@ -894,6 +894,18 @@ def journey_action(path,d,pid,now):
         sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
         return 200,journey_public(completed,run,unlocked,db,pid)
 
+def progress_snapshot(pid):
+    # Read the authenticated player's durable state only. No client save data is trusted.
+    with database() as db:
+        row=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
+        account=sql(db,'SELECT username FROM accounts WHERE player_id=?',(pid,)).fetchone()
+        me=dict(zip(('name','points','wins','losses','draws'),row),**cosmetics_for(db,pid,True),account=account[0] if account else None)
+        wallet=wallet_state(db,pid)
+        wallet['solved']=[x[0] for x in sql(db,'SELECT puzzle_id FROM puzzle_solves WHERE player_id=?',(pid,)).fetchall()]
+        j=sql(db,'SELECT completed,payload,unlocked_at FROM journey WHERE player_id=?',(pid,)).fetchone()
+        journey=journey_public(j[0],json.loads(j[1]) if j[1] else None,j[2],db,pid) if j else journey_public(0,None,'',db,pid)
+        return dict(version=1,savedAt=int(time.time()*1000),persistent=bool(DATABASE_URL),me=me,wallet=wallet,journey=journey)
+
 def social_action(path,d,now):
     if path.startswith('/api/social/account/'):return account_action(path,d,now)
     if path=='/api/social/register':
@@ -903,6 +915,8 @@ def social_action(path,d,now):
     with database() as db:
         if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone(): return 403,{'error':'Perfil não encontrado. Abra o cadastro.'}
     PRESENCE[pid]=now
+    if path=='/api/social/save/state':return 200,progress_snapshot(pid)
+    if path.startswith('/api/social/save/'):return 404,{'error':'Ação de salvamento inválida.'}
     if path.startswith('/api/social/journey/'):return journey_action(path,d,pid,now)
     if path.startswith('/api/social/school/'):return school_action(path,d,pid,now)
     if path.startswith('/api/social/live/'):return live_action(path,d,pid,now)
@@ -1004,7 +1018,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/royal-demo.html':
             self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
