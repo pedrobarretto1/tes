@@ -21,9 +21,9 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   X ou pedido deixar de estar válido; avisos informativos mantêm 7/10 s.
   index.html cache v69. Convites ainda expiram no servidor em 60 s.
 - Testes: sintaxe JS; testes de curva, partida legada, 12 simulações com
-  jogador heurístico e legalidade. Resultados CI/publicação a confirmar.
+  jogador heurístico e legalidade. CI e Render: 14 testes da Torre OK, 12/12 vitórias do jogador heurístico, SELFTEST geral OK. Simulação JS: pedidos sem timer, X sem recusa, deduplicação e timers informativos preservados.
 - Commits bcf0198f, 1c3c40e2, 2f2b1306, 5c8f3b76, 23387e38, 59cd69af.
-  Sem reset de dados, sem alterar recompensas ou regras. Não excluir Pedro 2
+  PR #3 integrada: 5966dd654e39e1738e2a66cfa258aa25282382b5. Render live dep-dbsaf7t6e07s739a6l60; Neon conectado. Sem reset de dados, sem alterar recompensas ou regras. Não excluir Pedro 2
   sem a confirmação solicitada.
 - Próximo: validar com jogador real, ajustar chance de busca por feedback.
   Rollback: reverter commits de balanceamento/UI; dados permanecem compatíveis.
