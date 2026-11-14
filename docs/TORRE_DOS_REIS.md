@@ -53,5 +53,13 @@ de setup Neon. A camada full-screen teve simulação JS de troca de reino,
 64 casas e pausa de animação; o criador aprovou visualmente. Testes reais
 de FPS e de todos os 100 andares ainda não existem.
 
+## Balanceamento revisado
+A Torre usa tower_ai e ai_balance, independentes da IA da Jornada. Andar 1
+sem busca minimax e com oportunidades de captura; chance de busca e força
+aumentam gradualmente nos andares 2–30, com picos nos encontros especiais.
+Todas as rotas do primeiro andar permanecem muito fáceis. Partidas legadas
+adotam nova política sem reset. O rótulo do HUD vem do campo balance da API.
+A curva é calibragem inicial; não representa Elo ou vitória garantida.
+
 ## Próximo passo
 Validar visualmente os cinco estágios do Castelo e a nova grade; calibrar IA em partidas reais. Detalhar Catacumbas 31–50 antes de ampliar o limite. Conservar runs legadas (inclusive 26–30 e completed), sem reset. Recompensas e cerimônias ainda pendentes. Recompensa do 100 diferente do tabuleiro do Rei Cósmico.
