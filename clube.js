@@ -79,38 +79,45 @@ window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!piece.animate){return}
   let layer=node('div','board-fx-layer');layer.setAttribute('aria-hidden','true');frame.append(layer);board.classList.add('board-fx-active');
   let fx={layer,animations:[],cancelled:false};moveEffect=fx;window.clubFXDestination=to;piece.classList.add('fx-hidden');
-  // Anchor the animation to the board itself. Percent positions survive scroll,
-  // responsive sizing and changes in the side panel while a stone is in flight.
-  function align(){let a=frame.getBoundingClientRect(),b=board.getBoundingClientRect();layer.style.left=(b.left-a.left-frame.clientLeft)+'px';layer.style.top=(b.top-a.top-frame.clientTop)+'px';layer.style.width=b.width+'px';layer.style.height=b.height+'px'}
-  align();if(typeof ResizeObserver!=='undefined'){fx.observer=new ResizeObserver(align);fx.observer.observe(board);fx.observer.observe(frame)}
-  const pos=i=>{let r=board.querySelector('[data-square="'+i+'"]').getBoundingClientRect(),a=layer.getBoundingClientRect(),x=r.left-a.left+r.width/2,y=r.top-a.top+r.height/2;return {x,y,w:r.width*.78,u:x/a.width*100,v:y/a.height*100,size:r.width*.78/a.width*100}};
-  function place(p,i){let r=pos(i);p.style.left=r.u+'%';p.style.top=r.v+'%';p.style.width=r.size+'%';p.style.height='auto';p.style.aspectRatio='1'}
+/* Board geometry is measured only on layout changes. The flight writes only transform. */
+  const squares=[...new Set([m.from,...m.path,...m.cap])],positions=new Map(),anchors=new Map();
+  function align(){
+    if(fx.cancelled)return;
+    const a=frame.getBoundingClientRect(),br=board.getBoundingClientRect();
+    if(!br.width||!br.height)return;
+    const next=new Map();
+    for(const i of squares){const cell=board.querySelector('[data-square="'+i+'"]');if(!cell)continue;const r=cell.getBoundingClientRect(),x=r.left-br.left+r.width/2,y=r.top-br.top+r.height/2;next.set(i,{x,y,w:r.width*.78,u:x/br.width*100,v:y/br.height*100,size:r.width*.78/br.width*100})}
+    layer.style.left=(br.left-a.left-frame.clientLeft)+'px';layer.style.top=(br.top-a.top-frame.clientTop)+'px';layer.style.width=br.width+'px';layer.style.height=br.height+'px';
+    positions.clear();for(const [i,r] of next)positions.set(i,r);
+    for(const [p,i] of anchors){const r=positions.get(i);if(r&&p.isConnected)anchor(p,r)}
+  }
+  function anchor(p,r){p.style.left=r.u+'%';p.style.top=r.v+'%';p.style.width=r.size+'%';p.style.height='auto';p.style.aspectRatio='1'}
+  function pos(i){return positions.get(i)}
+  function place(p,i){anchors.set(p,i);const r=pos(i);if(r)anchor(p,r)}
+  align();if(!pos(m.from)||!pos(to)){window.cancelClubMoveFX();return}
+  if(typeof ResizeObserver!=='undefined'){fx.observer=new ResizeObserver(align);fx.observer.observe(board);fx.observer.observe(frame)}
   function disc(value,cls){return node('span','piece fx-disc '+cls+' '+(value>0?'white':'black')+(Math.abs(value)===2?' king':''))}
   const ghost=disc(old,'fx-moving');place(ghost,m.from);layer.append(ghost);
   const taken=new Map();for(let i of m.cap){if(!oldBoard[i])continue;let victim=disc(oldBoard[i],'fx-victim');place(victim,i);layer.append(victim);taken.set(i,victim)}
   async function animate(el,frames,options){let anim=el.animate(frames,options);fx.animations.push(anim);try{await anim.finished}catch(e){}}
-  // V5.8: one visual stone, one frame clock. CSS left/top animations may
-  // be interrupted or re-evaluated when the board redraws or the layout changes.
-  // Never advance more than 34 ms of animation on a single painted frame.
+  // Transform-only motion. Geometry is cached; resize callbacks update it.
   function slide(fromSquare,toSquare,duration){
     return new Promise(resolve=>{
       let frameId=0,lastTime=null,elapsed=0,done=false;
+      place(ghost,fromSquare);
+      ghost.style.transform='translate3d(-50%,-50%,0) scale(1)';
       function finish(){if(done)return;done=true;cancelAnimationFrame(frameId);fx.stopFrame=null;resolve()}
       fx.stopFrame=finish;
       function draw(t){
         if(fx.cancelled){finish();return}
-        if(lastTime===null)lastTime=t;
-        let delta=Math.max(0,Math.min(34,t-lastTime));lastTime=t;
-        // Pause rather than skipping to the end when the tab is hidden.
-        if(document.hidden){frameId=requestAnimationFrame(draw);return}
-        let a=pos(fromSquare),z=pos(toSquare);
-        if(!Number.isFinite(a.u+a.v+z.u+z.v+a.size)||a.size<=0){frameId=requestAnimationFrame(draw);return}
+        if(document.hidden){lastTime=null;frameId=requestAnimationFrame(draw);return}
+        const delta=lastTime===null?0:Math.max(0,Math.min(50,t-lastTime));lastTime=t;
+        const a=pos(fromSquare),z=pos(toSquare);
+        if(!a||!z||a.w<=0){frameId=requestAnimationFrame(draw);return}
         elapsed=Math.min(duration,elapsed+delta);
-        let p=elapsed/duration,q=p*p*(3-2*p);
-        ghost.style.left=(a.u+(z.u-a.u)*q)+'%';
-        ghost.style.top=(a.v+(z.v-a.v)*q)+'%';
-        ghost.style.width=(a.size+(z.size-a.size)*q)+'%';
-        ghost.style.transform='translate(-50%,-50%) scale('+(1+.035*Math.sin(Math.PI*p))+')';window.royalTrack?.(a.u+(z.u-a.u)*q,a.v+(z.v-a.v)*q,Math.sign(oldBoard[m.from]||old));
+        const p=elapsed/duration,q=p*p*(3-2*p),dx=(z.x-a.x)*q,dy=(z.y-a.y)*q;
+        ghost.style.transform='translate3d(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px),0) scale('+(1+.025*Math.sin(Math.PI*p))+')';
+        window.royalTrack?.(a.u+(z.u-a.u)*q,a.v+(z.v-a.v)*q,Math.sign(oldBoard[m.from]||old));
         if(p>=1){finish();return}
         frameId=requestAnimationFrame(draw);
       }
@@ -119,12 +126,12 @@ window.clubMoveFX=async(m,old,oldBoard,promoted=false)=>{
   }
   try{
     let previous=m.from;
-    for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=Math.min(1200,540+distance*130);let captured=taken.get(m.cap[k]);
+    for(let k=0;k<m.path.length;k++){if(fx.cancelled)return;let target=m.path[k],from=pos(previous),end=pos(target),dx=end.x-from.x,dy=end.y-from.y;let distance=Math.max(Math.abs(dx),Math.abs(dy))/Math.max(1,from.w/.78),duration=Math.min(600,240+distance*65);let captured=taken.get(m.cap[k]);
       await slide(previous,target,duration);if(fx.cancelled)return;
-      place(ghost,target);ghost.style.transform='translate(-50%,-50%) scale(1)';
-      if(captured){{let r=pos(m.cap[k]);window.royalCapture?.(oldBoard[m.cap[k]],mySide,r.u,r.v)}window.themeMove?.(layer,pos(m.cap[k]),'capture');await animate(captured,[{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) translateY(12px) rotate(22deg) scale(.45)',opacity:0}],{duration:240,easing:'ease-in',fill:'forwards'});captured.remove()}previous=target;
+      place(ghost,target);ghost.style.transform='translate3d(-50%,-50%,0) scale(1)';
+      if(captured){{let r=pos(m.cap[k]);window.royalCapture?.(oldBoard[m.cap[k]],mySide,r.u,r.v)}window.themeMove?.(layer,pos(m.cap[k]),'capture');await animate(captured,[{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) translateY(12px) rotate(22deg) scale(.45)',opacity:0}],{duration:150,easing:'ease-in',fill:'forwards'});anchors.delete(captured);captured.remove()}previous=target;
     }
-    if(promoted&&!fx.cancelled){{let r=pos(to);window.royalPromotion?.(Math.sign(oldBoard[m.from]||old),r.u,r.v)}window.themeMove?.(layer,pos(to),'promotion');ghost.classList.add('king');let ring=node('span','fx-promotion');place(ring,to);layer.append(ring);await Promise.all([animate(ghost,[{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.2)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:420,easing:'ease-out'}),animate(ring,[{transform:'translate(-50%,-50%) scale(.6)',opacity:1},{transform:'translate(-50%,-50%) scale(1.5)',opacity:0}],{duration:480,fill:'forwards'})])}
+    if(promoted&&!fx.cancelled){{let r=pos(to);window.royalPromotion?.(Math.sign(oldBoard[m.from]||old),r.u,r.v)}window.themeMove?.(layer,pos(to),'promotion');ghost.classList.add('king');let ring=node('span','fx-promotion');place(ring,to);layer.append(ring);await Promise.all([animate(ghost,[{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.2)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:320,easing:'ease-out'}),animate(ring,[{transform:'translate(-50%,-50%) scale(.6)',opacity:1},{transform:'translate(-50%,-50%) scale(1.5)',opacity:0}],{duration:350,fill:'forwards'})])}
   }finally{if(moveEffect===fx)window.cancelClubMoveFX()}
 };
 // Scrolling and resizing no longer cancel a move; the layer follows the board.
