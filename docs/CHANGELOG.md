@@ -19,8 +19,8 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   gastar coroas adicionais. Demais modalidades fora da Torre não modificadas.
 - test_torre_ui.js: regressão com DOM simulado para 12 cenários terminais,
   ambos modos, atualização/reabertura, foco, contadores e 64 casas; workflow
-  torre-beta.yml executa o teste. Sintaxe JS validada; CI/publicação a confirmar.
-- Commits f6dd5585, 4f3e40ce, 03c549eb. Rollback: reverter alterações de UI/testes,
+  torre-beta.yml executa o teste. CI 43628856830 aprovado, incluindo 12 cenários UI, 14 testes Torre e SELFTEST geral.
+- Commits f6dd5585, 4f3e40ce, 03c549eb. PR #4 integrada: 278736309a751ad6f58a7701172aafe1b87ffcc6. Render live dep-dbsar9qfngtc73c7deo0. Rollback: reverter alterações de UI/testes,
   sem migração ou alteração de banco.
 
 ## 14/11/2026 — Rebalanceamento da Torre e pedidos sem timer
