@@ -146,7 +146,7 @@ def run(s):
             assert other['code']==match['code'] and other['side']==-match['side']
             room=s.ROOMS[match['code']]
             # Switch from the synthetic matchmaking clock to the real HTTP clock.
-            room['last']=s.time.monotonic();room['seen']={1:room['last'],-1:room['last']}
+            room['last']=s.time.monotonic();room['seen']={1:room['last'],-1:room['last']};room['clock_at']=room['last'];room['started']=room['last']
             assert room['minutes']==5 and not s.MATCH_QUEUE
             aa={k:other[k] for k in ('code','side','token')}
             bb={k:match[k] for k in ('code','side','token')}
