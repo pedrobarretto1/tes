@@ -11,9 +11,9 @@ def run(s):
             s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={};s.LOGIN_LIMITS={};s.SPECTATORS={};s.TOURNAMENTS={}
             s.setup()
             a={'name':'Teste A','profileToken':'a'*64};b={'name':'Teste B','profileToken':'b'*64}
-            def call(path,who,**kw):
-                status,d=s.social_action('/api/social/'+path,dict(who,**kw),1000)
-                assert status==200,(path,status,d)
+            def call(route,who,**kw):
+                status,d=s.social_action('/api/social/'+route,dict(who,**kw),1000)
+                assert status==200,(route,status,d)
                 return d
             call('register',a);call('register',b)
             c={'name':'João da Silva','profileToken':'c'*64};call('register',c)
