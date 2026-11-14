@@ -479,6 +479,9 @@ def run(s):
             login=call('account/login',b,username='teste_a',password='teste-senha-123')
             other_device=dict(name='Teste A',profileToken=login['token'])
             assert s.identity(other_device)==aid and other_device['profileToken']!=auth['profileToken']
+            assert call('save/state',other_device)['me']['account']=='teste_a'
+            assert call('save/state',auth)['me']['points']==call('save/state',other_device)['me']['points']
+            assert call('save/state',auth)['wallet']['owned']==call('save/state',other_device)['wallet']['owned']
             assert call('state',other_device)['me']['points']==previous['me']['points']
             saved=call('customize',other_device,name='Guardiao A',avatar='knight',title='first_win',frame='bronze')
             assert saved['me']['avatar']=='knight' and saved['me']['title']=='first_win'
