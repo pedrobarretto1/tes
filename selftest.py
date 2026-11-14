@@ -106,7 +106,8 @@ def run(s):
                 handler=object.__new__(s.Handler); payload=json.dumps(body).encode()
                 handler.path=path;handler.headers={'Content-Length':str(len(payload))};handler.rfile=BytesIO(payload)
                 out=[];handler.reply=lambda status,data,*args:out.extend([status,data])
-                handler.do_POST();assert out[0]==200,out
+                with patch.object(s.time,'monotonic',return_value=1000.0):handler.do_POST()
+                assert out[0]==200,out
                 return out[1]
             for expected in (1,-1):
                 orig=s.secrets.choice
@@ -164,8 +165,8 @@ def run(s):
             other=call('state',a)['session'];match=found['session']
             assert other['code']==match['code'] and other['side']==-match['side']
             room=s.ROOMS[match['code']]
-            # Switch from the synthetic matchmaking clock to the real HTTP clock.
-            room['last']=s.time.monotonic();room['seen']={1:room['last'],-1:room['last']};room['clock_at']=room['last'];room['started']=room['last']
+            # Keep HTTP and social tests on the same deterministic clock.
+            room['last']=1000.0;room['seen']={1:room['last'],-1:room['last']};room['clock_at']=room['last'];room['started']=room['last']
             assert room['minutes']==5 and not s.MATCH_QUEUE
             aa={k:other[k] for k in ('code','side','token')}
             bb={k:match[k] for k in ('code','side','token')}
