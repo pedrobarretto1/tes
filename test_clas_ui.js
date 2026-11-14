@@ -84,7 +84,7 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert(!(await page.getByRole('button',{name:'Fundar ordem',exact:true}).isDisabled()));
       assert.equal(await page.locator('.clan-foundation-form input[type=number]').count(),7);
       assert(await page.locator('#clanoverlay .clan-shell').evaluate(el=>el.scrollWidth<=el.clientWidth+2),'creation horizontal overflow');
-      await page.evaluate(()=>{const {api,data}=window.clanTest;api.set({...data,mine:{id:'c',name:'Chama Eterna',tag:'CE',owner:'me',description:'Teste',emblem:'knight',crest:{symbol:'knight',symbol_color:'violet',frame_style:'dark',frame_color:'silver',background_color:'wine'},count:1,capacity:30,level:5,requirements:{},checks:[],members:[data.me]}},'manage');api.renderClan()});
+      await page.evaluate(()=>{const {api,data}=window.clanTest;api.set({...data,mine:{id:'c',name:'Chama Eterna',tag:'CE',owner:'me',description:'Teste',emblem:'knight',crest:{symbol:'knight',symbol_color:'violet',frame_style:'dark',frame_color:'silver',background_color:'wine'},count:1,capacity:30,level:5,requirements:{},checks:[],members:[data.me]}},'personalize');api.renderClan()});
       const admin=page.locator('.clan-crest-admin-preview .clan-crest');
       assert.equal(await admin.getAttribute('data-frame'),'dark');
       assert.equal(await admin.getAttribute('data-symbol-color'),'violet');
@@ -93,6 +93,29 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       await page.getByLabel('Brasão da ordem').selectOption('jerusalem');
       assert.equal(await admin.locator('svg.clan-jerusalem-cross path').count(),5);
       assert(await page.getByRole('button',{name:'Salvar brasão',exact:true}).isVisible());
+      await page.evaluate(()=>{
+        const {api,data}=window.clanTest;
+        const member=(id,role)=>({id,name:id,role,points:1000,wins:0,losses:0,draws:0,rate:null,level:1});
+        const members=[member('king','king'),member('vice','vice'),member('captain','captain'),member('member','member')];
+        window.roleFixture=(role,tab)=>{
+          const me=members.find(p=>p.role===role);
+          api.set({...data,me:{...me,xp:0},mine:{id:'c',name:'Ordem',tag:'ORD',owner:'king',role,description:'Teste',emblem:'shield',count:4,capacity:30,level:1,requirements:{},checks:[],members,reports:[{id:'r',author:'captain',author_name:'captain',target:'member',target_name:'member',status:'open',history:[{kind:'report',name:'captain',text:'Motivo',at:1}],can_decide:role==='king',can_reply:false,can_reopen:false}]},decisions:[]},tab);api.renderClan();
+        };
+        window.roleFixture('member','home');
+      });
+      const tab=label=>page.locator('#clantabs').getByRole('button',{name:label,exact:true});
+      assert.equal(await tab('Administração').count(),0);assert.equal(await tab('Personalização').count(),0);assert.equal(await tab('Denúncias').count(),0);assert(await tab('Torneios').isVisible());
+      await page.evaluate(()=>window.roleFixture('captain','manage'));
+      assert(await tab('Administração').isVisible());assert(await tab('Denúncias').isVisible());assert.equal(await tab('Personalização').count(),0);
+      assert.equal(await page.getByRole('button',{name:'Remover',exact:true}).count(),0);
+      assert.equal(await page.getByText('Denunciar jogador',{exact:true}).count(),1);
+      await page.evaluate(()=>window.roleFixture('vice','personalize'));
+      assert(await tab('Personalização').isVisible());assert(await page.getByRole('button',{name:'Salvar brasão',exact:true}).isVisible());
+      await page.evaluate(()=>window.roleFixture('king','manage'));
+      assert.equal(await page.getByRole('button',{name:'Salvar cargo',exact:true}).count(),3);
+      await page.evaluate(()=>window.roleFixture('king','reports'));
+      assert(await page.getByRole('button',{name:'Devolver para esclarecimentos',exact:true}).isVisible());
+      assert(await page.getByRole('button',{name:'Registrar decisão',exact:true}).isVisible());
       console.log('CLAN UI OK:',width,'px; search, live preview, validation, responsive layout');
       await page.close();
     }
