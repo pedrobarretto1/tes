@@ -60,7 +60,7 @@ window.openRoyalDemo=key=>{if(!names.includes(key))return;let old=document.getEl
 let dialog=document.createElement('dialog');dialog.id='royalDemoDialog';dialog.className='royal-demo-dialog';dialog.setAttribute('aria-label','Experimentar relíquia');
 let bar=document.createElement('header'),title=document.createElement('strong'),close=document.createElement('button'),iframe=document.createElement('iframe');
 title.textContent='Laboratório de Relíquias';close.type='button';close.className='secondary';close.textContent='Fechar prévia';close.onclick=()=>dialog.close();bar.append(title,close);
-iframe.title='Prévia interativa do tabuleiro';iframe.setAttribute('sandbox','allow-scripts');iframe.src='/royal-demo.html?v=3&king='+encodeURIComponent(key);dialog.append(bar,iframe);document.body.append(dialog);
+iframe.title='Prévia interativa do tabuleiro';iframe.setAttribute('sandbox','allow-scripts');iframe.src='/royal-demo.html?v=4&king='+encodeURIComponent(key);dialog.append(bar,iframe);document.body.append(dialog);
 let onMessage=e=>{if(e.source===iframe.contentWindow&&e.data?.type==='royal-demo-close')dialog.close()};window.addEventListener('message',onMessage);
 dialog.addEventListener('close',()=>{window.removeEventListener('message',onMessage);iframe.remove();dialog.remove()},{once:true});dialog.showModal();updateRoyalLoop();dialog.addEventListener('close',updateRoyalLoop,{once:true})};
 let host,canvas,ctx,theme=null,raf=0,last=0,clock=0,eye={x:0,y:0},target={x:50,y:50},angle=0,phase=[0,2.2,4.1],emotion=null,ending=null,timer=0,epoch=0,particles=[],tiles=new Map();
@@ -70,10 +70,10 @@ const palette={shadow:'255,154,75',divine:'255,232,170',infinite:'171,215,255'};
 const quotes={shadow:{victory:'A fortaleza reconhece seu soberano.',defeat:'O trono não pertence aos fracos.',resign:'Até a próxima batalha, guerreiro.'},divine:{victory:'Sua conquista ecoará na eternidade.',defeat:'Mesmo a luz precisa conhecer a escuridão.',resign:'O caminho permanece aberto para seu retorno.'},infinite:{victory:'Você conquistou aquilo que não possui limites.',defeat:'Até as estrelas mais brilhantes chegam ao seu fim.',resign:'O infinito aguardará seu retorno.'}};
 function decorate(){if(!theme)return;for(let el of board.querySelectorAll('.sq')){let i=Number(el.dataset.square),key=theme+':'+i+':'+el.classList.contains('dark');if(!tiles.has(key))tiles.set(key,tile(i,theme,el.classList.contains('dark')));el.style.setProperty('--royal-tile',tiles.get(key))}}
 function align(){if(!canvas)return;let r=frame.getBoundingClientRect(),d=Math.min(compact.matches?1:1.5,devicePixelRatio||1),w=Math.round(r.width*d),h=Math.round(r.height*d);if(w&&h&&(canvas.width!==w||canvas.height!==h)){canvas.width=w;canvas.height=h}}
-function sync(){let k=kind();if(k===theme)returnwindow.royalReset();theme=k;host?.remove();canvas?.remove();host=canvas=ctx=null;royalNodes.clear();if(!k)return;host=document.createElement('div');host.className='royal-architecture';host.setAttribute('aria-hidden','true');host.innerHTML=({shadow,divine,infinite})[k]();frame.prepend(host);canvas=document.createElement('canvas');canvas.className='royal-canvas';canvas.setAttribute('aria-hidden','true');frame.append(canvas);ctx=canvas.getContext('2d');angle=0;phase=[0,2.2,4.1];clock=0;last=0;decorate();align();startRoyalLoop()}
+function sync(){let k=kind();if(k===theme)return;window.royalReset();theme=k;host?.remove();canvas?.remove();host=canvas=ctx=null;royalNodes.clear();if(!k)return;host=document.createElement('div');host.className='royal-architecture';host.setAttribute('aria-hidden','true');host.innerHTML=({shadow,divine,infinite})[k]();frame.prepend(host);canvas=document.createElement('canvas');canvas.className='royal-canvas';canvas.setAttribute('aria-hidden','true');frame.append(canvas);ctx=canvas.getContext('2d');angle=0;phase=[0,2.2,4.1];clock=0;last=0;decorate();align();startRoyalLoop()}
 const covered=()=>['schooloverlay','journeyoverlay','clubmenu','clubwelcome'].some(id=>{let e=E(id);return e&&!e.classList.contains('hidden')})||!!E('relicceremony')?.open||!!E('royalDemoDialog')?.open;
 function startRoyalLoop(){if(!theme||!host||document.hidden||(covered()&&(!ending||ending.revealed)))return;if(!raf){last=0;raf=requestAnimationFrame(tick)}}
-function updateRoyalLoop(){if(document.hidden||(covered()&&(!ending||ending.revealed))){if(raf)cancelAnimationFrame(raf);raf=0;last=0}else startRoyalLoop()}
+function updateRoyalLoop(){let paused=covered()?'1':'0';if(root.dataset.visualPaused!==paused)root.dataset.visualPaused=paused;if(document.hidden||(covered()&&(!ending||ending.revealed))){if(raf)cancelAnimationFrame(raf);raf=0;last=0}else startRoyalLoop()}
 new MutationObserver(sync).observe(root,{attributes:true,attributeFilter:['data-theme']});
 const coverObserver=new MutationObserver(updateRoyalLoop);
 for(let id of ['schooloverlay','journeyoverlay','clubmenu','clubwelcome','relicceremony']){let e=E(id);if(e)coverObserver.observe(e,{attributes:true,attributeFilter:['class','open']})}
@@ -116,5 +116,5 @@ else if(theme==='divine'){if(out==='victory'){for(let [i,n] of [[42,490],[42,350
 else{if(out==='victory'){let pts=Array.from({length:12},(_,i)=>[270+249*Math.cos(i*Math.PI/6),317+277*Math.sin(i*Math.PI/6)]);for(let i=0;i<12;i++){let f=clamp(q*18-i);if(f)line(pts[i],[mix(pts[i][0],pts[(i+1)%12][0],f),mix(pts[i][1],pts[(i+1)%12][1],f)],rgb,a,2)}glow(270,317,180*smooth(q)+15,rgb,p*.8);ring(270,317,35+220*smooth(q),20+145*smooth(q),q,rgb,p,2)}else if(out==='defeat'){let r=15+100*(1-smooth(q));glow(270,317,r*1.5,'136,112,224',a*.7);ring(270,317,r,r*.33,q*4,rgb,a,2)}else{ring(270,317,16+110*p,28+155*p,0,rgb,p,3);glow(270,317,40+150*p,rgb,p*.4)}}}
 }}
 raf=requestAnimationFrame(tick)}
-sync();
+sync();updateRoyalLoop();
 })();

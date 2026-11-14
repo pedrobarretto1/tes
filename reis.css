@@ -89,3 +89,5 @@ html[data-theme^="relic-"]:not([data-theme="relic-throne"]) .boardframe>.board{
  .royal-architecture{filter:none}
 }
 @media(max-width:370px){.royal-shop-grid{grid-template-columns:minmax(0,1fr)}}
+
+html[data-visual-paused="1"] :is(.theme-ambient-particle,.theme-floating,.theme-mist){animation-play-state:paused!important}
