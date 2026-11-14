@@ -18,3 +18,5 @@ html[data-scene="relic"]{--scene-bg:#211a24;--scene-glow:#785032;--scene-accent:
 .journey-board .sq.target:after{box-shadow:0 0 0 3px #f5d58d50}
 .journey-board .sq.selected .piece{outline:2px solid #f9df9b;outline-offset:1px}
 .journey-card .club-head button{width:auto}
+
+.journey-playing #journeyboardmap{display:block;margin:8px auto;width:auto;font-size:12px}.journey-playing #journeyboardmap.hidden{display:none}.journey-playing #difficulty,.journey-playing #offlineclockfield{opacity:.65}.victory #journeyresultmap{margin-top:9px;width:100%}.journey-playing .focus-bar #focusmode{color:#e9c68b}
