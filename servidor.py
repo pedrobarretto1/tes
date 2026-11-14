@@ -50,8 +50,16 @@ def piano_sample(name):
         except (OSError,ValueError):return None
 
 
-# Persistent PostgreSQL when DATABASE_URL is configured; temporary SQLite otherwise.
-DATABASE_URL=os.environ.get('DATABASE_URL','')
+# PostgreSQL is mandatory on Render; SQLite is only for local development/tests.
+DATABASE_URL=os.environ.get('DATABASE_URL','').strip()
+if (os.environ.get('RENDER_SERVICE_ID') or os.environ.get('RENDER')=='true') and not DATABASE_URL:
+    raise RuntimeError('DATABASE_URL ausente: armazenamento temporario proibido em producao.')
+def database_provider():
+    if not DATABASE_URL:return 'sqlite-local'
+    from urllib.parse import urlsplit
+    try:host=(urlsplit(DATABASE_URL).hostname or '').lower()
+    except ValueError:host=''
+    return 'neon' if host.endswith('.neon.tech') else 'postgresql'
 if DATABASE_URL:
     try: import psycopg
     except ImportError:
@@ -1211,7 +1219,7 @@ class Handler(BaseHTTPRequestHandler):
             if name not in PIANO_FILES or not path.endswith('.mp3'):return self.reply(404,{'error':'Amostra inexistente.'})
             data=piano_sample(name)
             return self.reply(200,data,'audio/mpeg') if data else self.reply(503,{'error':'Piano indisponível temporariamente.'})
-        elif self.path == '/api/health': self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL)})
+        elif self.path == '/api/health': self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL),'databaseProvider':database_provider()})
         elif self.path == '/api/ranking':
             try:
                 with database() as db:
@@ -1312,6 +1320,7 @@ if __name__=='__main__':
     from selftest import run
     run(sys.modules[__name__])
     setup()
+    print('DATABASE READY: '+database_provider(),flush=True)
     port=int(os.environ.get('PORT','8765'))
     print(f'Casa de Damas: http://localhost:{port} (Ctrl+C para encerrar)',flush=True)
     ThreadingHTTPServer(('0.0.0.0',port),Handler).serve_forever()
