@@ -684,7 +684,7 @@ def live_action(path,d,pid,now):
         if r and r.get('public') and len(r['tokens'])==2 and now-max(r['seen'].values())<90:
             SPECTATORS[pid]=(code,now);snap=room_snapshot(r,1,now);moves=snap.get('moves',[])
             last=[moves[-1]['from'],*moves[-1]['path']] if moves else []
-            public_moves=[dict(m,sequence=i+1) for i,m in enumerate(moves)][-24:]
+            public_moves=live_moves([dict(m,sequence=i+1) for i,m in enumerate(moves)][-24:],board_size(r['rule']),r['sequence']) or []
             return 200,dict(code=code,mode='online',matchId=r['match'],board=snap['board'],names=snap['names'],turn=snap['turn'],rule=r['rule'],sequence=r['sequence'],last=last,moves=public_moves,remaining=r['remaining'],minutes=r.get('minutes',0),result=r['winner'],closed=r['closed'],viewers=sum(v[0]==code for v in SPECTATORS.values()))
         for owner,v in LOCAL_LIVE.items():
             if v['code']==code and not active_room(owner,now):

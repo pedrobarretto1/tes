@@ -232,11 +232,19 @@ def run(s):
             move=s.legal(payload['board'],1,'official')[0];payload.update(board=s.journey_apply(payload['board'],move),sequence=1,turn=-1,last=[move['from'],*move['path']])
             assert call('live/publish',broadcaster,**payload)['code']==code
             assert call('live/watch',viewer,code=code)['sequence']==1
+            published=dict(move,sequence=1,side=1,promotion=False,private='never expose')
+            payload['moves']=[published]
+            assert call('live/publish',broadcaster,**payload)['code']==code
+            watched=call('live/watch',viewer,code=code)
+            assert watched['moves']==[dict(move,sequence=1,side=1,promotion=False)] and watched['matchId']==code
+            status,_=s.social_action('/api/social/live/publish',dict(broadcaster,**{**payload,'moves':[dict(published,sequence=2)]}),1000);assert status==400
+            assert s.live_moves([dict(published,**{'from':64})],8,1) is None
+            assert s.live_moves([dict(published,sequence=1),dict(published,sequence=3)],8,3) is None
             payload['result']=1;call('live/publish',broadcaster,**payload)
             assert call('live/watch',viewer,code=code)['result']==1
             assert not any(r['code']==code for r in call('live/list',viewer)['rooms'])
             for mode in ('local','journey'):
-                payload.update(mode=mode,match=mode,board=s.initial_for('official'),sequence=0,turn=1,last=[],result=None)
+                payload.update(mode=mode,match=mode,board=s.initial_for('official'),sequence=0,turn=1,last=[],moves=[],result=None)
                 code=call('live/publish',broadcaster,**payload)['code']
                 assert call('live/watch',viewer,code=code)['mode']==mode
             call('live/stop',broadcaster)
