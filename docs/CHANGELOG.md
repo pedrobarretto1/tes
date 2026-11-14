@@ -5,6 +5,21 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Planejamento dos Clãs e torneios financiados
+- Pedido: clãs com requisitos opcionais, pedidos exclusivos ao dono, convites,
+  chat, nível médio e torneios de membros com PH/moedas/skins de prêmio.
+- docs/CLAS_PLANO.md: especificação, fluxos, autorização, nível por feitos,
+  requisitos AND, revalidação, cofre, catálogo, cancelamento, idempotência,
+  persistência e testes. AGENTS.md aponta para o plano.
+- Fragilidades verificadas: players.points é ranking e saldo (visitantes
+  iniciam com 1000 PH); TOURNAMENTS está em memória; não há nível numérico
+  canônico. Proposta: nível derivado; moedas/skins com reserva transacional;
+  PH direto somente após decisão de separar economia e ranking.
+- Limites, fórmula XP e regras de torneio são propostas, não aprovados.
+  Nenhuma alteração em código jogável, banco ou deploy; testes não aplicáveis.
+- Próximo: implementar núcleo social em branch, testar; persistir torneios
+  e partidas antes de reservar valores. Registrar cada correção e publicação.
+
 ## 14/11/2026 — Reinício visual do tabuleiro após resultado da Torre
 - Pedido: reiniciar a mesa após vitória, derrota, empate e desistência em ambos
   os modos. Causa: render() exibia game.board do duelo encerrado, ainda mantido
