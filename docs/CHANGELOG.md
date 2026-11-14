@@ -5,6 +5,26 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Notificações interativas de desafio e amizade
+- Pedido: aceitar/recusar direto no aviso, X e duração conforme o tipo.
+- clube.js: pendingRequests, requestActions, snack, syncRequestSnacks e
+  renderNotices unificam convites e amizade; desafios aceitos abrem seleção
+  de modalidade existente, sem criar sala até confirmar. Recusar chama API
+  existente. Central de avisos permite responder a pedidos pendentes.
+- X e expiração apenas ocultam o cartão, não recusam nem marcam como lido;
+  30 s para pedidos, 10 s para respostas informativas, 7 s presença.
+  Deduplicação durante polling, limpeza ao trocar perfil e ao resolver,
+  proteção contra ações simultâneas; convite ainda expira em 60 s no servidor.
+- index.html remove toast antigo; cache clube.js v68, clube.css v64;
+  CSS de ações, status, responsividade e redução de movimento.
+- Testes: sintaxe JS e simulação de dois cartões, timers 30/10/7 s,
+  deduplicação, aceite de desafio sem API, recusa de amizade, X e timeout
+  sem recusa; todos aprovados. Sem teste visual em navegadores reais.
+- Commits 7116bc50, 90ade956, 4e834a98, e8d524b8. Publicação a confirmar.
+- Banco não modificado: exclusão do perfil visitante solicitado depende de
+  confirmação explícita após identificar o registro. Não registrar dados pessoais.
+- Rollback: reverter commits da UI; sem alteração no protocolo ou na Torre.
+
 ## 14/11/2026 — Castelo 1–25: catálogo e mapa da campanha
 - Pedido: continuar a Torre e corrigir mapa antigo de 10 níveis.
 - torre.py: catálogo v2, 4 reinos de 25, 25 inimigos do Castelo, classes,
