@@ -5,6 +5,21 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Proposta de desempate nos torneios de clãs
+- Pedido: definir empate inicial/final e consequência para quem propõe/aceita.
+- docs/CLAS_PLANO.md: empate não elimina; revanche com cores invertidas;
+  par de rápidas, placar 1/0,5/0 e sessão final com prazo. Proposta de
+  co-campeões e divisão da reserva na final; skin convertida em moedas
+  pelo preço reservado; impasse anterior à final sem vencedor implica
+  cancelamento objetivo e devolução, nunca sorteio. PH segue pendente.
+- Verificação: event_tick atual cria nova sala a cada empate, sem limite
+  explícito; não alterar torneios oficiais nesta etapa. Novo fluxo deverá
+  persistir estado e liquidar reserva uma única vez.
+- Decisões propostas, ainda sem aprovação final. Apenas documentação;
+  sem código, banco, deploy ou testes de execução.
+- Commit plano 2139a8099752562062f44a65e0c17ffa792c421a. Próximo: confirmar política e
+  implementar torneios persistidos com testes de empate e reserva.
+
 ## 14/11/2026 — Planejamento dos Clãs e torneios financiados
 - Pedido: clãs com requisitos opcionais, pedidos exclusivos ao dono, convites,
   chat, nível médio e torneios de membros com PH/moedas/skins de prêmio.
