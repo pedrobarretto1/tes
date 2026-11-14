@@ -174,3 +174,13 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 .clan-jerusalem-cross{display:block;width:1em;height:1em;fill:currentColor;overflow:visible}
 
 #clanoverlay .clan-foundation-preview .clan-crest{width:136px;height:159px;font-size:76px;margin:18px 0 14px} @media(max-width:650px){#clanoverlay .clan-foundation-preview .clan-crest{width:100px;height:117px;font-size:56px}}
+
+/* Keep the header and scroll content inside the heraldic outer frame. */
+#clanoverlay{box-sizing:border-box;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr);overflow:hidden}
+#clanoverlay .clan-shell{display:flex;flex-direction:column;min-height:0;max-height:100%;overflow:hidden;padding:clamp(15px,2.5vw,28px);isolation:isolate}
+#clanoverlay .clan-shell>.club-head{position:relative;flex:0 0 auto;min-width:0;z-index:2;margin:0;padding:0 0 13px;align-items:center}
+#clanoverlay .clan-shell>.club-head>div{min-width:0;overflow-wrap:anywhere}
+#clanoverlay .clan-shell>.club-head .eyebrow{line-height:1.4;margin:0 0 3px}
+#clanoverlay .clan-scroll{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#8e744d #202426;padding:0 3px 4px 0;scroll-padding-top:10px}
+#clanoverlay .clan-foundation-preview{top:8px}
+@media(max-width:650px){#clanoverlay .clan-foundation-preview{top:auto}}
