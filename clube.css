@@ -177,3 +177,6 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 #clanoverlay .clan-crest-admin-preview .clan-crest{width:82px;height:94px;font-size:46px}
 #clanoverlay .clan-crest-admin-preview h3{overflow-wrap:anywhere;min-width:0;color:#ecd4a6}
 @media(max-width:420px){#clanoverlay .crest-editor{grid-template-columns:minmax(0,1fr)}#clanoverlay .crest-swatches{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}#clanoverlay .crest-swatch{height:30px}}
+
+/* Jerusalem cross: scalable vector, independent of font support. */
+.clan-jerusalem-cross{display:block;width:1em;height:1em;fill:currentColor;overflow:visible}

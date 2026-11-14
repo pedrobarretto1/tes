@@ -109,4 +109,14 @@ class ClanTest(unittest.TestCase):
         self.assertEqual(self.call('owner','dissolve')[0],200)
         with s.database() as db:
             self.assertIsNone(s.sql(db,'SELECT 1 FROM clan_crests WHERE clan_id=?',(cid,)).fetchone())
+    def test_jerusalem_crest(self):
+        design=dict(symbol='jerusalem',symbol_color='crimson',frame_style='sacred',frame_color='gold',background_color='ivory')
+        code,d=self.call('owner','create',name='Ordem Real',tag='REAL',crest=design)
+        self.assertEqual(code,200,d)
+        self.assertEqual(d['mine']['crest'],design)
+        self.assertEqual(d['mine']['emblem'],'jerusalem')
+        self.assertEqual(self.call('alice','state')[1]['clans'][0]['crest'],design)
+        changed={**design,'symbol_color':'obsidian','frame_style':'dark'}
+        self.assertEqual(self.call('owner','crest',crest=changed)[0],200)
+        self.assertEqual(self.call('owner','state')[1]['mine']['crest'],changed)
 if __name__=='__main__':unittest.main()

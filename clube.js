@@ -152,7 +152,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!E('challengecho
 /* Clan social beta: persistent server state, no client-side membership authority. */
 let clanData=null,clanTab='browse',clanBusy=false,clanQuery='',clanOffset=0,clanEpoch=0,clanChatBusy=false,clanChatKey='',clanChatSerial=0;
 const clanFields=[['points','PH mínimo'],['wins','Vitórias mínimas'],['losses','Derrotas mínimas'],['rate','Taxa de vitória (%)'],['level','Nível mínimo'],['max_losses','Derrotas máximas'],['games','Partidas mínimas']];
-const clanEmblems={shield:'⛨',crown:'♛',knight:'♞',rook:'♜',star:'★',moon:'☾'},clanEmblemNames={shield:'Escudo',crown:'Coroa',knight:'Cavaleiro',rook:'Fortaleza',star:'Estrela',moon:'Lua'};
+const clanEmblems={shield:'⛨',crown:'♛',knight:'♞',rook:'♜',star:'★',moon:'☾',jerusalem:'☩'},clanEmblemNames={shield:'Escudo',crown:'Coroa',knight:'Cavaleiro',rook:'Fortaleza',star:'Estrela',moon:'Lua',jerusalem:'Cruz de Jerusalém'};
 const clanStats=p=>p.name+' · Nv. '+p.level+' · '+p.points+' PH · '+p.wins+' V / '+p.losses+' D / '+p.draws+' E · '+(p.rate==null?'Sem taxa':p.rate.toFixed(1)+'% vitórias');
 const clanChecks=checks=>checks.length?checks.map(c=>(c.ok?'✓ ':'✕ ')+c.label+': '+(c.actual==null?'—':Number.isInteger(c.actual)?c.actual:c.actual.toFixed(1))+' / '+c.required).join(' · '):'Sem requisitos';
 function clanVisible(){return !E('clanoverlay').classList.contains('hidden')}
@@ -168,7 +168,19 @@ const crestColors={gold:['Ouro','#d8b875'],silver:['Prata','#c8d5de'],bronze:['B
 const crestStyles={royal:'Real',fortress:'Militar',dark:'Sombria',sacred:'Sagrada',ancient:'Antiga',ornate:'Mística'};
 function crestDefault(emblem='shield'){return {symbol:emblem,symbol_color:'gold',frame_style:'royal',frame_color:'gold',background_color:({crown:'bronze',knight:'wine',star:'sapphire',moon:'sapphire'})[emblem]||'steel'}}
 function crestDesign(value){let d=typeof value==='string'?crestDefault(value):{...crestDefault(value?.symbol),...value};return {symbol:clanEmblems[d.symbol]?d.symbol:'shield',symbol_color:crestColors[d.symbol_color]?d.symbol_color:'gold',frame_style:crestStyles[d.frame_style]?d.frame_style:'royal',frame_color:crestColors[d.frame_color]?d.frame_color:'gold',background_color:crestColors[d.background_color]?d.background_color:'steel'}}
-function paintCrest(shield,value){let d=crestDesign(value);shield.dataset.emblem=d.symbol;shield.dataset.frame=d.frame_style;shield.dataset.symbolColor=d.symbol_color;shield.dataset.frameColor=d.frame_color;shield.dataset.backgroundColor=d.background_color;shield.style.setProperty('--crest-symbol',crestColors[d.symbol_color][1]);shield.style.setProperty('--crest-frame',crestColors[d.frame_color][1]);shield.style.setProperty('--crest-bg',crestColors[d.background_color][1]);shield.children[0].textContent=clanEmblems[d.symbol];shield.children[1].textContent=d.frame_style==='ornate'?'✦':d.frame_style==='sacred'?'✧':d.frame_style==='ancient'?'◆':d.frame_style==='fortress'?'▪':d.frame_style==='dark'?'◈':'♢'}
+function paintCrestSymbol(glyph,symbol){
+ glyph.replaceChildren();
+ if(symbol!=='jerusalem'){glyph.textContent=clanEmblems[symbol];return}
+ // Exact five-cross silhouette, drawn in SVG so all palette colors work.
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
+ svg.setAttribute('viewBox','0 0 448 448');svg.setAttribute('class','clan-jerusalem-cross');svg.setAttribute('aria-hidden','true');svg.setAttribute('fill','currentColor');
+ const path=document.createElementNS(ns,'path');
+ path.setAttribute('d','M156 16H291V44H247V200H403V156H431V291H403V247H247V403H291V431H156V403H200V247H44V291H16V156H44V200H200V44H156Z');svg.append(path);
+ for(const [x,y] of [[76,76],[280,76],[76,280],[280,280]]){
+  const cross=document.createElementNS(ns,'path');cross.setAttribute('d','M32 0H59V32H92V59H59V92H32V59H0V32H32Z');cross.setAttribute('transform','translate('+x+' '+y+')');svg.append(cross);
+ }glyph.append(svg)
+}
+function paintCrest(shield,value){let d=crestDesign(value);shield.dataset.emblem=d.symbol;shield.dataset.frame=d.frame_style;shield.dataset.symbolColor=d.symbol_color;shield.dataset.frameColor=d.frame_color;shield.dataset.backgroundColor=d.background_color;shield.style.setProperty('--crest-symbol',crestColors[d.symbol_color][1]);shield.style.setProperty('--crest-frame',crestColors[d.frame_color][1]);shield.style.setProperty('--crest-bg',crestColors[d.background_color][1]);paintCrestSymbol(shield.children[0],d.symbol);shield.children[1].textContent=d.frame_style==='ornate'?'✦':d.frame_style==='sacred'?'✧':d.frame_style==='ancient'?'◆':d.frame_style==='fortress'?'▪':d.frame_style==='dark'?'◈':'♢'}
 function clanCrest(value='shield'){let shield=node('span','clan-crest'),glyph=node('span','clan-crest-glyph'),ornament=node('span','clan-crest-ornament');shield.setAttribute('aria-hidden','true');shield.append(glyph,ornament);paintCrest(shield,value);return shield}
 function crestControls(parent,value,onChange){
  let design=crestDesign(value),grid=node('div','crest-editor'),controls={};
