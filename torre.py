@@ -75,13 +75,36 @@ def encounter(floor):
     kind = "boss" if local == 25 else "preboss" if local == 24 else "elite" if local % 5 == 0 else "normal"
     detail = CASTLE[local - 1] if d["id"] == "castle" else CRYPT_BETA[local - 1] if d["id"] == "crypt" and local <= 5 else (d["final_boss"] if kind == "boss" else "Guardião do andar " + str(floor), None, "Em desenvolvimento")
     name, difficulty, style = detail
-    tier = 0 if difficulty is None or difficulty < 2 else 1 if difficulty < 3 else 2 if difficulty < 4 else 3
-    if kind == "elite": tier = min(3, tier + 1)
+    tier = ai_balance(floor)["tier"]
     return {"floor": floor, "id": f'{d["id"]}-{local:02d}', "name": name, "kind": kind,
             "difficulty": difficulty, "style": style, "stage": stage,
             "chapter": CHAPTERS[d["id"]][stage-1], "tier": tier,
             "released": floor <= RELEASE_MAX_FLOOR, "fixed": kind != "normal",
             "checkpoint_after": local in (10, 20, 25)}
+
+# Tower-only balance. Chance of using the strong search, not a win rate.
+# Deliberately keep the first four floors below the Journey's lowest profile.
+BALANCE_VERSION = 1
+TOWER_SEARCH_CHANCE = (
+    0, .02, .04, .07, .12, .09, .13, .16, .20, .27,
+    .22, .26, .30, .34, .43, .37, .41, .45, .49, .60,
+    .52, .57, .62, .68, .78, .64, .68, .72, .76, .83,
+)
+
+def ai_balance(floor, route="guardian"):
+    base = TOWER_SEARCH_CHANCE[min(max(floor, 1), len(TOWER_SEARCH_CHANCE))-1]
+    # First floor is a genuine beginner encounter regardless of route.
+    # Route modifiers remain modest and never replace the progression.
+    bonus = .10 if route == "executioner" else .04 if route == "unknown" else 0
+    chance = 0 if floor == 1 else min(.95, base + bonus * min(1, (floor-1)/5))
+    tier = 0 if floor <= 14 else 1 if floor <= 22 else 2 if floor <= 29 else 3
+    if route == "executioner" and floor >= 16 and floor not in (20,24,25,30):
+        tier = min(3, tier + 1)
+    # Early weaker moves actively leave tactical opportunities; later moves
+    # increasingly favor material, advancement and safety.
+    weakness = max(0., 1 - (floor-1)/24)
+    return {"version": BALANCE_VERSION, "chance": chance, "tier": tier,
+            "weakness": weakness, "label": "Muito fácil" if floor<=4 else "Fácil" if floor<=9 else "Fácil a moderada" if floor<=14 else "Moderada" if floor<=19 else "Desafiadora" if floor<=24 else "Chefe / avançada"}
 
 @dataclass(frozen=True)
 class Run:
