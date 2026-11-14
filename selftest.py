@@ -442,6 +442,14 @@ def run(s):
             before=call('school/state',hero)['coins']
             unchanged=call('journey/state',hero);assert unchanged['completed']==3 and unchanged['run']['outcome']=='draw'
             assert call('school/state',hero)['coins']==before
+            # A real final quiet move with two kings against one draws, not wins.
+            drawn_run=dict(id='last-quiet',version=2,chapter=3,board=lead[:],sequence=39,quiet=0,repeats={},outcome=None,last=[],moves=[],reward=0)
+            drawn_run['endgame']=dict(**s.journey_endgame(lead),start=30,remaining=1)
+            with s.database() as db:s.sql(db,'UPDATE journey SET payload=? WHERE player_id=?',(json.dumps(drawn_run),hero_id))
+            quiet_move=next(m for m in s.legal(lead,1,'official') if not m['cap'])
+            drawn=call('journey/move',hero,id='last-quiet',sequence=39,move=quiet_move)
+            assert drawn['run']['outcome']=='draw' and drawn['run']['reason']=='endgame' and drawn['completed']==3
+            assert call('school/state',hero)['coins']==before
             # Real server move at the last half-move: a capture wins before the draw.
             win_board=[0]*64;win_board[42]=2;win_board[35]=-2
             last_run=dict(id='last-capture',version=2,chapter=3,board=win_board,sequence=33,quiet=0,repeats={},outcome=None,last=[],moves=[],reward=0)
