@@ -84,6 +84,9 @@ def role(db,sql,c,pid):
     if c['owner']==pid:return 'king'
     r=sql(db,'SELECT role FROM clan_roles WHERE player_id=?',(pid,)).fetchone()
     return r[0] if r else 'member'
+def public_identity(db,sql,pid):
+    r=sql(db,"SELECT c.id,c.name,c.tag,CASE WHEN c.owner=m.player_id THEN 'king' ELSE COALESCE(r.role,'member') END FROM clan_members m JOIN clans c ON c.id=m.clan_id LEFT JOIN clan_roles r ON r.player_id=m.player_id WHERE m.player_id=?",(pid,)).fetchone()
+    return dict(zip(('id','name','tag','role'),r)) if r else None
 def tournament_block(db,sql,cid,pid,now=None):
     """Mandatory guard for future internal tournament create/join/play APIs."""
     now=time.time() if now is None else now
@@ -131,7 +134,7 @@ def notices(db,sql,pid):
     result=[]
     for rid,kind,target,cid,created,name,owner in rows:
         p=stats(db,sql,target);c=clan(db,sql,cid)
-        if p and c:result.append(dict(id=rid,kind=kind,clan_id=cid,clan_name=name,crest=c['crest'],profile=p,checks=check(p,c['requirements']),created_at=created))
+        if p and c:result.append(dict(id=rid,kind=kind,clan_id=cid,clan_name=name,crest=c['crest'],royal=kind=='invite',profile=p,checks=check(p,c['requirements']),created_at=created))
     return result
 def account(db,sql,pid):
     return bool(sql(db,'SELECT 1 FROM accounts WHERE player_id=?',(pid,)).fetchone())
@@ -177,7 +180,7 @@ def action(s,path,d,pid):
             if not p or not account(db,sql,target):return err('O jogador precisa de uma conta registrada.')
             if member(db,sql,target):return err('O jogador já pertence a um clã.',409)
             if len(members(db,sql,c['id']))>=LIMIT:return err('Clã lotado.',409)
-            if not all(x['ok'] for x in check(p,c['requirements'])):return err('O jogador não cumpre os requisitos.',409)
+            if op=='apply' and not all(x['ok'] for x in check(p,c['requirements'])):return err('O jogador não cumpre os requisitos.',409)
             old=sql(db,"SELECT status,updated_at FROM clan_requests WHERE clan_id=? AND player_id=? ORDER BY updated_at DESC LIMIT 1",(c['id'],target)).fetchone()
             if old and old[0]=='pending':return err('Já existe um pedido pendente.',409)
             if old and old[0]=='declined' and now-old[1]<300:return err('Aguarde cinco minutos após uma recusa.',409)
@@ -191,7 +194,7 @@ def action(s,path,d,pid):
             if type(d.get('accept')) is not bool:return err('Resposta inválida.')
             if d['accept']:
                 p=stats(db,sql,target)
-                if not p or not account(db,sql,target) or member(db,sql,target) or len(members(db,sql,c['id']))>=LIMIT or not all(x['ok'] for x in check(p,c['requirements'])):return err('O candidato não atende mais aos requisitos ou não há vaga.',409)
+                if not p or not account(db,sql,target) or member(db,sql,target) or len(members(db,sql,c['id']))>=LIMIT or (r[2]=='apply' and not all(x['ok'] for x in check(p,c['requirements']))):return err('O candidato não atende mais aos requisitos ou não há vaga.',409)
                 sql(db,'INSERT INTO clan_members VALUES(?,?,?)',(target,c['id'],now))
                 sql(db,"UPDATE clan_requests SET status='closed',updated_at=? WHERE player_id=? AND status='pending' AND id<>?",(now,target,d['id']))
             sql(db,'UPDATE clan_requests SET status=?,updated_at=? WHERE id=?',('accepted' if d['accept'] else 'declined',now,d['id']))
@@ -301,7 +304,7 @@ def action(s,path,d,pid):
                 if not 1<=len(body)<=500:return err('Mensagem deve ter de 1 a 500 caracteres.')
                 if sql(db,'SELECT COUNT(*) FROM clan_messages WHERE author=? AND created_at>?',(pid,now-10)).fetchone()[0]>=5:return err('Envie mensagens mais devagar.',429)
                 sql(db,'INSERT INTO clan_messages VALUES(?,?,?,?,?)',(secrets.token_hex(12),cid,pid,body,now))
-            rows=sql(db,'SELECT m.id,m.author,p.name,m.body,m.created_at FROM clan_messages m JOIN players p ON p.id=m.author WHERE m.clan_id=? ORDER BY m.created_at DESC,m.id DESC LIMIT 50',(cid,)).fetchall()
-            return 200,{'clan':cid,'messages':[dict(zip(('id','author','name','body','created_at'),r)) for r in reversed(rows)]}
+            rows=sql(db,'SELECT m.id,m.author,p.name,m.body,m.created_at,CASE WHEN cm.player_id IS NULL THEN NULL WHEN c.owner=m.author THEN 'king' ELSE COALESCE(cr.role,'member') END FROM clan_messages m JOIN players p ON p.id=m.author JOIN clans c ON c.id=m.clan_id LEFT JOIN clan_members cm ON cm.player_id=m.author AND cm.clan_id=m.clan_id LEFT JOIN clan_roles cr ON cr.player_id=cm.player_id WHERE m.clan_id=? ORDER BY m.created_at DESC,m.id DESC LIMIT 50',(cid,)).fetchall()
+            return 200,{'clan':cid,'messages':[dict(zip(('id','author','name','body','created_at','role'),r)) for r in reversed(rows)]}
         else:return err('Ação desconhecida.',404)
         return 200,state(db,sql,pid)
