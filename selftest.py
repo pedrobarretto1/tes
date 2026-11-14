@@ -405,6 +405,20 @@ def run(s):
             first=call('journey/move',hero,id=start['id'],sequence=0,move=start['legal'][0])['run']
             assert first['sequence']==2 and len(first['moves'])==2 and first['outcome'] is None
             assert call('journey/start',hero,chapter=0)['run']['board']==first['board']
+            # Stronger engine: legal replies, tactical horizon and tier budgets.
+            assert [x['depth'] for x in s.JOURNEY]==[3,5,7,9,11]
+            assert all(s.JOURNEY_BUDGETS[i][0]<s.JOURNEY_BUDGETS[i+1][0] for i in range(4))
+            trap=[0]*64
+            for i,p in ((24,1),(40,1),(42,-1),(51,-1)):trap[i]=p
+            original=trap[:];stats={}
+            choice=s.journey_ai(trap,2,stats=stats)
+            assert choice in s.legal(trap,-1,'official') and trap==original and stats['depth']>=1
+            assert not any(m['cap'] for m in s.legal(s.journey_apply(trap,choice),1,'official'))
+            for level,path in ((0,None),(4,None),(4,'shadow'),(4,'divine'),(4,'infinite')):
+                stats={};board=s.initial_for('official');m=s.journey_ai(board,level,path,stats=stats)
+                assert m in s.legal(board,-1,'official') and stats['depth']>=1
+                assert stats['maxDepth']==(12 if path else s.JOURNEY[level]['depth'])
+            print('JOURNEY AI OK: legal moves, tactical trap, five budgets and three legendary paths',flush=True)
             # Test fixture only: complete a near-terminal traditional game.
             board=[0]*64;board[42]=1;board[35]=-1
             start=dict(id='test-first',version=2,chapter=0,board=board,sequence=0,quiet=0,repeats={s.position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)

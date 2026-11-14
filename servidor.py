@@ -768,11 +768,11 @@ def event_action(path,d,pid,now):
 # Journey of the Master. All positions, legal moves, opponent turns and rewards
 # are authoritative on the server. One saved run per profile; no ranked PH.
 JOURNEY=[
- dict(name='O Aprendiz',hall='I · A Primeira Mesa',theme='classic',depth=1,quote='Cada grande mestre começou com um primeiro salto.',description='Partida completa contra um adversário iniciante.'),
- dict(name='O Estrategista',hall='II · O Salão Antigo',theme='imperial',depth=2,quote='A paciência vale mais que a pressa.',description='Partida completa contra um adversário que valoriza a posição.'),
- dict(name='O Guardião',hall='III · A Cripta',theme='midnight-crypt',depth=3,quote='Nem toda armadilha está à vista.',description='Partida completa contra um adversário que calcula armadilhas.'),
- dict(name='O Mestre Imperial',hall='IV · O Palácio',theme='champion-legacy',depth=4,quote='O trono exige mais do que coragem.',description='Uma partida completa contra um adversário mais forte.'),
- dict(name='O Último Rei',hall='V · O Trono',theme='relic-throne',depth=5,quote='Que a última pedra revele quem merece a coroa.',description='O duelo final. Vença para conquistar a relíquia lendária.')]
+ dict(name='O Aprendiz',hall='I · A Primeira Mesa',theme='classic',depth=7,quote='Cada grande mestre começou com um primeiro salto.',description='Partida completa: fundamentos, defesa e capturas calculadas.'),
+ dict(name='O Estrategista',hall='II · O Salão Antigo',theme='imperial',depth=11,quote='A paciência vale mais que a pressa.',description='Controle do centro, proteção das peças e antecipação de trocas.'),
+ dict(name='O Guardião',hall='III · A Cripta',theme='midnight-crypt',depth=3,quote='Nem toda armadilha está à vista.',description='Armadilhas, sequências de captura e contra-ataques.'),
+ dict(name='O Mestre Imperial',hall='IV · O Palácio',theme='champion-legacy',depth=9,quote='O trono exige mais do que coragem.',description='Busca profunda, defesa ativa e domínio dos finais.'),
+ dict(name='O Último Rei',hall='V · O Trono',theme='relic-throne',depth=5,quote='Que a última pedra revele quem merece a coroa.',description='O desafio supremo: busca profunda e finais precisos. Vença para conquistar a relíquia.')]
 def journey_board(chapter):
     return initial_for('official')
 def journey_apply(b,m):
@@ -780,45 +780,114 @@ def journey_apply(b,m):
     for v in m['cap']:x[v]=0
     x[to]=p*2 if abs(p)==1 and to//8==(0 if p>0 else 7) else p
     return x
-def journey_ai(b,chapter,path=None):
+# Increasing search budgets; all moves still come from the official legal generator.
+JOURNEY_BUDGETS=((.12,5000),(.23,14000),(.38,28000),(.60,48000),(.85,75000))
+JOURNEY_NEIGHBORS=tuple(tuple((i//8+dr)*8+i%8+dc for dr,dc in DIR if 0<=i//8+dr<8 and 0<=i%8+dc<8) for i in range(64))
+JOURNEY_CENTER=tuple(min(i//8,7-i//8,i%8,7-i%8) for i in range(64))
+
+def journey_ai(b,chapter,path=None,run=None,stats=None):
     moves=legal(b,-1,'official')
     if not moves:return None
-    deadline=time.monotonic()+.12;nodes=0;best=moves[0]
+    limit,nlimit=JOURNEY_BUDGETS[chapter]
+    maxdepth=JOURNEY[chapter]['depth']
+    if path in ROYAL_PATHS:maxdepth=12;limit=.95;nlimit=90000
+    deadline=time.monotonic()+limit;nodes=0;best=moves[0];finished=0
+    tt={};move_cache={};history={};killers={}
+    MATE=100000;INF=200000
+    def getmoves(x,side):
+        k=(tuple(x),side)
+        if k not in move_cache:
+            ms=legal(x,side,'official')
+            if len(move_cache)<18000:move_cache[k]=ms
+            return ms
+        return move_cache[k]
     def evaluate(x,side):
-        value=0
+        count=sum(bool(p) for p in x);value=0
         for i,p in enumerate(x):
-            if p:
-                sign=1 if p>0 else -1;r,c=divmod(i,8)
-                v=330 if abs(p)==2 else 100+5*(7-r if sign==1 else r)
-                v+=3*min(r,7-r,c,7-c)
-                if chapter==1 and abs(p)==1 and r==(7 if sign==1 else 0):v+=12
-                if path=='shadow':v+=7*min(r,7-r,c,7-c)+ (9*(7-r if sign==1 else r) if abs(p)==1 else 0)
-                elif path=='divine':v+=12 if abs(p)==1 and r==(7 if sign==1 else 0) else 0
-                elif path=='infinite':v+=24 if abs(p)==2 else 3*(7-r if sign==1 else r)
-                value+=sign*side*v
+            if not p:continue
+            sign=1 if p>0 else -1;r=i//8;advance=7-r if sign==1 else r
+            near=JOURNEY_NEIGHBORS[i];center=JOURNEY_CENTER[i]
+            if abs(p)==2:
+                v=320+5*center+2*sum(x[j]==0 for j in near)
+                if i//8+i%8==7:v+=6
+            else:
+                v=100+5*advance+4*center
+                if count>12 and advance==0:v+=12
+                v+=4*sum(x[j]*p>0 for j in near)
+                v+=2*sum(x[j]==0 and (j//8-r)==-sign for j in near)
+                if advance>=5:v+=10*(advance-4)
+            # Small stylistic preferences; material and tactics dominate.
+            if path=='shadow':v+=3*center+(5*advance if abs(p)==1 else 0)
+            elif path=='divine':v+=5*sum(x[j]*p>0 for j in near)
+            elif path=='infinite':v+=14 if abs(p)==2 else 2*advance
+            value+=sign*side*v
         return value
-    def search(x,side,depth,alpha,beta,ply):
+    def sig(m):return (m['from'],tuple(m['path']),tuple(m['cap']))
+    def order(x,ms,side,ply,preferred=None):
+        def score(m):
+            k=sig(m);to=m['path'][-1];p=x[m['from']]
+            return (1000000 if k==preferred else 0)+(10000 if k==killers.get(ply) else 0)+sum(1000 if abs(x[j])==2 else 350 for j in m['cap'])+(250 if abs(p)==1 and to//8==(0 if side==1 else 7) else 0)+history.get((side,k),0)+5*JOURNEY_CENTER[to]
+        return sorted(ms,key=score,reverse=True)
+    def search(x,side,depth,alpha,beta,ply,qleft=5):
         nonlocal nodes
         nodes+=1
-        if nodes>6500 or time.monotonic()>deadline:raise TimeoutError
-        ms=legal(x,side,'official')
-        if not ms:return -100000+ply
-        if depth==0:return evaluate(x,side)
-        value=-1000000
-        for m in sorted(ms,key=lambda m:-len(m['cap'])):
-            value=max(value,-search(journey_apply(x,m),-side,depth-1,-beta,-alpha,ply+1))
+        if nodes>nlimit or time.monotonic()>deadline:raise TimeoutError
+        ms=getmoves(x,side)
+        if not ms:return -MATE+ply
+        # Extend compulsory captures at the horizon, not arbitrary quiet moves.
+        if depth<=0 and (not ms[0]['cap'] or qleft<=0):return evaluate(x,side)
+        k=(tuple(x),side,ply);entry=tt.get(k) if depth>0 else None
+        original_alpha=alpha;original_beta=beta
+        if entry and entry[0]>=depth:
+            _,v,flag,_=entry
+            if flag=='exact':return v
+            if flag=='lower':alpha=max(alpha,v)
+            if flag=='upper':beta=min(beta,v)
+            if alpha>=beta:return v
+        value=-INF;choice=None
+        for m in order(x,ms,side,ply,entry[3] if entry else None):
+            v=-search(journey_apply(x,m),-side,depth-1,-beta,-alpha,ply+1,qleft-(depth<=0))
+            if v>value:value=v;choice=sig(m)
             alpha=max(alpha,value)
-            if alpha>=beta:break
+            if alpha>=beta:
+                if not m['cap']:
+                    killers[ply]=sig(m);hk=(side,sig(m));history[hk]=min(3000,history.get(hk,0)+max(1,depth)**2)
+                break
+        if depth>0 and len(tt)<24000:
+            flag='upper' if value<=original_alpha else 'lower' if value>=original_beta else 'exact'
+            # A narrowed TT window can also produce a bound, never an exact value.
+            if entry and entry[0]>=depth and entry[2]=='upper' and value>=entry[1] and flag=='exact':flag='lower'
+            if entry and entry[0]>=depth and entry[2]=='lower' and value<=entry[1] and flag=='exact':flag='upper'
+            tt[k]=(depth,value,flag,choice)
         return value
-    for depth in range(1,JOURNEY[chapter]['depth']+1):
+    # Exact draw adjudication for the imminent move; search itself is bounded
+    # and does not claim to solve every future draw history.
+    def root_context(x,m):
+        if not run:return False,0
+        key=position_key(x,1,'official');seen=run['repeats'].get(key,0)
+        child=dict(run,board=x,sequence=run['sequence']+1,quiet=run['quiet']+1 if not m['cap'] and abs(b[m['from']])==2 else 0,repeats=dict(run['repeats']))
+        child['repeats'][key]=seen+1
+        draw=bool(getmoves(x,1)) and bool(journey_draw_reason(child,key))
+        # Avoid gratuitous loops when ahead; defend a draw when behind.
+        bias=0
+        if seen:
+            strength=evaluate(b,-1)
+            bias=(-12 if strength>35 else 8 if strength<-35 else -3)*min(2,seen)
+        return draw,bias
+    contexts={sig(m):root_context(journey_apply(b,m),m) for m in moves}
+    for depth in range(1,maxdepth+1):
         try:
-            value=-1000000;choice=best
-            for m in moves:
-                score=-search(journey_apply(b,m),1,depth-1,-1000000,-value,1)
+            value=-INF;choice=best
+            for m in order(b,moves,-1,0,sig(best)):
+                draw,bias=contexts[sig(m)];x=journey_apply(b,m)
+                score=0 if draw else -search(x,1,depth-1,-INF,-(value-bias),1)+bias
                 if score>value:value=score;choice=m
-            best=choice;moves=[best]+[m for m in moves if m!=best]
+            best=choice;finished=depth
+            if abs(value)>MATE-100:break
         except TimeoutError:break
+    if stats is not None:stats.update(depth=finished,nodes=nodes,maxDepth=maxdepth,seconds=limit)
     return best
+
 def journey_endgame(board):
     """CBD CODEX 2020 art. 59 D/E; a full move is one move per side."""
     white=(board.count(2),board.count(1))
@@ -981,7 +1050,7 @@ def journey_action(path,d,pid,now):
                 if journey_bot_lost(run):
                     run['outcome']='win';run['reason']='bot_resign'
                 else:
-                    ai=journey_ai(run['board'],run['chapter'],run.get('path'))
+                    ai=journey_ai(run['board'],run['chapter'],run.get('path'),run)
                     if ai:play(ai,-1)
                     else:run['outcome']='win'
             if run['outcome'] is None:journey_bot_offer(run)
