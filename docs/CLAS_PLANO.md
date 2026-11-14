@@ -32,6 +32,11 @@ Renderer SVG compartilhado: heraldicFrames e paintCrestFrame em clube.js, CSS em
 - Convite Real: somente o Rei envia convite, independentemente dos requisitos de entrada; o destinatário decide aceitar/recusar. Solicitações espontâneas continuam exigindo os requisitos no envio e no aceite. O servidor mantém conta registrada, vaga, único clã, expiração, limites e consentimento; não confia em sinalização do cliente. Convites emitidos pelo Rei continuam válidos até expirar mesmo se a liderança mudar. Avisos e Pedidos identificam a exceção. Nenhuma alteração em penalidades ou torneios.
 - Testes de backend e Chromium de cargos e convites; publicação a confirmar. Esta regra substitui a restrição anterior de requisitos obrigatórios em convites.
 
+## Recomendações de recrutamento
+- Membro, Capitão e Vice-capitão podem recomendar conta registrada sem clã, pelo perfil ou lista de membros. Recomendar não exige requisitos e não envia convite. Só Rei e Capitães veem a lista e recebem aviso; autor não recebe seu próprio aviso. Capitão dá parecer favorável/contrário (uma análise por recomendação, sem autoavaliação); Rei decide independentemente do parecer e pode enviar Convite Real ou encerrar. A aceitação do Rei cria convite e encerra recomendação atomicamente; recomendado ainda deve aceitar. Verificar vaga, conta, pedido pendente e ausência de outro clã.
+- clan_recommendations: histórico, estado pending/invited/declined/expired, autor, alvo, parecer e datas. Uma pendente por clã/alvo, 5 recomendações por autor/dia, 30 pendentes por clã, validade 7 dias. API recommend, recommend-review, recommend-decide; stats e requisitos consultados ao visualizar, sem confiar no cliente. Privacidade no servidor: somente cargo captain/king recebe payload, vice não vê fila. UI aba Recomendações, avisos com acesso direto.
+- Testes backend e Chromium; publicação a confirmar.
+
 ## Produto
 - Clube → Clãs: busca por nome/sigla, lista paginada, criar clã, Meu clã.
 - Clã: nome único normalizado, sigla, brasão, descrição, dono, membros, data, nível, chat e torneios.
