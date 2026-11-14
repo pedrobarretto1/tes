@@ -27,7 +27,7 @@ O catálogo v2 está publicado em produção.
   empate não avança nem perde; ao zerar, volta ao checkpoint (1/11/21/26)
   e restaura três, preservando recorde. Santuário restaura coroas.
 - Expedição: 3 coroas, sem retorno; fim ao zerar. Tentativas independentes.
-- Catálogo v2: encounter, realm_map, total_floors e catalog_version no payload. Rotas guardião/carrasco/desconhecido nos andares normais; elites, pré-boss e boss fixos. Perfil da IA derivado da meta D, Carrasco sobe um perfil, Desconhecido varia um perfil. Cinco perfis de busca (3/5/7/9/11 máximos). Estilos ainda são metas, não IA especializada. Finais/caminhos narrativos
+- Catálogo v2: encounter, realm_map, total_floors e catalog_version no payload. Rotas guardião/carrasco/desconhecido nos andares normais; elites, pré-boss e boss fixos. Perfil de IA definido por ai_balance(floor, route), com busca probabilística e heurística fraca gradual; todas as rotas do primeiro andar são muito fáceis. Nos demais, Carrasco e Desconhecido recebem ajustes modestos. A Jornada mantém seus cinco perfis de busca (3/5/7/9/11 máximos). Estilos ainda são metas, não IA especializada. Finais/caminhos narrativos
   e recompensas cosméticas não implementados.
 - Partida completa, brasileira (lei da maioria), 8×8, claras humanas,
   sem limite de tempo geral, com contagem oficial de finais.
@@ -48,7 +48,7 @@ python -m py_compile servidor.py torre.py
 python -m unittest test_torre.py test_torre_api.py -v
 python -c "import servidor,selftest; selftest.run(servidor)"
 
-Os 12 testes Torre, o SELFTEST geral, a compilação Python e a sintaxe JS passaram no CI e/ou na publicação do catálogo v2. A simulação da interface verificou mapa de 25 casas e troca do reino no 26. Validação visual real pendente. O startup executa a suíte Torre em SQLite temporário antes
+Os 14 testes Torre (incluindo 12 partidas simuladas, 12 vitórias do jogador heurístico), o SELFTEST geral, a compilação Python e a sintaxe JS passaram no CI e/ou na publicação do catálogo v2. A simulação da interface verificou mapa de 25 casas e troca do reino no 26. Validação visual real pendente. O startup executa a suíte Torre em SQLite temporário antes
 de setup Neon. A camada full-screen teve simulação JS de troca de reino,
 64 casas e pausa de animação; o criador aprovou visualmente. Testes reais
 de FPS e de todos os 100 andares ainda não existem.
