@@ -5,6 +5,27 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Desafiado escolhe a modalidade do convite
+- Pedido: permitir que quem recebe um desafio escolha a regra da partida.
+- servidor.py: social_action challenge/respond valida a regra escolhida
+  pelo destinatário, preserva compatibilidade com clientes antigos (sugestão
+  original quando ausente), usa a regra final para criar a sala e envia a
+  mesma sessão a ambos. Guarda ranked_requested para recalcular elegibilidade.
+- clube.js: renderClub inclui seletor das oito modalidades e indicação de
+  sugestão, tempo e ranking; preserva escolha durante atualização do Clube.
+  index.html explica que regra de envio é sugestão; cache clube.js v66.
+- Decisão: convite casual permanece casual; ranqueado vira casual se a
+  escolha for Duelo de Damas, Internacional, Canadense ou customizada.
+  O tempo e a política de sala pública continuam conforme fluxo original.
+  Não há segunda confirmação: o envio autoriza a escolha do destinatário.
+- selftest.py: troca Livre→Brasileira, escolha inválida, usuário remetente
+  não autorizado, resposta duplicada, sincronização, Internacional 100 casas
+  sem PH e escolha Inglesa elegível preservando ranking. Teste JS de sintaxe
+  aprovado; suíte completa será verificada no startup do Render.
+- Commits a2575e28, 84a0e9d0, c4e29856, c9452fe4. Sem alteração de banco,
+  Torre, Jornada ou matchmaking. Publicação a confirmar.
+- Rollback: reverter commits desta mudança mantendo as outras funcionalidades.
+
 ## 14/11/2026 — Detalhamento do Castelo Esquecido (opção B)
 - Pedido: planejar os 25 níveis individualmente; mapa 5×5 do reino atual,
   ícones de guardiões, elites, pré-boss e boss; HUD próprio por cenário.
