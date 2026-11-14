@@ -52,6 +52,12 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert.equal(await crest.getAttribute('data-symbol-color'),'crimson');
       assert.equal(await crest.getAttribute('data-frame-color'),'silver');
       assert.equal(await crest.getAttribute('data-background-color'),'wine');
+      await page.getByLabel('Brasão da ordem').selectOption('jerusalem');
+      assert.equal(await crest.getAttribute('data-emblem'),'jerusalem');
+      assert.equal(await crest.locator('svg.clan-jerusalem-cross path').count(),5);
+      assert.equal(await crest.locator('svg.clan-jerusalem-cross').evaluate(el=>getComputedStyle(el).fill),'rgb(165, 45, 67)');
+      await page.getByLabel('Brasão da ordem').selectOption('knight');
+      assert.equal(await crest.locator('svg').count(),0);
       const shapes=new Set();
       for(const style of ['royal','fortress','dark','sacred','ancient','ornate']){
         await page.getByLabel('Estilo da moldura').selectOption(style);
@@ -68,6 +74,8 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert.equal(await admin.getAttribute('data-symbol-color'),'violet');
       await page.getByLabel('Estilo da moldura').selectOption('sacred');
       assert.equal(await admin.getAttribute('data-frame'),'sacred');
+      await page.getByLabel('Brasão da ordem').selectOption('jerusalem');
+      assert.equal(await admin.locator('svg.clan-jerusalem-cross path').count(),5);
       assert(await page.getByRole('button',{name:'Salvar brasão',exact:true}).isVisible());
       console.log('CLAN UI OK:',width,'px; search, live preview, validation, responsive layout');
       await page.close();
