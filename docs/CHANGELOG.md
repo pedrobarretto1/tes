@@ -5,6 +5,34 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Conselho Real: hierarquia, administração e denúncias
+- Pedido: Rei com controle integral, Vice-capitão personaliza, Capitão
+  acompanha membros/denuncia, Membro sem opções administrativas.
+- clas.py: três tabelas aditivas (roles/reports/penalties), role/ROLE_RANK,
+  promote, report/return/reply/reopen/decide, histórico persistente e
+  tournament_block; controle de permissão por operação, revalidação sob
+  clan_guard, proteção contra autopromoção/denúncia de superior/dupla decisão.
+- Decisões: Rei é owner existente; membros legados começam Membro. Rei
+  único que promove/rebaixa/expulsa; transferência mantém um Rei. Vice
+  pode editar brasão/requisitos/descrição, nunca cargo/expulsão. Denúncia
+  retorna a Vice elegível ou Capitão autor se não houver Vice; Rei pode
+  retomar justificando. Histórico privado (Capitão próprio, Vice/Rei do clã
+  exceto alvo); afetado recebe apenas decisão, mensagem/prazo. Limite 10
+  denúncias/autor/dia, uma ativa por autor/alvo. Suspensão 1h–365d por clã,
+  persiste se sair/reentrar; expiração por horário de servidor.
+- servidor.py: clan_role no estado social; avisos de denúncia/devolução/
+  resposta/decisão/cargo usam notifications. clube.js: abas Administração,
+  Personalização, Denúncias, Minhas decisões; controles por cargo, link
+  dos avisos e insignias. clube.css estilo Conselho Real, cache v75/v70.
+- Torneios internos ainda pendentes; penalidade salva e helper testável,
+  a futura API deve obrigatoriamente aplicá-lo em criar/inscrever/jogar.
+  Não bloquear partidas oficiais, ranking ou campanhas. Nenhum saldo alterado.
+- test_clas.py: hierarquia, legado, autorização, histórico, retorno/resposta,
+  suspensão/expiração, expulsão, transferência; test_clas_ui.js: abas e
+  ações por cargo. CI/publicação pendentes. Branch clas-conselho-real.
+- Rollback: reverter código preservando novas tabelas (não apagar histórico).
+  Validação manual entre contas reais ainda pendente.
+
 ## 14/11/2026 — Molduras heráldicas refinadas
 - Pedido: refinar as seis molduras dos brasões, antes recortes geométricos planos.
 - clube.js: heraldicFrames, paintCrestFrame, crestShade e crestSvg criam seis
