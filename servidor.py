@@ -768,11 +768,11 @@ def event_action(path,d,pid,now):
 # Journey of the Master. All positions, legal moves, opponent turns and rewards
 # are authoritative on the server. One saved run per profile; no ranked PH.
 JOURNEY=[
- dict(name='O Aprendiz',hall='I · A Primeira Mesa',theme='classic',depth=7,quote='Cada grande mestre começou com um primeiro salto.',description='Partida completa: fundamentos, defesa e capturas calculadas.'),
- dict(name='O Estrategista',hall='II · O Salão Antigo',theme='imperial',depth=11,quote='A paciência vale mais que a pressa.',description='Controle do centro, proteção das peças e antecipação de trocas.'),
- dict(name='O Guardião',hall='III · A Cripta',theme='midnight-crypt',depth=3,quote='Nem toda armadilha está à vista.',description='Armadilhas, sequências de captura e contra-ataques.'),
+ dict(name='O Aprendiz',hall='I · A Primeira Mesa',theme='classic',depth=3,quote='Cada grande mestre começou com um primeiro salto.',description='Partida completa: fundamentos, defesa e capturas calculadas.'),
+ dict(name='O Estrategista',hall='II · O Salão Antigo',theme='imperial',depth=5,quote='A paciência vale mais que a pressa.',description='Controle do centro, proteção das peças e antecipação de trocas.'),
+ dict(name='O Guardião',hall='III · A Cripta',theme='midnight-crypt',depth=7,quote='Nem toda armadilha está à vista.',description='Armadilhas, sequências de captura e contra-ataques.'),
  dict(name='O Mestre Imperial',hall='IV · O Palácio',theme='champion-legacy',depth=9,quote='O trono exige mais do que coragem.',description='Busca profunda, defesa ativa e domínio dos finais.'),
- dict(name='O Último Rei',hall='V · O Trono',theme='relic-throne',depth=5,quote='Que a última pedra revele quem merece a coroa.',description='O desafio supremo: busca profunda e finais precisos. Vença para conquistar a relíquia.')]
+ dict(name='O Último Rei',hall='V · O Trono',theme='relic-throne',depth=11,quote='Que a última pedra revele quem merece a coroa.',description='O desafio supremo: busca profunda e finais precisos. Vença para conquistar a relíquia.')]
 def journey_board(chapter):
     return initial_for('official')
 def journey_apply(b,m):
