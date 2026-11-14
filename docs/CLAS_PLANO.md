@@ -10,6 +10,9 @@ Validação: CI final 43632355617, 18 testes aprovados, SELFTEST e regressão UI
 - Nível conforme fórmula abaixo, conquistas oficiais permitidas explicitamente; média exibida com uma casa. Gestão: dono transfere liderança, remove membros ou dissolve somente quando for o único membro; saída de dono bloqueada. Requisitos editáveis. Notificações acionáveis sem timer local, revalidação no servidor.
 - Testes SQLite em test_clas.py; CI inclui regressões da Torre e gerais. Nenhum prêmio debitado, nenhuma mudança de PH. Torneios internos, cofre, desempates e auditoria continuam próximos passos.
 
+## Refinamento visual publicado
+PR #6, commit e522bf09430b3a6eb7ec94dcb4df6f27dd5cb588, Render dep-dbsbidu1egvs73dculog live. Salão de ferro/dourado, abas compactas, busca em grid, campos legíveis e carta de fundação com prévia em tempo real do nome, sigla, descrição e brasão. Menu Clãs usa secondary. Sigla preserva regra 2–6 letras/números, sem pontos; aviso antes do envio. CI 43633284488 aprovou Chromium em 375/758/1280 px, 18 testes Python e SELFTEST. Teste de ingresso entre duas contas reais ainda pendente. Nenhuma mudança em banco, requisitos ou economia.
+
 ## Produto
 - Clube → Clãs: busca por nome/sigla, lista paginada, criar clã, Meu clã.
 - Clã: nome único normalizado, sigla, brasão, descrição, dono, membros, data, nível, chat e torneios.
