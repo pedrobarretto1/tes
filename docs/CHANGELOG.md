@@ -19,8 +19,8 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   cooldown 5 min após recusa; sem timer visual. Torneios apenas aba informativa,
   sem débito, sem PH transferível. Moderação/paginação antiga pendentes.
 - test_clas.py: 4 testes com SQLite, CI inicial 43632242305 aprovado,
-  incluindo 14 testes Torre, regressão UI e SELFTEST. Última revisão a validar.
-- PR #5; publicação pendente. Não alterar dados existentes; schema aditivo.
+  incluindo 14 testes Torre, regressão UI e SELFTEST. CI final 43632355617 aprovado (18 testes); simulação JS verificou requisitos, campos opcionais e controles do dono. Sem teste visual real.
+- PR #5 integrada: 8d7cb4de18a59d4507af4e7e8e5cbf7c77bf8d04. Render live dep-dbsbddlg1s2s73enea1g; Neon conectado e cinco tabelas de clãs confirmadas. Startup SELFTEST e 14 testes Torre OK. Não alterar dados existentes; schema aditivo.
   Rollback: reverter código mantendo tabelas e dados de clãs; não apagar banco.
 
 ## 14/11/2026 — Proposta de desempate nos torneios de clãs
