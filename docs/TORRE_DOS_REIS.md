@@ -6,7 +6,7 @@ O catálogo v2 está publicado em produção.
 
 ## Produção confirmada
 - Site: https://casa-de-damas.onrender.com/torre.html
-- Última revisão funcional confirmada: bc68ac387a5992c6e806e03e5a87b01d969ddf6f (Render dep-dbsa9pjm8hqs73c6ukb0, live). O layout tradicional em tela cheia foi preservado.
+- Última revisão funcional confirmada: 5966dd654e39e1738e2a66cfa258aa25282382b5 (Render dep-dbsaf7t6e07s739a6l60, live). O layout tradicional em tela cheia foi preservado.
 - Revisão v2: Castelo 1–25, Catacumbas 26–50, Império 51–75, Trono do Fim 76–100. Limite jogável 30; Castelo completo e entrada das Catacumbas 26–30. Andares 31–100 visíveis no catálogo, não liberados.
 
 ## Arquivos e contratos
