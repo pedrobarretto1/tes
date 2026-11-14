@@ -630,6 +630,21 @@ def school_action(path,d,pid,now):
             return 200,wallet_state(db,pid)
         solved=[x[0] for x in sql(db,'SELECT puzzle_id FROM puzzle_solves WHERE player_id=?',(pid,)).fetchall()]
         return 200,dict(puzzles=[dict(id=p['id'],name=p['name'],level=p['level'],goal=p['goal'],reward=p['reward'],board=puzzle_board(p)) for p in PUZZLES],daily=daily,solved=solved,**wallet_state(db,pid))
+def live_moves(raw,n,seq):
+    # Public move metadata only: no chat, tokens, profile IDs or client-supplied names.
+    if not isinstance(raw,list) or len(raw)>24:return None
+    clean=[];prev=None
+    for m in raw:
+        if not isinstance(m,dict):return None
+        i=m.get('sequence');side=m.get('side');origin=m.get('from');path=m.get('path');cap=m.get('cap')
+        if type(i)!=int or not 1<=i<=seq or (prev is not None and i!=prev+1) or type(side)!=int or side not in (-1,1) or type(origin)!=int or not 0<=origin<n*n:return None
+        if not isinstance(path,list) or not 1<=len(path)<=n*n or not isinstance(cap,list) or len(cap)>n*n or any(type(j)!=int or not 0<=j<n*n for j in path+cap):return None
+        if len(cap) not in (0,len(path)):return None
+        clean.append(dict(sequence=i,side=side,from_=origin,path=path,cap=cap,promotion=m.get('promotion') is True))
+        clean[-1]['from']=clean[-1].pop('from_');prev=i
+    if clean and clean[-1]['sequence']!=seq:return None
+    return clean
+
 def live_action(path,d,pid,now):
     for k,v in list(SPECTATORS.items()):
         if now-v[1]>15:SPECTATORS.pop(k,None)
@@ -646,6 +661,8 @@ def live_action(path,d,pid,now):
         if not isinstance(board,list) or len(board)!=n*n or any(type(p)!=int or p not in (-2,-1,0,1,2) or (p and (i//n+i%n)%2==0) for i,p in enumerate(board)):return 400,{'error':'Tabuleiro inválido.'}
         last=d.get('last',[])
         if not isinstance(last,list) or len(last)>n*n or any(type(i)!=int or not 0<=i<n*n for i in last):return 400,{'error':'Lance inválido.'}
+        moves=live_moves(d.get('moves',[]),n,seq)
+        if moves is None:return 400,{'error':'Histórico de lances inválido.'}
         v=LOCAL_LIVE.get(pid)
         if v and v['match']==match and seq<v['sequence']:return 409,{'error':'Posição desatualizada.'}
         with database() as db:
@@ -653,7 +670,7 @@ def live_action(path,d,pid,now):
         opponent='Jogador local' if mode=='local' else 'Computador'
         if mode=='journey':opponent=' '.join(str(d.get('opponent','Mestre')).split())[:50] or 'Mestre'
         code=v['code'] if v and v['match']==match else 'L-'+secrets.token_hex(12)
-        LOCAL_LIVE[pid]=dict(code=code,match=match,seen=now,board=board,names={str(side):name,str(-side):opponent},turn=turn,rule=rule,mode=mode,sequence=seq,last=last,result=result,closed=False,minutes=0,remaining=None)
+        LOCAL_LIVE[pid]=dict(code=code,match=match,seen=now,board=board,names={str(side):name,str(-side):opponent},turn=turn,rule=rule,mode=mode,sequence=seq,last=last,moves=moves,result=result,closed=False,minutes=0,remaining=None)
         return 200,{'ok':True,'code':code}
     if action=='leave':
         old=SPECTATORS.get(pid)
@@ -667,11 +684,12 @@ def live_action(path,d,pid,now):
         if r and r.get('public') and len(r['tokens'])==2 and now-max(r['seen'].values())<90:
             SPECTATORS[pid]=(code,now);snap=room_snapshot(r,1,now);moves=snap.get('moves',[])
             last=[moves[-1]['from'],*moves[-1]['path']] if moves else []
-            return 200,dict(code=code,mode='online',board=snap['board'],names=snap['names'],turn=snap['turn'],rule=r['rule'],sequence=r['sequence'],last=last,remaining=r['remaining'],minutes=r.get('minutes',0),result=r['winner'],closed=r['closed'],viewers=sum(v[0]==code for v in SPECTATORS.values()))
+            public_moves=[dict(m,sequence=i+1) for i,m in enumerate(moves)][-24:]
+            return 200,dict(code=code,mode='online',matchId=r['match'],board=snap['board'],names=snap['names'],turn=snap['turn'],rule=r['rule'],sequence=r['sequence'],last=last,moves=public_moves,remaining=r['remaining'],minutes=r.get('minutes',0),result=r['winner'],closed=r['closed'],viewers=sum(v[0]==code for v in SPECTATORS.values()))
         for owner,v in LOCAL_LIVE.items():
             if v['code']==code and not active_room(owner,now):
                 SPECTATORS[pid]=(code,now)
-                return 200,dict({k:val for k,val in v.items() if k not in ('match','seen')},viewers=sum(x[0]==code for x in SPECTATORS.values()))
+                return 200,dict({k:val for k,val in v.items() if k not in ('match','seen')},matchId=v['code'],viewers=sum(x[0]==code for x in SPECTATORS.values()))
         return 404,{'error':'Partida pública indisponível ou transmissão encerrada.'}
     if action!='list':return 404,{'error':'Ação inválida.'}
     rooms=[]

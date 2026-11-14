@@ -1,6 +1,7 @@
 (()=>{'use strict';
 const E=id=>document.getElementById(id),check=E('livepermission'),focus=E('focuslive');
-let enabled=localStorage.getItem('damas-live-optin')==='yes',match=crypto.randomUUID(),sent='',lastSent=0,inflight=false,revision=0,dirty=false,stopPending=false,finalAt=0,ownerToken='';
+let enabled=localStorage.getItem('damas-live-optin')==='yes',match=crypto.randomUUID(),sent='',lastSent=0,inflight=false,revision=0,dirty=false,stopPending=false,finalAt=0,ownerToken='',moveLog=[];
+window.liveMove=(m,side,seq,promotion)=>{moveLog.push({from:m.from,path:m.path.slice(),cap:m.cap.slice(),side,sequence:seq,promotion:!!promotion});moveLog=moveLog.slice(-24)};
 window.liveEnabled=()=>enabled;
 async function request(action,data={},token=profileToken()){if(!token)return;let ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),8000);try{let res=await fetch('/api/social/live/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,profileToken:token}),signal:ctl.signal});if(!res.ok)throw Error('Transmissão indisponível');return await res.json()}finally{clearTimeout(timer)}}
 function paint(){check.checked=enabled;focus.setAttribute('aria-pressed',String(enabled));focus.textContent=enabled?'◉ Transmitindo':'◉ Transmitir';focus.hidden=mode==='online';}
@@ -8,8 +9,10 @@ function eligible(){return enabled&&mode!=='online'&&offlineStarted}
 function stop(){revision++;sent='';lastSent=0;finalAt=0;stopPending=true;dirty=true;flush()}
 function change(v){enabled=v;localStorage.setItem('damas-live-optin',v?'yes':'no');paint();if(!v)stop();else{dirty=true;flush()}}
 check.onchange=()=>change(check.checked);focus.onclick=()=>change(!enabled);
-window.liveReset=()=>{match=crypto.randomUUID();if(enabled||sent||inflight)stop()};
-function snapshot(){let result=winner==='draw'?0:winner||null;return {public:true,match,mode:window.journeyActive?.()?'journey':mode,rule:ruleMode,board:b.slice(),side:mySide,turn,sequence:Math.max(0,sequence||0),last:last.slice(),result,opponent:name(-mySide)}}
+window.liveReset=()=>{moveLog=[];match=crypto.randomUUID();if(enabled||sent||inflight)stop()};
+function snapshot(){let r=window.journeyLiveSnapshot?.(),result=winner==='draw'?0:winner||null;
+if(r){let moves=(r.moves||[]).map((m,i)=>({...m,sequence:i+1})).slice(-24);return {public:true,match,mode:'journey',rule:'official',board:r.board.slice(),side:1,turn:1,sequence:r.sequence,last:r.last||[],moves,result:r.outcome==='draw'?0:r.outcome==='win'?1:r.outcome==='loss'?-1:null,opponent:window.journeyOpponent?.()||'Mestre'}}
+return {public:true,match,mode,rule:ruleMode,board:b.slice(),side:mySide,turn,sequence:Math.max(0,sequence||0),last:last.slice(),moves:moveLog.slice(-24),result,opponent:name(-mySide)}}
 function flush(){if(inflight)return;let token=profileToken();if(ownerToken&&ownerToken!==token){let old=ownerToken;ownerToken='';sent='';lastSent=0;revision++;inflight=true;request('stop',{},old).catch(()=>{}).finally(()=>{inflight=false;flush()});return}
 if(stopPending){stopPending=false;inflight=true;request('stop',{},ownerToken||token).catch(()=>{}).finally(()=>{inflight=false;ownerToken='';if(dirty||stopPending)flush()});return}
 if(!eligible()){dirty=false;if(sent){stop()}return}
