@@ -27,6 +27,11 @@ Renderer SVG compartilhado: heraldicFrames e paintCrestFrame em clube.js, CSS em
 - API /api/social/clans/promote, report, report-return, report-reply, report-reopen, report-decide; edit/crest aceita Vice/Rei. UI clube.js usa cargo do servidor, avisos levam à aba Denúncias ou Minhas decisões. Estado social sincroniza cargo. Testes backend e Chromium aprovados (CI 43637006196, 22 testes Python, SELFTEST e três larguras). PR #10 publicada: e8e2f8f77667bacd5190ccc247d47b15949b7238, Render dep-dbsc5m56e07s739efrl0 live. Validação manual em contas reais pendente.
 - Este bloco substitui regras antigas que restringiam personalização ao dono e deixavam denúncias pendentes.
 
+## Insígnias e Convite Real
+- Cargo atual sob o nome dos integrantes em Membros, Administração, chat interno e perfis próprio/público (com sigla do clã). Não substitui título cosmético. A API de chat consulta a associação e o cargo atual; mensagens de ex-membros não exibem cargo atual. public_identity expõe somente id/nome/sigla/cargo públicos.
+- Convite Real: somente o Rei envia convite, independentemente dos requisitos de entrada; o destinatário decide aceitar/recusar. Solicitações espontâneas continuam exigindo os requisitos no envio e no aceite. O servidor mantém conta registrada, vaga, único clã, expiração, limites e consentimento; não confia em sinalização do cliente. Convites emitidos pelo Rei continuam válidos até expirar mesmo se a liderança mudar. Avisos e Pedidos identificam a exceção. Nenhuma alteração em penalidades ou torneios.
+- Testes de backend e Chromium de cargos e convites; publicação a confirmar. Esta regra substitui a restrição anterior de requisitos obrigatórios em convites.
+
 ## Produto
 - Clube → Clãs: busca por nome/sigla, lista paginada, criar clã, Meu clã.
 - Clã: nome único normalizado, sigla, brasão, descrição, dono, membros, data, nível, chat e torneios.
