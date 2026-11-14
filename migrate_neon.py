@@ -43,6 +43,10 @@ def install_schema(conn):
 
 def migrate():
     stage="connect"
+    missing=[k for k in ("SOURCE_DATABASE_URL","NEON_DATABASE_URL") if not os.environ.get(k,"").strip()]
+    if missing:
+        state("blocked",missing=missing)
+        return
     try:
         with psycopg.connect(os.environ["SOURCE_DATABASE_URL"],connect_timeout=15) as src, psycopg.connect(os.environ["NEON_DATABASE_URL"],connect_timeout=15) as dst:
             stage="destination safety"
