@@ -1084,8 +1084,37 @@ def journey_action(path,d,pid,now):
 
 
 # Tower beta: isolated per-account progression; official server engine, no PH or wallet rewards.
+def tower_ai(game, rng=None):
+    """Tower-only play: legal beginner mistakes, gradually mixed with search."""
+    from torre import ai_balance
+    import random
+    b=game['board'];moves=legal(b,-1,'official')
+    if not moves:return None
+    balance=ai_balance(game['floor'],game.get('route','guardian'))
+    # Rebalance saved games too, without replacing board, moves or lives.
+    game['balance']=balance;game['chapter']=balance['tier']
+    if len(moves)==1:return moves[0]
+    if rng is None:rng=random.Random(str(game['id'])+':'+str(game['sequence']))
+    if rng.random()<balance['chance']:
+        return journey_ai(b,balance['tier'],None,game)
+    weak=balance['weakness']
+    def score(m):
+        x=journey_apply(b,m);human=legal(x,1,'official')
+        danger=max((len(r['cap']) for r in human),default=0)
+        promotion=abs(b[m['from']])==1 and abs(x[m['path'][-1]])==2
+        # Early opponents overlook exposed pieces and often miss promotions.
+        # Still play a complete, legal game; no forced capture is skipped.
+        capture=sum(3 if abs(b[j])==2 else 1 for j in m['cap'])
+        repeat=game['repeats'].get(position_key(x,1,'official'),0)
+        advance=(m['path'][-1]//8-m['from']//8) if abs(b[m['from']])==1 else 0
+        tactical=(2.8*weak-1.6*(1-weak))*danger
+        return (tactical+(1-weak)*capture*2+(1-weak)*2*promotion
+                -4.5*weak*promotion+.08*advance-1.8*repeat
+                -12*weak*(not human)+rng.uniform(0,.45+1.0*weak))
+    return max(moves,key=score)
+
 def tower_action(path,d,pid,now):
-    from torre import Run,new_run,choose,start_match,finish_match,public_state,encounter,MODES,ROUTES
+    from torre import Run,new_run,choose,start_match,finish_match,public_state,encounter,ai_balance,MODES,ROUTES
     from dataclasses import asdict
     mode=d.get('mode','ascensao')
     if mode not in MODES:return 400,{'error':'Modo inválido.'}
@@ -1098,7 +1127,8 @@ def tower_action(path,d,pid,now):
         p=Run(**data['progress']);game=data.get('game')
         def response():
             w=wallet_state(db,pid)
-            return 200,{'progress':public_state(p),'game':({**game,'legal':legal(game['board'],1,'official') if game['outcome'] is None else []} if game else None),'theme':w.get('theme','classic'),'skin':w.get('skin','skin-classic')}
+            balance=ai_balance(p.floor,game.get('route','guardian') if game and p.status=='playing' else 'guardian')
+            return 200,{'progress':public_state(p),'balance':balance,'game':({**game,'legal':legal(game['board'],1,'official') if game['outcome'] is None else []} if game else None),'theme':w.get('theme','classic'),'skin':w.get('skin','skin-classic')}
         if action=='state':
             if not raw:sql(db,'UPDATE tower_runs SET payload=? WHERE player_id=? AND mode=?',(json.dumps(data),pid,mode))
             return response()
@@ -1116,11 +1146,9 @@ def tower_action(path,d,pid,now):
             p=choose(p,route)
             match=secrets.token_hex(12);p=start_match(p,match)
             board=initial_for('official')
-            # Persist exact opponent/tier for ongoing matches; routes only on normal floors.
-            tier=meta['tier']
-            if route=='executioner':tier=min(4,tier+1)
-            if route=='unknown':tier=max(0,min(4,tier+secrets.choice((-1,0,1))))
-            game=dict(id=match,chapter=tier,encounter=meta,floor=p.floor,route=route,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
+            balance=ai_balance(p.floor,route)
+            tier=balance['tier']
+            game=dict(id=match,chapter=tier,balance=balance,encounter=meta,floor=p.floor,route=route,board=board,sequence=0,quiet=0,repeats={position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
             journey_draw_clock(game)
         elif action in ('move','resign','draw'):
             if p.status!='playing' or not game or game['outcome'] is not None or d.get('id')!=game['id'] or type(d.get('sequence')) is not int or d['sequence']!=game['sequence']:return 409,{'error':'Partida desatualizada. Atualize a Torre.'}
@@ -1148,7 +1176,7 @@ def tower_action(path,d,pid,now):
                     if journey_bot_lost(game):
                         game['outcome']='win';game['reason']='bot_resign'
                     else:
-                        ai=journey_ai(game['board'],game['chapter'],None,game)
+                        ai=tower_ai(game)
                         if ai:play(ai,-1)
                         else:game['outcome']='win'
                 if game['outcome'] is None:journey_bot_offer(game)
