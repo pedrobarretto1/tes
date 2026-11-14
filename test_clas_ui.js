@@ -123,7 +123,7 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       await page.evaluate(()=>window.roleFixture('member','members'));
       assert.equal(await tab('Recomendações').count(),0);assert(await page.getByRole('button',{name:'Enviar recomendação',exact:true}).isVisible());
       await page.evaluate(()=>window.roleFixture('vice','members'));assert.equal(await tab('Recomendações').count(),0);
-      await page.evaluate(()=>window.roleFixture('captain','recommendations'));assert(await tab('Recomendações').isVisible());assert(await page.getByRole('button',{name:'Recomendar aprovação',exact:true}).isVisible());assert.equal(await page.getByRole('button',{name:'Enviar Convite Real',exact:true}).count(),0);
+      await page.evaluate(()=>window.roleFixture('captain','recommendations'));assert(await tab('Recomendações').isVisible());assert(await page.getByRole('button',{name:'Parecer favorável',exact:true}).isVisible());assert.equal(await page.getByRole('button',{name:'Enviar Convite Real',exact:true}).count(),0);
       await page.evaluate(()=>window.roleFixture('king','recommendations'));assert(await page.getByRole('button',{name:'Enviar Convite Real',exact:true}).isVisible());
       await page.evaluate(()=>window.roleFixture('king','reports'));
       assert(await page.getByRole('button',{name:'Devolver para esclarecimentos',exact:true}).isVisible());
