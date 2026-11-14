@@ -5,6 +5,24 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Aceitar desafio abre escolha antes de criar a sala
+- Pedido: ao aceitar um desafio recebido, abrir uma tela própria para escolher
+  a modalidade antes de entrar na partida, em vez do seletor no cartão do convite.
+- clube.js: renderClub exibe Aceitar desafio e Recusar; openChallengeChoice
+  apenas abre modal, sem requisição. confirmChallengeChoice envia a modalidade
+  selecionada a challenge/respond somente na confirmação. Botão Voltar mantém
+  convite pendente; Escape volta; expiração bloqueia confirmação; envio duplicado
+  bloqueado; joinInvitation fecha modal. Sugestão inicial, tempo e elegibilidade
+  de PH exibidos. Contrato servidor e regras de ranking permanecem intactos.
+- index.html: challengechoiceoverlay, cache clube.js v67 e clube.css v63.
+  clube.css: modal com identidade do Clube e responsividade.
+- Testes: sintaxe JS e simulação isolada do fluxo aprovadas: primeira aceitação
+  sem API, Voltar sem requisição, restrição casual, confirmação única com regra
+  escolhida, convite expirado bloqueado. Não houve teste em dois navegadores.
+- Commits: 066e24de, b3c34c1b, aa04b8e8. Sem mudança em servidor, banco, Torre
+  ou Jornada. Publicação a confirmar.
+- Rollback: reverter os três commits funcionais e preservar o seletor anterior.
+
 ## 14/11/2026 — Desafiado escolhe a modalidade do convite
 - Pedido: permitir que quem recebe um desafio escolha a regra da partida.
 - servidor.py: social_action challenge/respond valida a regra escolhida
