@@ -375,6 +375,16 @@ def run(s):
             status,_=s.social_action('/api/social/school/buy',dict(hero,item='relic-throne'),1000);assert status==403
             start=call('journey/start',hero,chapter=0)['run']
             assert start['sequence']==0 and len(start['legal'])>0
+            assert start['board']==s.initial_for('official') and start['board'].count(1)==12 and start['board'].count(-1)==12
+            for chapter in range(5):assert s.journey_board(chapter)==s.initial_for('official')
+            first=call('journey/move',hero,id=start['id'],sequence=0,move=start['legal'][0])['run']
+            assert first['sequence']==2 and len(first['moves'])==2 and first['outcome'] is None
+            assert call('journey/start',hero,chapter=0)['run']['board']==first['board']
+            # Test fixture only: complete a near-terminal traditional game.
+            board=[0]*64;board[42]=1;board[35]=-1
+            start=dict(id='test-first',version=2,chapter=0,board=board,sequence=0,quiet=0,repeats={s.position_key(board,1,'official'):1},outcome=None,last=[],moves=[],reward=0)
+            with s.database() as db:s.sql(db,'UPDATE journey SET payload=? WHERE player_id=?',(json.dumps(start),hero_id))
+            start=call('journey/state',hero)['run']
             status,_=s.social_action('/api/social/journey/move',dict(hero,id=start['id'],sequence=0,move={'from':0,'path':[1],'cap':[]}),1000);assert status==400
             result=call('journey/move',hero,id=start['id'],sequence=0,move=start['legal'][0])
             assert result['completed']==1 and result['run']['outcome']=='win' and result['run']['reward']==25
