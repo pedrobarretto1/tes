@@ -11,9 +11,9 @@ DOMAINS = (
     (21, 30, "gold", "Império Dourado", "O Imperador de Ouro"),
     (91, 100, "cosmos", "Trono do Fim", "O Rei Primordial"),
 )
-# Only the first domain is intended for the first playable release.
+# Beta opens the three contiguous designed domains.
 # The intervening domains 31–90 have not been designed yet.
-RELEASE_MAX_FLOOR = 10
+RELEASE_MAX_FLOOR = 30
 MODES = ("ascensao", "expedicao")
 ROUTES = ("guardian", "executioner", "unknown")
 
@@ -74,6 +74,7 @@ def finish_match(run, match_id, outcome):
             changes["floor"] = run.floor + 1
             if run.mode == "ascensao" and run.floor % 10 == 0:
                 changes["checkpoint"] = run.floor + 1
+                changes["lives"] = 3
     elif outcome == "loss":
         changes["lives"] = run.lives - 1
         if changes["lives"] <= 0:
