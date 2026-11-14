@@ -850,7 +850,7 @@ def journey_draw_clock(run):
     old=run.get('endgame')
     if not old or old.get('key')!=spec['key']:
         old=dict(**spec,start=run['sequence'])
-    clock=dict(**old,remaining=max(0,old['limit']*2-(run['sequence']-old['start'])))
+    clock={**old,'remaining':max(0,old['limit']*2-(run['sequence']-old['start']))}
     run['endgame']=clock
     return clock
 
