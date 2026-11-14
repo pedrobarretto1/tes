@@ -18,3 +18,6 @@ jobs:
       - run: node --check /tmp/tower.js
       - run: node test_torre_ui.js
       - run: node --check clube.js
+      - run: npm install --no-save --no-package-lock playwright@1.51.1
+      - run: npx playwright install chromium --with-deps
+      - run: node test_clas_ui.js
