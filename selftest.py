@@ -5,10 +5,10 @@ from unittest.mock import patch
 import json
 
 def run(s):
-    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS)
+    old=(s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS,s.LOCAL_LIVE)
     with TemporaryDirectory() as tmp:
         try:
-            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={};s.LOGIN_LIMITS={};s.SPECTATORS={};s.TOURNAMENTS={}
+            s.BASE=Path(tmp);s.DATABASE_URL='';s.ROOMS={};s.PRESENCE={};s.INVITES={};s.MATCH_QUEUE={};s.LOGIN_LIMITS={};s.SPECTATORS={};s.TOURNAMENTS={};s.LOCAL_LIVE={}
             s.setup()
             a={'name':'Teste A','profileToken':'a'*64};b={'name':'Teste B','profileToken':'b'*64}
             def call(route,who,**kw):
@@ -218,6 +218,31 @@ def run(s):
                 watch=call('live/watch',c,code=host['code'])
                 assert len(watch['board'])==n*n and 'token' not in watch and 'chat' not in watch
                 room['closed']=True
+            # Explicit opt-in spectator streams from local, AI and campaign matches.
+            broadcaster={'name':'Mestre Ao Vivo','profileToken':'e'*64};viewer={'name':'Observador','profileToken':'f'*64}
+            call('register',broadcaster);call('register',viewer)
+            bid=s.identity(broadcaster)
+            payload=dict(public=True,match='local-1',mode='ai',rule='official',board=s.initial_for('official'),side=1,turn=1,sequence=0,last=[],result=None)
+            status,_=s.social_action('/api/social/live/publish',dict(broadcaster,**{**payload,'public':False}),1000);assert status==403
+            status,_=s.social_action('/api/social/live/publish',dict(broadcaster,**{**payload,'board':[0]*63}),1000);assert status==400
+            live=call('live/publish',broadcaster,**payload);code=live['code']
+            assert any(p['id']==bid and p['live']['code']==code for p in call('state',viewer)['players'])
+            assert call('player',viewer,target=bid)['player']['live']['mode']=='ai'
+            watched=call('live/watch',viewer,target=bid);assert watched['code']==code and watched['board']==payload['board'] and 'token' not in watched
+            move=s.legal(payload['board'],1,'official')[0];payload.update(board=s.apply(payload['board'],move,'official'),sequence=1,turn=-1,last=[move['from'],*move['path']])
+            assert call('live/publish',broadcaster,**payload)['code']==code
+            assert call('live/watch',viewer,code=code)['sequence']==1
+            payload['result']=1;call('live/publish',broadcaster,**payload)
+            assert call('live/watch',viewer,code=code)['result']==1
+            assert not any(r['code']==code for r in call('live/list',viewer)['rooms'])
+            for mode in ('local','journey'):
+                payload.update(mode=mode,match=mode,board=s.initial_for('official'),sequence=0,turn=1,last=[],result=None)
+                code=call('live/publish',broadcaster,**payload)['code']
+                assert call('live/watch',viewer,code=code)['mode']==mode
+            call('live/stop',broadcaster)
+            status,_=s.social_action('/api/social/live/watch',dict(viewer,code=code),1000);assert status==404
+            code=call('live/publish',broadcaster,**payload)['code']
+            status,_=s.social_action('/api/social/live/watch',dict(viewer,code=code),1016);assert status==404
             assert not s.valid_rule('custom-0111')
             for p in s.PUZZLES:
                 moves=s.legal(s.puzzle_board(p),1,'official')
@@ -467,4 +492,4 @@ def run(s):
             assert s.identity(other_device) is None and s.identity(auth)==aid
             print('SELFTEST OK: presence, friendship, removal, accent-insensitive offline search, public profile, invitations, four moves, ranked resignation, duplicate result, casual mode, both random colors, rematch color swap and correct points, friendship notices, unread counts, presence offline/online, resignation then exit, repeated result, direct leave, casual result, matchmaking, reconnect snapshot, draw agreement, replay, timeout, queue cancellation, five variants, reverse victory, larger boards, custom rooms, chat, spectators, puzzles, coins, themes, independent skins, champion rewards, thematic bundles, seasonal access, profile frames, tournament, king table, campaign and relic, account linking/login, identity preservation, password hash, profile cosmetics, achievements, logout',flush=True)
         finally:
-            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS=old
+            s.BASE,s.DATABASE_URL,s.ROOMS,s.PRESENCE,s.INVITES,s.MATCH_QUEUE,s.LOGIN_LIMITS,s.SPECTATORS,s.TOURNAMENTS,s.LOCAL_LIVE=old

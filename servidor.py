@@ -656,7 +656,9 @@ def live_action(path,d,pid,now):
         LOCAL_LIVE[pid]=dict(code=code,match=match,seen=now,board=board,names={str(side):name,str(-side):opponent},turn=turn,rule=rule,mode=mode,sequence=seq,last=last,result=result,closed=False,minutes=0,remaining=None)
         return 200,{'ok':True,'code':code}
     if action=='leave':
-        SPECTATORS.pop(pid,None);return 200,{'ok':True}
+        old=SPECTATORS.get(pid)
+        if old and (not d.get('code') or d.get('code')==old[0]):SPECTATORS.pop(pid,None)
+        return 200,{'ok':True}
     if action=='watch':
         code=str(d.get('code',''));target=str(d.get('target',''))
         if target and not code:
