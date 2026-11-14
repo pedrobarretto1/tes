@@ -151,19 +151,11 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 @media(max-width:650px){#clanoverlay .clan-foundation{grid-template-columns:minmax(0,1fr)}#clanoverlay .clan-foundation-preview{position:static;grid-row:1;padding:20px 15px}#clanoverlay .clan-foundation-preview .clan-crest{width:76px;height:88px;font-size:43px;margin:12px 0}#clanoverlay .clan-preview-description{min-height:0;margin:6px 0}#clanoverlay .clan-result-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:420px){#clanoverlay .clan-requirements{grid-template-columns:minmax(0,1fr)}#clanoverlay .clan-tabs{gap:4px}#clanoverlay .clan-tab{min-width:78px;font-size:11px;padding:9px 5px}#clanoverlay .clan-banner{gap:10px;padding:13px}#clanoverlay .clan-banner-seal{display:none}#clanoverlay .clan-search>button{min-width:70px;padding:10px 8px}#clanoverlay .clan-search{gap:8px;padding:9px}}
 
-/* Custom heraldry: one lightweight CSS renderer for previews, cards and notices.
-   Colors are independently selected from the server's allowlist, no contrast rule. */
-.clan-crest,#clanoverlay .clan-crest{--crest-frame:#d8b875;--crest-bg:#36464d;--crest-symbol:#d8b875;--crest-shape:polygon(0 0,100% 0,100% 63%,90% 81%,50% 100%,10% 81%,0 63%);position:relative;display:grid;place-items:center;isolation:isolate;flex:none;width:56px;height:65px;clip-path:var(--crest-shape);background:var(--crest-frame);color:var(--crest-symbol);font:34px Georgia,serif;box-sizing:border-box}
-.clan-crest::before,#clanoverlay .clan-crest::before{content:"";position:absolute;inset:3px;background:linear-gradient(155deg,#ffffff16,transparent 48%,#00000020),var(--crest-bg);clip-path:inherit;z-index:-1}
-#clanoverlay .clan-crest[data-emblem]::before{background:linear-gradient(155deg,#ffffff16,transparent 48%,#00000020),var(--crest-bg)}
-.clan-crest[data-frame=fortress],#clanoverlay .clan-crest[data-frame=fortress]{--crest-shape:polygon(0 0,27% 0,27% 8%,39% 8%,39% 0,61% 0,61% 8%,73% 8%,73% 0,100% 0,100% 73%,50% 100%,0 73%)}
-.clan-crest[data-frame=dark],#clanoverlay .clan-crest[data-frame=dark]{--crest-shape:polygon(0 0,20% 9%,50% 0,80% 9%,100% 0,91% 57%,100% 72%,50% 100%,0 72%,9% 57%)}
-.clan-crest[data-frame=sacred],#clanoverlay .clan-crest[data-frame=sacred]{--crest-shape:polygon(50% 0,90% 17%,100% 42%,86% 80%,50% 100%,14% 80%,0 42%,10% 17%)}
-.clan-crest[data-frame=ancient],#clanoverlay .clan-crest[data-frame=ancient]{--crest-shape:polygon(10% 0,90% 0,100% 13%,94% 68%,77% 87%,50% 100%,23% 87%,6% 68%,0 13%);background:repeating-linear-gradient(135deg,#0002 0 2px,transparent 2px 5px),var(--crest-frame)}
-.clan-crest[data-frame=ornate],#clanoverlay .clan-crest[data-frame=ornate]{--crest-shape:polygon(50% 0,67% 12%,89% 7%,85% 27%,100% 37%,89% 68%,73% 83%,50% 100%,27% 83%,11% 68%,0 37%,15% 27%,11% 7%,33% 12%)}
-.clan-crest .clan-crest-glyph,#clanoverlay .clan-crest .clan-crest-glyph{line-height:1;padding-bottom:8%;text-shadow:0 1px 2px #0005;color:var(--crest-symbol)}
-.clan-crest-ornament{position:absolute;bottom:10%;font-size:.30em;color:var(--crest-frame);line-height:1}
-.clan-crest[data-frame=ornate] .clan-crest-ornament{font-size:.44em}
+/* Heraldic metalwork: layered SVG frame and separately colored central symbol. */
+.clan-crest,#clanoverlay .clan-crest{--crest-frame:#d8b875;--crest-bg:#36464d;--crest-symbol:#d8b875;position:relative;display:grid;place-items:center;isolation:isolate;flex:none;width:56px;height:65px;clip-path:none;background:none;color:var(--crest-symbol);font:34px Georgia,serif;box-sizing:border-box}
+.clan-crest::before,#clanoverlay .clan-crest::before,#clanoverlay .clan-crest[data-emblem]::before{content:none}
+.clan-crest-metal{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0;overflow:visible;pointer-events:none}
+.clan-crest .clan-crest-glyph,#clanoverlay .clan-crest .clan-crest-glyph{position:relative;z-index:1;display:grid;place-items:center;width:70%;height:68%;font-size:.85em;line-height:1;padding:0 0 8%;box-sizing:border-box;text-shadow:0 1px 2px #0005;color:var(--crest-symbol)}
 .club-snack .clan-crest,.club-notice-row .clan-crest{width:34px;height:39px;font-size:21px}
 #clanoverlay .crest-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin:10px 0 15px}
 #clanoverlay .crest-editor>.clan-field{margin:0}
@@ -180,3 +172,15 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 
 /* Jerusalem cross: scalable vector, independent of font support. */
 .clan-jerusalem-cross{display:block;width:1em;height:1em;fill:currentColor;overflow:visible}
+
+#clanoverlay .clan-foundation-preview .clan-crest{width:136px;height:159px;font-size:76px;margin:18px 0 14px} @media(max-width:650px){#clanoverlay .clan-foundation-preview .clan-crest{width:100px;height:117px;font-size:56px}}
+
+/* Keep the header and scroll content inside the heraldic outer frame. */
+#clanoverlay{box-sizing:border-box;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr);overflow:hidden}
+#clanoverlay .clan-shell{display:flex;flex-direction:column;min-height:0;max-height:100%;overflow:hidden;padding:clamp(15px,2.5vw,28px);isolation:isolate}
+#clanoverlay .clan-shell>.club-head{position:relative;flex:0 0 auto;min-width:0;z-index:2;margin:0;padding:0 0 13px;align-items:center}
+#clanoverlay .clan-shell>.club-head>div{min-width:0;overflow-wrap:anywhere}
+#clanoverlay .clan-shell>.club-head .eyebrow{line-height:1.4;margin:0 0 3px}
+#clanoverlay .clan-scroll{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#8e744d #202426;padding:0 3px 4px 0;scroll-padding-top:10px}
+#clanoverlay .clan-foundation-preview{top:8px}
+@media(max-width:650px){#clanoverlay .clan-foundation-preview{top:auto}}

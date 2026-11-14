@@ -44,6 +44,20 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert.equal(await page.locator('.clan-preview-description').textContent(),'Honra, lealdade e glória.');
       assert.equal(await page.locator('.clan-foundation-preview .clan-crest').getAttribute('data-emblem'),'knight');
       const crest=page.locator('.clan-foundation-preview .clan-crest');
+      // The heading and back button must stay within the outer border while the form scrolls.
+      const header=page.locator('#clanoverlay .club-head'),shell=page.locator('#clanoverlay .clan-shell'),scroll=page.locator('#clanscroll');
+      await scroll.evaluate(el=>el.scrollTop=el.scrollHeight);
+      const [hb,sb,cb]=await Promise.all([header.boundingBox(),shell.boundingBox(),scroll.boundingBox()]);
+      assert(hb.y>=sb.y+8&&hb.y+hb.height<=cb.y+1,'header overlaps scroll or border at '+width);
+      assert(hb.x>=sb.x+8&&hb.x+hb.width<=sb.x+sb.width-8,'header outside frame at '+width);
+      assert(cb.y+cb.height<=sb.y+sb.height-8,'scroll content outside frame at '+width);
+      assert(await scroll.evaluate(el=>el.scrollTop>0),'form should scroll');
+      await page.setViewportSize({width,height:540});
+      const [hs,ss,cs]=await Promise.all([header.boundingBox(),shell.boundingBox(),scroll.boundingBox()]);
+      assert(ss.y>=0&&ss.y+ss.height<=541,'short viewport shell clipped');
+      assert(hs.y>=ss.y+8&&hs.y+hs.height<=cs.y+1,'short viewport heading clipped');
+      await page.setViewportSize({width,height:800});
+      await scroll.evaluate(el=>el.scrollTop=0);
       await page.getByLabel('Estilo da moldura').selectOption('ornate');
       await page.getByRole('button',{name:'Cor do símbolo · Rubi',exact:true}).click();
       await page.getByRole('button',{name:'Cor da moldura · Prata',exact:true}).click();
@@ -57,11 +71,13 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert.equal(await crest.locator('svg.clan-jerusalem-cross path').count(),5);
       assert.equal(await crest.locator('svg.clan-jerusalem-cross').evaluate(el=>getComputedStyle(el).fill),'rgb(165, 45, 67)');
       await page.getByLabel('Brasão da ordem').selectOption('knight');
-      assert.equal(await crest.locator('svg').count(),0);
+      assert.equal(await crest.locator('svg.clan-jerusalem-cross').count(),0);
       const shapes=new Set();
       for(const style of ['royal','fortress','dark','sacred','ancient','ornate']){
         await page.getByLabel('Estilo da moldura').selectOption(style);
-        shapes.add(await crest.evaluate(el=>getComputedStyle(el).clipPath));
+        shapes.add(await crest.locator('.crest-outer').getAttribute('d'));
+        assert((await crest.locator('svg.clan-crest-metal path').count())>=7);
+        assert.equal(await crest.locator('.crest-field').getAttribute('fill'),'#672e42');
       }
       assert.equal(shapes.size,6);
       for(const label of ['Cor do símbolo','Cor da moldura','Cor do fundo'])await page.getByRole('button',{name:label+' · Ouro',exact:true}).click();

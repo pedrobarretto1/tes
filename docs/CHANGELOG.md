@@ -5,6 +5,25 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Molduras heráldicas refinadas
+- Pedido: refinar as seis molduras dos brasões, antes recortes geométricos planos.
+- clube.js: heraldicFrames, paintCrestFrame, crestShade e crestSvg criam seis
+  desenhos SVG originais com campo interno, contornos metálicos duplos,
+  ornamentos, rebites e sombreamento derivado da cor escolhida. IDs antigos
+  royal/fortress/dark/sacred/ancient/ornate preservados. Símbolos e cores
+  independentes, inclusive Cruz de Jerusalém, sem contraste obrigatório.
+- clube.css: substitui clip-path por SVG em camadas, sem filtros/animacoes,
+  adapta cartões, notificações e preview maior de fundação. Cache v74/v69.
+- test_clas_ui.js: verifica seis paths distintos, camadas, cor de fundo,
+  troca da Cruz de Jerusalém, preview e editor administrativo.
+- Correção adicional (print): cabeçalho do Salão escapava da moldura durante
+  rolagem. index.html separa #clanscroll; CSS limita shell ao grid do viewport,
+  cabeçalho fixo dentro da borda e corpo rolável, preview com margem interna;
+  renderClan/openClan reiniciam rolagem ao trocar aba. Teste Chromium confere
+  limites do topo/rodapé durante rolagem e viewport baixo de 540 px.
+- Sem alteração de servidor, schema, economia ou dados. CI/publicação pendentes.
+  Rollback: reverter renderer e CSS; designs salvos continuam compatíveis.
+
 ## 14/11/2026 — Cruz de Jerusalém nos brasões
 - Pedido: incluir o símbolo da imagem enviada, com cruz central e quatro menores.
 - clas.py: novo ID jerusalem no catálogo EMBLEMS, compatível com create/crest.
@@ -14,9 +33,9 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   Cache JS v73/CSS v68. Todas as cores e molduras continuam livres.
 - Testes: test_clas.py cria/edita/recarrega o design; test_clas_ui.js confere
   cinco paths, cor, troca para símbolo anterior e editor administrativo.
-  CI e publicação pendentes.
+  CI 43634566062 aprovado: 20 testes Python e Chromium 375/758/1280 px.
 - Sem alteração de schema, dados existentes, economia ou requisitos.
-  Branch clas-cruz-jerusalem. Rollback: reverter UI e manter ID no catálogo
+  PR #8 integrada: 8d8c245e94fe79390e10d46a8ead64c1a2eb79f9. Render dep-dbsbp5ec6qcc738o7o2g. Rollback: reverter UI e manter ID no catálogo
   para não invalidar brasões já salvos.
 
 ## 14/11/2026 — Brasões personalizados dos Clãs
