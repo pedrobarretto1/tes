@@ -21,16 +21,17 @@ def setup(db,sql):
         "CREATE UNIQUE INDEX IF NOT EXISTS clan_pending_unique ON clan_requests(clan_id,player_id) WHERE status='pending'",
     ):sql(db,q)
     sql(db,'INSERT INTO clan_guard(id) VALUES(1) ON CONFLICT(id) DO NOTHING')
-def stats(db,sql,pid):
-    r=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
-    if not r:return None
-    name,points,wins,losses,draws=r
-    c=sql(db,'SELECT completed FROM cosmetics WHERE player_id=?',(pid,)).fetchone()
-    j=sql(db,'SELECT completed FROM journey WHERE player_id=?',(pid,)).fetchone()
-    earned=sum(row[0] in ACHIEVEMENTS for row in sql(db,'SELECT code FROM achievements WHERE player_id=?',(pid,)).fetchall())
-    completed=c[0] if c else 0
-    xp=10*wins+3*draws+2*completed+25*earned+50*(j[0] if j else 0)
+STATS_SQL="""SELECT p.id,p.name,p.points,p.wins,p.losses,p.draws,
+ COALESCE(c.completed,0),COALESCE(j.completed,0),
+ (SELECT COUNT(*) FROM achievements a WHERE a.player_id=p.id AND a.code IN ('first_win','ten_wins','streak5','honor20','friends5','triple_king','cup_champion'))
+ FROM players p LEFT JOIN cosmetics c ON c.player_id=p.id LEFT JOIN journey j ON j.player_id=p.id"""
+def stat_row(r):
+    pid,name,points,wins,losses,draws,completed,chapters,earned=r
+    xp=10*wins+3*draws+2*completed+25*earned+50*chapters
     return dict(id=pid,name=name,points=points,wins=wins,losses=losses,draws=draws,games=wins+losses+draws,rate=100*wins/(wins+losses+draws) if wins+losses+draws else None,level=1+math.isqrt(xp//50),xp=xp)
+def stats(db,sql,pid):
+    r=sql(db,STATS_SQL+' WHERE p.id=?',(pid,)).fetchone()
+    return stat_row(r) if r else None
 def requirements(raw):
     if not isinstance(raw,dict) or set(raw)-set(FIELDS):raise ValueError('Requisitos inválidos.')
     out={}
@@ -51,7 +52,7 @@ def clan(db,sql,cid):
     d=dict(zip(('id','name','tag','description','emblem','owner','requirements','created_at'),r))
     d['requirements']=json.loads(d['requirements']);return d
 def members(db,sql,cid):
-    return [p for r in sql(db,'SELECT player_id FROM clan_members WHERE clan_id=? ORDER BY joined_at,player_id',(cid,)).fetchall() if (p:=stats(db,sql,r[0]))]
+    return [stat_row(r) for r in sql(db,STATS_SQL+' JOIN clan_members m ON m.player_id=p.id WHERE m.clan_id=? ORDER BY m.joined_at,p.id',(cid,)).fetchall()]
 def summary(db,sql,c,pid,full=False):
     m=members(db,sql,c['id']);p=stats(db,sql,pid)
     d=dict(c,count=len(m),level=round(sum(x['level'] for x in m)/len(m),1) if m else 0,checks=check(p,c['requirements']),capacity=LIMIT)
