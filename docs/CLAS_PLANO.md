@@ -27,6 +27,16 @@ Renderer SVG compartilhado: heraldicFrames e paintCrestFrame em clube.js, CSS em
 - API /api/social/clans/promote, report, report-return, report-reply, report-reopen, report-decide; edit/crest aceita Vice/Rei. UI clube.js usa cargo do servidor, avisos levam à aba Denúncias ou Minhas decisões. Estado social sincroniza cargo. Testes backend e Chromium aprovados (CI 43637006196, 22 testes Python, SELFTEST e três larguras). PR #10 publicada: e8e2f8f77667bacd5190ccc247d47b15949b7238, Render dep-dbsc5m56e07s739efrl0 live. Validação manual em contas reais pendente.
 - Este bloco substitui regras antigas que restringiam personalização ao dono e deixavam denúncias pendentes.
 
+## Insígnias e Convite Real
+- Cargo atual sob o nome dos integrantes em Membros, Administração, chat interno e perfis próprio/público (com sigla do clã). Não substitui título cosmético. A API de chat consulta a associação e o cargo atual; mensagens de ex-membros não exibem cargo atual. public_identity expõe somente id/nome/sigla/cargo públicos.
+- Convite Real: somente o Rei envia convite, independentemente dos requisitos de entrada; o destinatário decide aceitar/recusar. Solicitações espontâneas continuam exigindo os requisitos no envio e no aceite. O servidor mantém conta registrada, vaga, único clã, expiração, limites e consentimento; não confia em sinalização do cliente. Convites emitidos pelo Rei continuam válidos até expirar mesmo se a liderança mudar. Avisos e Pedidos identificam a exceção. Nenhuma alteração em penalidades ou torneios.
+- Testes de backend e Chromium de cargos e convites; publicação a confirmar. Esta regra substitui a restrição anterior de requisitos obrigatórios em convites.
+
+## Recomendações de recrutamento
+- Membro, Capitão e Vice-capitão podem recomendar conta registrada sem clã, pelo perfil ou lista de membros. Recomendar não exige requisitos e não envia convite. Só Rei e Capitães veem a lista e recebem aviso; autor não recebe seu próprio aviso. Capitão dá parecer favorável/contrário (uma análise por recomendação, sem autoavaliação); Rei decide independentemente do parecer e pode enviar Convite Real ou encerrar. A aceitação do Rei cria convite e encerra recomendação atomicamente; recomendado ainda deve aceitar. Verificar vaga, conta, pedido pendente e ausência de outro clã.
+- clan_recommendations: histórico, estado pending/invited/declined/expired, autor, alvo, parecer e datas. Uma pendente por clã/alvo, 5 recomendações por autor/dia, 30 pendentes por clã, validade 7 dias. API recommend, recommend-review, recommend-decide; stats e requisitos consultados ao visualizar, sem confiar no cliente. Privacidade no servidor: somente cargo captain/king recebe payload, vice não vê fila. UI aba Recomendações, avisos com acesso direto.
+- Testes backend e Chromium; publicação a confirmar.
+
 ## Produto
 - Clube → Clãs: busca por nome/sigla, lista paginada, criar clã, Meu clã.
 - Clã: nome único normalizado, sigla, brasão, descrição, dono, membros, data, nível, chat e torneios.
@@ -41,7 +51,7 @@ Propostas adicionais: máximo de derrotas e mínimo de partidas concluídas.
 Taxa = vitórias / (vitórias + derrotas + empates) × 100; zero partidas = sem taxa, não qualifica se taxa exigida. Usar dados de ranking do servidor, não dados enviados pelo cliente. Sem expulsão automática quando a estatística cai depois de entrar; regras valem para admissão.
 - Candidato consulta requisitos e diagnóstico; se não atende, não pode solicitar.
 - Solicitação pendente única por candidato/clã. Apenas dono recebe notificação com nome, stats públicos, requisitos e status de cada um, Aceitar/Recusar/X. Revalidação no aceite (requisitos atuais, vaga, conta e ausência de outro clã). Entra numa única transação; pedidos concorrentes invalidados.
-- Dono pode convidar um perfil; convidado escolhe aceitar/recusar; mesma validação, sem bypass. Fechar cartão não recusa. Pedido de clã persiste; política de validade proposta 7 dias, notificação acionável sem timer local. Limites de envio e cooldown após recusa. Chat nunca expõe tokens, sessões, senhas.
+- Dono pode convidar um perfil; convidado escolhe aceitar/recusar; Convite Real dispensa requisitos, mantendo as demais validações. Fechar cartão não recusa. Pedido de clã persiste; política de validade proposta 7 dias, notificação acionável sem timer local. Limites de envio e cooldown após recusa. Chat nunca expõe tokens, sessões, senhas.
 - Se requisitos forem alterados, comparar regras atuais e informar candidato, não aprovar silenciosamente com regra antiga.
 
 ## Nível

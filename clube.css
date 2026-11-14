@@ -203,3 +203,6 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 #clanoverlay .clan-report-history small{color:#b1a38b;font:11px Arial}
 #clanoverlay [hidden]{display:none!important}
 @media(max-width:420px){#clanoverlay .clan-admin-actions{grid-template-columns:minmax(0,1fr)}}
+
+/* Insígnia do clã: abaixo do nome, sem substituir títulos do perfil. */
+.clan-nameplate{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}.clan-person-name{display:block;overflow-wrap:anywhere}.clan-role-badge{display:inline-flex;align-items:center;align-self:flex-start;gap:4px;padding:3px 8px;border:1px solid #827359;border-radius:4px;background:#252a2a;color:#d2c5ae;font:700 11px/1.4 Arial;max-width:100%;overflow-wrap:anywhere}.clan-role-badge[data-role=king]{border-color:#d8b875;background:#463622;color:#ffe1a1}.clan-role-badge[data-role=vice]{border-color:#a69abf;color:#e0d3fb;background:#30283d}.clan-role-badge[data-role=captain]{border-color:#a1b2bd;color:#d6e1e8;background:#293943}.clan-role-tag{font-weight:400}.clan-profile-role{margin:4px 0}.clan-chat-author{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.clan-chat-author>small{flex:none}.clan-nameplate .clan-role-badge,#clanoverlay .clan-nameplate .clan-role-badge{font-size:11px;padding:3px 8px}

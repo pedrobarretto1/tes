@@ -99,12 +99,19 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
         const members=[member('king','king'),member('vice','vice'),member('captain','captain'),member('member','member')];
         window.roleFixture=(role,tab)=>{
           const me=members.find(p=>p.role===role);
-          api.set({...data,me:{...me,xp:0},mine:{id:'c',name:'Ordem',tag:'ORD',owner:'king',role,description:'Teste',emblem:'shield',count:4,capacity:30,level:1,requirements:{},checks:[],members,reports:[{id:'r',author:'captain',author_name:'captain',target:'member',target_name:'member',status:'open',history:[{kind:'report',name:'captain',text:'Motivo',at:1}],can_decide:role==='king',can_reply:false,can_reopen:false}]},decisions:[]},tab);api.renderClan();
+          api.set({...data,me:{...me,xp:0},mine:{id:'c',name:'Ordem',tag:'ORD',owner:'king',role,description:'Teste',emblem:'shield',count:4,capacity:30,level:1,requirements:{},checks:[],members,recommendations:[{id:'rec',author:'member',author_name:'member',profile:member('candidate','member'),status:'pending',available:true,checks:[{label:'PH mínimo',actual:1000,required:2000,ok:false}]}],reports:[{id:'r',author:'captain',author_name:'captain',target:'member',target_name:'member',status:'open',history:[{kind:'report',name:'captain',text:'Motivo',at:1}],can_decide:role==='king',can_reply:false,can_reopen:false}]},decisions:[]},tab);api.renderClan();
         };
         window.roleFixture('member','home');
       });
       const tab=label=>page.locator('#clantabs').getByRole('button',{name:label,exact:true});
       assert.equal(await tab('Administração').count(),0);assert.equal(await tab('Personalização').count(),0);assert.equal(await tab('Denúncias').count(),0);assert(await tab('Torneios').isVisible());
+      await page.evaluate(()=>window.roleFixture('member','members'));
+      const plates=page.locator('.clan-nameplate');
+      assert.equal(await plates.count(),4);
+      for(let i=0;i<4;i++){let plate=plates.nth(i);let name=await plate.locator('.clan-person-name').boundingBox(),badge=await plate.locator('.clan-role-badge').boundingBox();assert(badge.y>=name.y+name.height-1,'cargo must be below name')}
+      assert.equal(await page.getByRole('button',{name:'Enviar convite real',exact:true}).count(),0);
+      await page.evaluate(()=>window.roleFixture('king','members'));
+      assert(await page.getByRole('button',{name:'Enviar convite real',exact:true}).isVisible());
       await page.evaluate(()=>window.roleFixture('captain','manage'));
       assert(await tab('Administração').isVisible());assert(await tab('Denúncias').isVisible());assert.equal(await tab('Personalização').count(),0);
       assert.equal(await page.getByRole('button',{name:'Remover',exact:true}).count(),0);
@@ -113,6 +120,11 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
       assert(await tab('Personalização').isVisible());assert(await page.getByRole('button',{name:'Salvar brasão',exact:true}).isVisible());
       await page.evaluate(()=>window.roleFixture('king','manage'));
       assert.equal(await page.getByRole('button',{name:'Salvar cargo',exact:true}).count(),3);
+      await page.evaluate(()=>window.roleFixture('member','members'));
+      assert.equal(await tab('Recomendações').count(),0);assert(await page.getByRole('button',{name:'Enviar recomendação',exact:true}).isVisible());
+      await page.evaluate(()=>window.roleFixture('vice','members'));assert.equal(await tab('Recomendações').count(),0);
+      await page.evaluate(()=>window.roleFixture('captain','recommendations'));assert(await tab('Recomendações').isVisible());assert(await page.getByRole('button',{name:'Parecer favorável',exact:true}).isVisible());assert.equal(await page.getByRole('button',{name:'Enviar Convite Real',exact:true}).count(),0);
+      await page.evaluate(()=>window.roleFixture('king','recommendations'));assert(await page.getByRole('button',{name:'Enviar Convite Real',exact:true}).isVisible());
       await page.evaluate(()=>window.roleFixture('king','reports'));
       assert(await page.getByRole('button',{name:'Devolver para esclarecimentos',exact:true}).isVisible());
       assert(await page.getByRole('button',{name:'Registrar decisão',exact:true}).isVisible());
