@@ -36,6 +36,46 @@ Prêmios:
 - Criador não altera vencedor, prêmio ou regras depois da inscrição; proposta de torneio financiado: criador pode competir, se vencer recebe devolução da própria reserva (não recompensa duplicada), registrar resultado e transparência. Avaliar proibir sua participação em caso de abuso. Sem recompensa competitiva oficial, sem PH de partidas internas e sem duplicar conquistas oficiais.
 - Cancelamento pré-início devolve reserva exata ao patrocinador. Após início: sem cancelamento unilateral; só timeout/falha objetiva/regras publicadas e auditoria. Organizador sair do clã não cancela obrigação. Se final decidida, prêmio entregue mesmo se clã mudar de dono. Não permitir dissolução com reserva em aberto.
 
+## Desempate dos torneios — proposta 14/11/2026
+- Propor ou aceitar empate não é derrota, desistência, W.O. nem eliminação.
+  Empate por acordo e empate automático do motor têm o mesmo efeito sobre a
+  chave. Recusa mantém a partida e o relógio. Limitar frequência de propostas
+  por jogador, sem bloquear empates regulamentares. UI temática já existente
+  do pedido de empate deve explicar a revanche e não prometer PH ranqueado.
+- Primeira partida empatada: revanche completa, mesma regra e relógio
+  original, cores invertidas, novo match_id. Não repetir o resultado anterior.
+- Segunda partida empatada: par de rápidas com 5 minutos por jogador em cada,
+  cores alternadas, placar 1 vitória / 0,5 empate / 0 derrota. Dois jogos
+  completos; quem tiver mais pontos avança. Outros confrontos da rodada
+  podem terminar, mas a chave só avança quando o adversário estiver definido.
+- Se o par rápido terminar empatado: última sessão com novo par rápido,
+  horário definido por regras publicadas antes da inscrição e prazo objetivo,
+  persistindo o placar e a reserva. W.O. somente por ausência/desistência
+  comprovada conforme regras, com janela de reconexão; não confundir empate.
+- Proposta para impasse final: após esgotar as sessões previstas, dois
+  co-campeões dividem o prêmio de moedas; valor ímpar devolve sobra ao
+  patrocinador. Skin indivisível: converter o custo já reservado em moedas
+  e dividir; não criar duas licenças nem cobrar extra. PH somente após
+  decisão de economia separada, com regra equivalente de divisão. Não
+  premiar nem criar campeão por sorteio, material restante ou PH prévio.
+- Em quartas/semifinal, empate persistente não gera dois classificados
+  para a mesma vaga. Se prazo final expirar sem desempate, suspender o
+  confronto; sem resolução dentro do prazo objetivo publicado, cancelar
+  o torneio e devolver a reserva integral (sem pagamento de campeão).
+  Esta é a alternativa conservadora para o MVP; avaliar desempate por
+  desafios de damas equivalentes em fase futura, não por sorteio.
+- Nenhum empate paga recompensa parcial ou altera o ranking oficial.
+  Liquidação da final (campeão único ou divisão) ou refund acontece uma
+  vez, transacionalmente, após decisão autoritativa. Persistir partidas,
+  placares, cores, prazos e transições; nenhuma ação do dono pode escolher
+  vencedor ou cancelar unilateralmente uma final empatada.
+- Testes: acordo/recusa, empate automático, inversão de cores, dois jogos
+  rápidos, placar empatado, reconexão, deadline e W.O. distintos, co-campeões,
+  divisão ímpar e skin, refund por impasse, idempotência/queda/restart.
+  Política proposta, não aprovada nem implementada; os eventos oficiais
+  atuais permanecem inalterados. event_tick hoje cria outra sala a cada
+  empate sem limite explícito; não reutilizar esse comportamento para prêmios.
+
 ## Persistência e segurança
 O código atual usa TOURNAMENTS em memória; event_champions grava campeão, mas estado de evento/salas não é suficiente para valores depositados. Não usar eventos atuais como cofre. Antes de torneios financiados persistir chave, participantes, regras, partidas, IDs, snapshots/movimentos, prazos e estado de liquidação; retomar após restart Render e reconexão. Ações de cancelamento/resultado verificadas servidor.
 Esquema aditivo proposto: clans, clan_members (unique player_id), clan_requests (pending único, tipo, status), clan_messages, clan_tournaments, clan_tournament_entries, clan_tournament_matches, clan_prize_escrow, clan_ledger. FK/constraints, índices por clã e status, transações PostgreSQL/SQLite. Saldo não negativo, atualização condicional coins>=amount, lock de linhas e ordem consistente; reserva, débito e criação atômicos. Liquidação/refund com estado único reserved→paid/refunded e chave idempotente por torneio, no mesmo commit que crédito/purchase. Não confiar em preço, saldo, dono, nível, requisitos, vencedor ou idempotência do cliente.
