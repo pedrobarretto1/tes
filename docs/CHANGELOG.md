@@ -21,9 +21,13 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   cache clube.js v71/clube.css v66.
 - Testes: sintaxe JS e simulação da busca, prévia, sigla C.T inválida/CE
   válida, envio com 7 requisitos null aprovadas. test_clas_ui.js verifica
-  layout real 375/758/1280 px no Chromium, workflow atualizado; CI pendente.
+  layout real 375/758/1280 px no Chromium: todos aprovados no CI 43633284488.
+  Primeiro CI falhou na instalação do Playwright em Ubuntu 26.04; runner
+  fixado em Ubuntu 24.04 (d147dc12), sem falha na interface. Testes gerais,
+  18 testes Python e regressão da Torre aprovados.
 - Sem alteração no servidor, banco, torneios, Torre ou regras de entrada.
-  Branch clas-honra-visual, publicação pendente; rollback reverte UI/teste.
+  PR #6 integrada: e522bf09430b3a6eb7ec94dcb4df6f27dd5cb588.
+  Render live dep-dbsbidu1egvs73dculog; rollback reverte UI/teste.
 
 ## 14/11/2026 — Clãs: primeira versão social
 - Pedido: aplicar clãs após aprovação do plano. Entrega inicial sem torneios
