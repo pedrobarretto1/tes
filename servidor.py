@@ -819,16 +819,47 @@ def journey_ai(b,chapter,path=None):
             best=choice;moves=[best]+[m for m in moves if m!=best]
         except TimeoutError:break
     return best
-def journey_material(board):
-    # Campaign-only adjudication: a king is worth three ordinary stones.
-    return sum((3 if abs(p)==2 else 1)*(1 if p>0 else -1) for p in board if p)
+def journey_endgame(board):
+    """CBD CODEX 2020 art. 59 D/E; a full move is one move per side."""
+    white=(board.count(2),board.count(1))
+    black=(board.count(-2),board.count(-1))
+    pair=tuple(sorted((white,black)))
+    names={
+        ((1,0),(1,0)):(2,'Uma dama contra uma dama'),
+        ((1,0),(2,0)):(5,'Duas damas contra uma dama'),
+        ((1,0),(1,1)):(5,'Uma dama e uma pedra contra uma dama'),
+        ((1,1),(1,1)):(5,'Uma dama e uma pedra de cada lado'),
+        ((2,0),(2,0)):(5,'Duas damas de cada lado'),
+    }
+    match=names.get(pair)
+    if match:
+        return dict(key=str((white,black)),limit=match[0],label=match[1])
+    if pair in (((1,0),(3,0)),((1,0),(2,1)),((1,0),(1,2))):
+        lone=2 if white==(1,0) else -2
+        i=board.index(lone)
+        # Playable long diagonal runs h8/a1 in this board's orientation.
+        if i//8+i%8==7:
+            return dict(key=str((white,black))+'-diagonal',limit=5,label='Três peças contra dama na grande diagonal')
+    return None
 
-def journey_adjudicate(run,reason):
-    balance=journey_material(run['board'])
-    run['outcome']='win' if balance>0 else 'loss' if balance<0 else 'draw'
-    run['reason']='material' if balance else reason
-    run['drawTrigger']=reason
-    run['materialBalance']=balance
+def journey_draw_clock(run):
+    spec=journey_endgame(run['board'])
+    if not spec:
+        run.pop('endgame',None)
+        return None
+    old=run.get('endgame')
+    if not old or old.get('key')!=spec['key']:
+        old=dict(**spec,start=run['sequence'])
+    clock=dict(**old,remaining=max(0,old['limit']*2-(run['sequence']-old['start'])))
+    run['endgame']=clock
+    return clock
+
+def journey_draw_reason(run,position):
+    clock=journey_draw_clock(run)
+    if clock and clock['remaining']==0:return 'endgame'
+    if run['quiet']>=40:return 'quiet'
+    if run['repeats'].get(position,0)>=3:return 'repetition'
+    return None
 
 def journey_award(db,pid,run,completed,unlocked):
     if run['outcome']=='win' and run['chapter']==completed:
@@ -853,14 +884,10 @@ def journey_action(path,d,pid,now):
         sql(db,'UPDATE journey SET completed=completed WHERE player_id=?',(pid,))
         completed,payload,unlocked=sql(db,'SELECT completed,payload,unlocked_at FROM journey WHERE player_id=?',(pid,)).fetchone()
         run=json.loads(payload) if payload else None
-        # Recover only the still-stored, server-recorded favorable draw from
-        # the old campaign rule. Never accept a client board or award twice.
-        if run and run.get('outcome')=='draw' and not run.get('drawTrigger') and journey_material(run['board'])>0:
-            trigger='quiet' if run.get('quiet',0)>=40 else 'repetition' if max(run.get('repeats',{}).values(),default=0)>=3 else 'limit' if run.get('sequence',0)>=500 else None
-            if trigger:
-                journey_adjudicate(run,trigger);run['recoveredDraw']=True
-                completed,unlocked=journey_award(db,pid,run,completed,unlocked)
-                sql(db,'UPDATE journey SET completed=?,payload=?,unlocked_at=? WHERE player_id=?',(completed,json.dumps(run),unlocked,pid))
+        # Preserve previously granted rewards; do not reclassify old results.
+        # For an in-progress legacy game, initialize a new clock at its saved position.
+        if run and run['outcome'] is None and 'endgame' not in run:
+            journey_draw_clock(run)
         if action=='state':return 200,journey_public(completed,run,unlocked,db,pid)
         if active_room(pid,now):return 409,{'error':'Saia da sala online antes de jogar a jornada.'}
         if action=='claim':
@@ -906,9 +933,9 @@ def journey_action(path,d,pid,now):
                 run.setdefault('moves',[]).append(dict(m,side=side,promotion=abs(piece)==1 and abs(run['board'][m['path'][-1]])==2))
                 run['last']=[m['from']]+m['path'];k=position_key(run['board'],-side,'official');run['repeats'][k]=run['repeats'].get(k,0)+1
                 if not legal(run['board'],-side,'official'):run['outcome']='win' if side==1 else 'loss'
-                elif run['quiet']>=40:journey_adjudicate(run,'quiet')
-                elif run['repeats'][k]>=3:journey_adjudicate(run,'repetition')
-                elif run['sequence']>=500:journey_adjudicate(run,'limit')
+                else:
+                    reason=journey_draw_reason(run,k)
+                    if reason:run['outcome']='draw';run['reason']=reason
             play(m,1)
             if run['outcome'] is None:
                 ai=journey_ai(run['board'],run['chapter'],run.get('path'))

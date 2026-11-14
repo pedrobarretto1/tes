@@ -419,23 +419,36 @@ def run(s):
             reply=call('journey/move',hero,id=second['id'],sequence=0,move=second['legal'][0])['run']
             assert reply['sequence']==2 and call('journey/state',hero)['run']['board']==reply['board']
             assert call('journey/start',hero,chapter=1)['run']['id']==reply['id']
-            # Campaign-only draw adjudication: a lead is not an immediate win.
+            # Official campaign endgames: start at the position, count full moves.
             lead=[0]*64;lead[40]=2;lead[42]=2;lead[7]=-2
-            assert s.journey_material(lead)==3
-            for trigger in ('quiet','repetition','limit'):
-                trial={'board':lead[:]}
-                s.journey_adjudicate(trial,trigger);assert trial['outcome']=='win' and trial['reason']=='material' and trial['drawTrigger']==trigger
-                trial={'board':[-p for p in lead]}
-                s.journey_adjudicate(trial,trigger);assert trial['outcome']=='loss'
-                equal=[0]*64;equal[40]=2;equal[7]=-2
-                trial={'board':equal};s.journey_adjudicate(trial,trigger);assert trial['outcome']=='draw' and trial['reason']==trigger
-            # Recover an old stored draw at level 4 and grant the reward exactly once.
+            assert s.journey_endgame(lead)['limit']==5
+            equal=[0]*64;equal[40]=2;equal[7]=-2
+            assert s.journey_endgame(equal)['limit']==2
+            for board,limit in ((lead,5),(equal,2),([-p for p in lead],5)):
+                trial=dict(board=board,sequence=30,quiet=0,repeats={})
+                assert s.journey_draw_clock(trial)['remaining']==limit*2
+                trial['sequence']+=limit*2-1
+                assert s.journey_draw_reason(trial,'x') is None
+                trial['sequence']+=1
+                assert s.journey_draw_reason(trial,'x')=='endgame'
+            trial=dict(board=lead[:],sequence=30,quiet=0,repeats={})
+            s.journey_draw_clock(trial);trial['board']=equal;trial['sequence']=31
+            assert s.journey_draw_clock(trial)['remaining']==4
+            trial['repeats']={'x':3};assert s.journey_draw_reason(trial,'x')=='repetition'
+            trial['repeats']={};trial['quiet']=40;assert s.journey_draw_reason(trial,'x')=='quiet'
+            # Old drawn games remain drawn; no retroactive unlock or extra coins.
             old_draw=dict(id='old-draw',version=2,chapter=3,board=lead,sequence=40,quiet=40,repeats={},outcome='draw',last=[],moves=[],reward=0)
             with s.database() as db:s.sql(db,'UPDATE journey SET completed=3,payload=? WHERE player_id=?',(json.dumps(old_draw),hero_id))
             before=call('school/state',hero)['coins']
-            recovered=call('journey/state',hero);assert recovered['completed']==4 and recovered['run']['outcome']=='win' and recovered['run']['recoveredDraw']
-            assert call('school/state',hero)['coins']==before+100
-            assert call('journey/state',hero)['completed']==4 and call('school/state',hero)['coins']==before+100
+            unchanged=call('journey/state',hero);assert unchanged['completed']==3 and unchanged['run']['outcome']=='draw'
+            assert call('school/state',hero)['coins']==before
+            # Real server move at the last half-move: a capture wins before the draw.
+            win_board=[0]*64;win_board[42]=2;win_board[35]=-2
+            last_run=dict(id='last-capture',version=2,chapter=3,board=win_board,sequence=33,quiet=0,repeats={},outcome=None,last=[],moves=[],reward=0)
+            last_run['endgame']=dict(**s.journey_endgame(win_board),start=30,remaining=1)
+            with s.database() as db:s.sql(db,'UPDATE journey SET payload=? WHERE player_id=?',(json.dumps(last_run),hero_id))
+            won=call('journey/move',hero,id='last-capture',sequence=33,move=s.legal(win_board,1,'official')[0])
+            assert won['run']['outcome']=='win' and won['completed']==4 and call('school/state',hero)['coins']==before+100
             # Test fixture only: simulate a late-game position in the final chapter.
             final_board=[0]*64;final_board[42]=1;final_board[35]=-1
             final_run=dict(id='test-final',chapter=4,board=final_board,sequence=20,quiet=0,repeats={s.position_key(final_board,1,'official'):1},outcome=None,last=[],reward=0)
