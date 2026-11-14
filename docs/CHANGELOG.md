@@ -5,6 +5,26 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 14/11/2026 — Clãs: identidade de honra, busca e fundação ao vivo
+- Pedido: corrigir letras espremidas na busca (print), dar mais identidade
+  às telas de busca/criação, atualizar prévia durante digitação e harmonizar menu.
+- Causa: largura global 100% dos botões consumia o flex da busca e fazia
+  as abas ocuparem linhas inteiras; inputs sem estilo específico.
+- clube.css: escopo #clanoverlay; busca em grid minmax(0,1fr)/auto, campos
+  escuros legíveis, abas compactas, brasões em CSS, salão de ferro/dourado,
+  cartas e estado vazio temático, formulário e prévia responsivos.
+- clube.js: renderClanCreation, clanCrest, labels explícitos; prévia atualiza
+  nome/sigla/descrição/brasão em input/change, sem salvar/recriar formulário;
+  sigla em maiúsculas, aviso de 2–6 letras/números (sem pontos), botão
+  bloqueado até nome/sigla válidos. Requisitos opcionais preservados.
+- index.html: menu Clãs secondary como os três vizinhos; novo banner,
+  cache clube.js v71/clube.css v66.
+- Testes: sintaxe JS e simulação da busca, prévia, sigla C.T inválida/CE
+  válida, envio com 7 requisitos null aprovadas. test_clas_ui.js verifica
+  layout real 375/758/1280 px no Chromium, workflow atualizado; CI pendente.
+- Sem alteração no servidor, banco, torneios, Torre ou regras de entrada.
+  Branch clas-honra-visual, publicação pendente; rollback reverte UI/teste.
+
 ## 14/11/2026 — Clãs: primeira versão social
 - Pedido: aplicar clãs após aprovação do plano. Entrega inicial sem torneios
   financiados: criação, busca, requisitos opcionais, solicitações e convites,
