@@ -34,6 +34,40 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.waitForFunction(()=>confirmedResult?.bot&&winner&&document.getElementById('resultpoints').textContent.includes('20 PH'),{},{timeout:15000});
   const profile=await page.evaluate(async()=>{const r=await fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:profileToken()})});return r.json()});
   assert.equal(profile.points,970);assert.equal(profile.losses,2);
+  await page.locator('#closevictory').click();
+  // Exercise the real local board at desktop and mobile widths. Keep the
+  // old orientation until the last animation (including chained jumps) ends.
+  const orientation=()=>page.evaluate(()=>({turn,flipped,first:Number(document.querySelector('#board').firstElementChild.dataset.square),sequence}));
+  async function localMove(){const m=await page.evaluate(()=>legal(b,turn)[0]);await page.locator('#board [data-square="'+m.from+'"]').click();for(const square of m.path){await page.locator('#board [data-square="'+square+'"]').click();await page.waitForFunction(()=>!animating)}}
+  for(const width of [1280,375]){
+    await page.setViewportSize({width,height:800});
+    await page.evaluate(()=>{setFocus(false);setMode('local');setRules('official');reset();startFocus()});
+    assert.deepEqual(await orientation(),{turn:1,flipped:false,first:0,sequence:0});
+    // Hold a single animation deliberately to verify the orientation timing.
+    await page.evaluate(()=>{window.savedMoveFX=window.clubMoveFX;window.clubMoveFX=()=>new Promise(resolve=>window.releaseLocalFX=resolve)});
+    const m=await page.evaluate(()=>legal(b,turn)[0]);
+    await page.locator('#board [data-square="'+m.from+'"]').click();
+    await page.locator('#board [data-square="'+m.path[0]+'"]').click();
+    await page.waitForFunction(()=>animating&&typeof window.releaseLocalFX==='function');
+    assert.deepEqual(await orientation(),{turn:-1,flipped:false,first:0,sequence:1});
+    await page.evaluate(()=>{window.clubMoveFX=window.savedMoveFX;window.releaseLocalFX()});
+    await page.waitForFunction(()=>!animating&&flipped);
+    assert.deepEqual(await orientation(),{turn:-1,flipped:true,first:63,sequence:1});
+    await localMove();
+    assert.deepEqual(await orientation(),{turn:1,flipped:false,first:0,sequence:2});
+    // Multi-capture: the intermediate hop must never turn the board.
+    await page.evaluate(()=>{reset();startFocus();b=Array(64).fill(0);b[42]=1;b[35]=-1;b[21]=-1;b[3]=-1;b[56]=1;repeats=new Map([[key(),1]]);render()});
+    await page.locator('#board [data-square="42"]').click();
+    await page.locator('#board [data-square="28"]').click();
+    await page.waitForFunction(()=>!animating&&prefix.length===1);
+    assert.deepEqual(await orientation(),{turn:1,flipped:false,first:0,sequence:0});
+    await page.locator('#board [data-square="14"]').click();
+    await page.waitForFunction(()=>!animating&&flipped);
+    assert.deepEqual(await orientation(),{turn:-1,flipped:true,first:63,sequence:1});
+    await page.evaluate(()=>{reset();startFocus()});
+    assert.deepEqual(await orientation(),{turn:1,flipped:false,first:0,sequence:0});
+    console.log('LOCAL UI OK: '+width+'px; automatic turn orientation, animation, multi-capture and reset');
+  }
   assert.deepEqual(errors,[]);
   console.log('BOT UI OK: server moves, medium/hard rewards, easy practice, profile persistence');
  }finally{if(browser)await browser.close();server.kill()}
