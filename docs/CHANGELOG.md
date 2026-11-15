@@ -5,6 +5,14 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Portal dos Dois Reinos, Xadrez v1
+- Pedido: universo Xadrez acessível fora do menu, menus independentes, mesma conta e amigos, indicador Damas/Xadrez; não incluir Torre dos Reis no Xadrez.
+- index.html: seletor no cabeçalho (visível também com menu inicial aberto), protege troca durante duelo online/IA remunerado/Jornada, confirma abandono Local. xadrez.html, xadrez.css e xadrez.js: mesa Local independente com 32 peças, giro por turno, histórico SAN, desfazer, desistência, promoção e salvamento em sessionStorage. Menu próprio Local/Amigos/Perfil/Regras; nenhuma Torre/Jornada ou link que simule sistema não implementado. Visual original em CSS/glyphs, sem imagens geradas.
+- chess-engine.js: motor local 0x88, lances legais, xeque, roque, en passant, promoção, mate, afogamento, material insuficiente, repetição, 50/75 lances. Sem resultado competitivo ou confiança do servidor no cliente.
+- servidor.py: PRESENCE_GAME efêmero, chess/state com identidade e amizades compartilhadas, sem PH/estatísticas de Damas; status online/busy/game em Damas, bloqueio de desafio durante partida Xadrez Local. Convites Damas recebidos no Xadrez encaminham ao Clube de Honra para escolha/aceite; sem convite Xadrez nesta versão. clube.js: presença abaixo do nome, polling visível, abertura Amigos ao retorno. Conta gerenciada no portal Damas; sem nova tabela ou migração. Amigos offline não exibem universo atual. Última aba visível com heartbeat define presença.
+- Escopo v1: apenas Local; IA, online Xadrez, ranking, PH/moedas, loja, clãs, escola e torneios ainda pendentes. Torre dos Reis exclusiva das Damas. Salva partida Local nesta aba, sem sincronização cloud. Mesma conta sem duplicar perfil. Nenhuma economia alterada.
+- Testes: perft 20/400/8902, regras especiais, isolamento social, Chromium 1280/375 e troca de reino; CI/publicação pendentes. Branch portal-xadrez-v1. Rollback: reverter portal e rotas/arquivos, sem mudança de dados.
+
 ## 15/11/2026 — Giro automático no modo Local
 - Pedido: alternar a perspectiva do tabuleiro para facilitar partidas no mesmo dispositivo.
 - index.html: runMoveFX atualiza flipped somente após finalizar a animação,
