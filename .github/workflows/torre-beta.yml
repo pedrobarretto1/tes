@@ -12,15 +12,18 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m py_compile servidor.py torre.py clas.py bot_duels.py
-      - run: python -m unittest test_torre.py test_torre_api.py test_clas.py test_bot_duels.py -v
+      - run: python -m unittest test_torre.py test_torre_api.py test_clas.py test_bot_duels.py test_chess_social.py -v
       - run: python -c "import servidor,selftest; selftest.run(servidor)"
       - run: python -c "import re,pathlib; pathlib.Path('/tmp/tower.js').write_text(re.findall(r'<script>(.*?)</script>',pathlib.Path('torre.html').read_text(),re.S)[-1])"
       - run: node --check /tmp/tower.js
       - run: node test_torre_ui.js
       - run: node --check clube.js
+      - run: node --check xadrez.js
+      - run: node test_chess_engine.js
       - run: python -c "import re,pathlib; p=pathlib.Path('index.html').read_text(); pathlib.Path('/tmp/main-game.js').write_text('\n'.join(re.findall(r'<script>(.*?)</script>',p,re.S)))"
       - run: node --check /tmp/main-game.js
       - run: npm install --no-save --no-package-lock playwright@1.51.1
       - run: npx playwright install chromium --with-deps
       - run: node test_clas_ui.js
       - run: node test_bot_ui.js
+      - run: node test_chess_ui.js
