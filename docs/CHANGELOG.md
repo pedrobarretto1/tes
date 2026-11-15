@@ -5,6 +5,19 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Giro automático no modo Local
+- Pedido: alternar a perspectiva do tabuleiro para facilitar partidas no mesmo dispositivo.
+- index.html: runMoveFX atualiza flipped somente após finalizar a animação,
+  se modo Local, partida em andamento e sem captura intermediária. Claras
+  embaixo na vez das claras, escuras embaixo na vez das escuras. Usa o renderer
+  e coordenadas existentes; não adiciona transformação CSS sobre as peças.
+  Nova partida volta à orientação inicial. Giro manual continua disponível
+  e a próxima troca de vez restabelece a perspectiva automática.
+- Sem alterações em regras, IA, online, Torre, Jornada, servidor ou economia.
+- test_bot_ui.js: teste real Chromium em 1280/375 px, duas trocas de vez,
+  animação retida, captura múltipla e reinício. CI/publicação pendentes.
+  Branch local-giro-automatico. Rollback: reverter alteração de interface.
+
 ## 14/11/2026 — Recompensas nas partidas contra computador
 - Pedido: Fácil sem recompensa, Médio 50%, Difícil 100% dos benefícios de partidas ranqueadas contra pessoas.
 - bot_duels.py: partidas autoritativas persistidas (bot_duels, uma por jogador), sorteio de cores, motor oficial, busca minimax com limites de profundidade/nós/tempo, relógio servidor, lances legais, empate automático/oferta e final inevitável. Nenhum resultado declarado pelo navegador. Idempotência por match/sequence/nonce e results; recompensa, histórico, replay, estatísticas e conquistas na mesma transação.
