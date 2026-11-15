@@ -66,7 +66,7 @@ $('chess-back').onclick=()=>{if(claimed)claimed='';else if(moves.length){history
 $('chess-resign').onclick=()=>{if(!ended()&&confirm('Confirmar desistência das '+(game().t===1?'brancas':'pretas')+'?')){claimed=(game().t===1?'Pretas':'Brancas')+' venceram por desistência.';selected=-1;promotion=null;render();poll()}};
 $('chess-claim').onclick=()=>{let st=C.status(history);if(!ended()&&st.claim){claimed='Empate por '+st.claim+'.';selected=-1;promotion=null;render();poll()}};
 $('chess-flip').onclick=()=>{flipped=!flipped;render()};$('chess-auto').onchange=()=>{auto=$('chess-auto').checked;if(auto)flipped=game().t===-1;render()};
-$('chess-menu').onclick=()=>open('menu-dialog');$('chess-friends').onclick=$('menu-friends').onclick=()=>open('friends-dialog');$('chess-profile').onclick=$('menu-profile').onclick=()=>open('profile-dialog');$('menu-rules').onclick=()=>open('rules-dialog');
+$('chess-menu').onclick=()=>open('menu-dialog');$('chess-friends').onclick=$('menu-friends').onclick=()=>open('friends-dialog');$('chess-profile').onclick=$('menu-profile').onclick=()=>open('profile-dialog');$('menu-rules').onclick=$('sidebar-rules').onclick=()=>open('rules-dialog');
 document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>$(e.dataset.close).close());
 function label(p){return !p.online?'Offline':(p.game==='chess'?'Xadrez':'Damas')+' · '+(p.busy?'Em partida':'Disponível')}
 function drawSocial(data){profile=data.me;online=true;$('chess-profile').textContent=profile.name;$('chess-profile-name').textContent=profile.name;$('white-name').textContent=profile.name;
