@@ -15,8 +15,11 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
   e a próxima troca de vez restabelece a perspectiva automática.
 - Sem alterações em regras, IA, online, Torre, Jornada, servidor ou economia.
 - test_bot_ui.js: teste real Chromium em 1280/375 px, duas trocas de vez,
-  animação retida, captura múltipla e reinício. CI/publicação pendentes.
-  Branch local-giro-automatico. Rollback: reverter alteração de interface.
+  animação retida, captura múltipla e reinício. CI 43745259870 aprovado:
+  31 testes Python, SELFTEST, regressão Torre, Clãs e IA, giro Local em
+  1280 e 375 px. PR #13 integrada: 7d270f351ec60c105a47079ea39e57165082c516.
+  Render dep-dbsvbrm1egvs73evvdj0 live; teste manual em produção pendente.
+  Rollback: reverter alteração de interface.
 
 ## 14/11/2026 — Recompensas nas partidas contra computador
 - Pedido: Fácil sem recompensa, Médio 50%, Difícil 100% dos benefícios de partidas ranqueadas contra pessoas.
