@@ -6,6 +6,7 @@ from urllib.request import urlopen, Request
 
 ROOMS = {}
 PRESENCE = {}
+PRESENCE_GAME = {}  # Ephemeral visible universe, not a competitive identity.
 INVITES = {}
 MATCH_QUEUE = {}
 LOGIN_LIMITS = {}
@@ -493,10 +494,30 @@ def live_for(pid,now):
         return dict(code=v['code'],mode=v['mode'])
     return None
 
+def presence_busy(pid,now):
+    return active_room(pid,now) or bool(live_for(pid,now)) or (now-PRESENCE.get(pid,-1000)<=25 and PRESENCE_GAME.get(pid,('damas',False))==('chess',True))
+def chess_state(pid,now):
+    # Shared social graph; deliberately no Damas competitive data.
+    with database() as db:
+        me=sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()
+        if not me:return None
+        rows=sql(db,"SELECT p.id,p.name,f.sender,f.state FROM friendships f JOIN players p ON p.id=CASE WHEN f.sender=? THEN f.receiver ELSE f.sender END WHERE f.sender=? OR f.receiver=?",(pid,pid,pid)).fetchall()
+        friends=[]
+        for other,name,sender,status in rows:
+            online=now-PRESENCE.get(other,-1000)<=25
+            friends.append(dict(id=other,name=name,relation='friend' if status=='accepted' else 'outgoing' if sender==pid else 'incoming',online=online,game=PRESENCE_GAME.get(other,('damas',False))[0] if online else None,busy=online and presence_busy(other,now)))
+        invites=[]
+        for key,v in INVITES.items():
+            if v['receiver']==pid and v['state']=='pending' and now-v['time']<60:
+                p=sql(db,'SELECT name FROM players WHERE id=?',(v['sender'],)).fetchone()
+                if p:invites.append(dict(id=key,name=p[0],game='damas'))
+    friends.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold()))
+    return dict(me=dict(name=me[0]),friends=friends,invites=invites)
 def social_state(pid,now):
     for event in list(TOURNAMENTS.values()):event_tick(event,now)
     for k,v in list(PRESENCE.items()):
-        if now-v>25: del PRESENCE[k]
+        if now-v>25:
+            del PRESENCE[k];PRESENCE_GAME.pop(k,None)
     for k,v in list(INVITES.items()):
         if now-v['time']>120: del INVITES[k]
     if pid in MATCH_QUEUE:
@@ -511,7 +532,7 @@ def social_state(pid,now):
             if other==pid: continue
             p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(other,)).fetchone()
             if not p: continue
-            people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,busy=active_room(other,now) or bool(live_for(other,now)),live=live_for(other,now),relation=rel.get(other,'none')))
+            people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,game=PRESENCE_GAME.get(other,('damas',False))[0] if other in PRESENCE else None,busy=presence_busy(other,now),live=live_for(other,now),relation=rel.get(other,'none')))
         challenges=[]; session=session_for(pid,now)
         for key,v in INVITES.items():
             if pid not in (v['sender'],v['receiver']): continue
@@ -544,7 +565,7 @@ def public_player(db,pid,row,now):
     rel=sql(db,'SELECT sender,receiver,state FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,other,other,pid)).fetchone()
     relation='none' if not rel else 'friend' if rel[2]=='accepted' else 'outgoing' if rel[0]==pid else 'incoming'
     online=now-PRESENCE.get(other,-1000)<=25
-    return dict(id=other,name=n,points=points,wins=wins,losses=losses,draws=draws,relation=relation,online=online,busy=online and (active_room(other,now) or bool(live_for(other,now))),live=live_for(other,now) if online else None)
+    return dict(id=other,name=n,points=points,wins=wins,losses=losses,draws=draws,relation=relation,online=online,game=PRESENCE_GAME.get(other,('damas',False))[0] if online else None,busy=online and presence_busy(other,now),live=live_for(other,now) if online else None)
 def social_lookup(path,d,pid,now):
     with database() as db:
         if path=='/api/social/search':
@@ -1221,6 +1242,13 @@ def social_action(path,d,now):
     with database() as db:
         if not sql(db,'SELECT id FROM players WHERE id=?',(pid,)).fetchone(): return 403,{'error':'Perfil não encontrado. Abra o cadastro.'}
     PRESENCE[pid]=now
+    if path in ('/api/social/register','/api/social/state'):
+        PRESENCE_GAME[pid]=('damas',False)
+    if path=='/api/social/chess/state':
+        # Chess Local is a client-only presence hint, never a result or reward.
+        PRESENCE_GAME[pid]=('chess',d.get('busy') is True)
+        MATCH_QUEUE.pop(pid,None)
+        return 200,chess_state(pid,now)
     if path=='/api/social/save/state':return 200,progress_snapshot(pid)
     if path.startswith('/api/social/save/'):return 404,{'error':'Ação de salvamento inválida.'}
     if path.startswith('/api/social/clans/'):
@@ -1289,7 +1317,7 @@ def social_action(path,d,now):
         return 200,social_state(pid,now)
     if path=='/api/social/challenge':
         if target==pid or target not in PRESENCE or now-PRESENCE[target]>25: return 409,{'error':'Jogador não está online.'}
-        if active_room(pid,now) or active_room(target,now): return 409,{'error':'Um jogador está em outra sala.'}
+        if presence_busy(pid,now) or presence_busy(target,now): return 409,{'error':'Um jogador está em outra partida.'}
         if any(v['state']=='pending' and now-v['time']<60 and {v['sender'],v['receiver']}=={pid,target} for v in INVITES.values()): return 409,{'error':'Já existe um desafio pendente.'}
         key=secrets.token_urlsafe(16); rule=d.get('rule','free')
         if not valid_rule(rule): return 400,{'error':'Regra inválida.'}
@@ -1333,11 +1361,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
             self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
+        elif self.path.split('?')[0]=='/xadrez.html':
+            self.reply(200,(BASE/'xadrez.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/torre.html':
             self.reply(200,(BASE/'torre.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/royal-demo.html':
             self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js'):
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js','/xadrez.js','/xadrez.css','/chess-engine.js'):
             file=self.path.split('?')[0][1:]
             self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
