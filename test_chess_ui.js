@@ -21,7 +21,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   assert.equal(await page.locator('#chess-board .chess-piece use').count(),32);
   assert(await page.evaluate(()=>{const pieces=[...document.querySelectorAll('#chess-board .chess-piece')];return pieces.every(p=>{const u=p.querySelector('use'),r=p.getBoundingClientRect(),cell=p.parentElement.getBoundingClientRect();return document.getElementById(u.getAttribute('href').slice(1))&&r.width>20&&r.height>20&&r.width<=cell.width&&r.height<=cell.height})}));
   await page.locator('#chess-focus').click();assert(await page.locator('body').evaluate(el=>el.classList.contains('chess-focus')));assert(!(await page.locator('.chess-sidebar').isVisible()));await page.locator('#chess-focus').click();assert(await page.locator('.chess-sidebar').isVisible());
-  await page.locator('#sidebar-rules').click();assert(await page.locator('#rules-dialog').isVisible());await page.locator('[data-close=rules-dialog]').click();
+  await page.locator('.chess-roadmap summary').click();await page.locator('#sidebar-rules').click();assert(await page.locator('#rules-dialog').isVisible());await page.locator('[data-close=rules-dialog]').click();
   assert.equal(await page.locator('[data-square=h1]').evaluate(el=>el.classList.contains('light')),true);
   await page.locator('#chess-menu').click();assert(await page.getByRole('button',{name:'♞ Partida Local Dois jogadores'}).isVisible());assert.equal(await page.locator('#menu-dialog').getByText('Torre dos Reis').count(),0);await page.locator('[data-close=menu-dialog]').click();
   await page.locator('[data-square=e2]').click();assert(await page.locator('[data-square=e4]').evaluate(el=>el.classList.contains('target')));await page.locator('[data-square=e4]').click();
@@ -32,7 +32,28 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.locator('#chess-friends').click();assert(await page.locator('#friends-dialog').isVisible());await page.locator('[data-close=friends-dialog]').click();
   await page.setViewportSize({width:375,height:780});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.equal(await page.locator('#chess-board button').count(),64);assert(await page.evaluate(()=>{const board=document.getElementById('chess-board').getBoundingClientRect();return Math.abs(board.width-board.height)<2&&board.width<=innerWidth&&[...document.querySelectorAll('#chess-board .chess-piece')].every(p=>p.getBoundingClientRect().width>20)}));
   await page.locator('#chess-menu').click();assert(await page.locator('#menu-dialog').isVisible());await page.locator('[data-close=menu-dialog]').click();
+  await page.locator('#chess-ranking-open').click();assert(await page.locator('#ranking-dialog').isVisible());assert((await page.locator('#chess-ranking-full').textContent()).includes('Teste Portal'));await page.locator('[data-close=ranking-dialog]').click();
+  await page.locator('[data-chess-mode=ai]').click();assert(await page.locator('#chess-difficulty').isVisible());await page.locator('[data-chess-level=medium]').click();
+  await page.locator('#sidebar-new').click();await page.waitForFunction(()=>document.getElementById('chess-side-hint').textContent.startsWith('Suas peças:'));
+  await page.waitForFunction(()=>document.getElementById('chess-status').textContent!=='Vez do Computador');
+  page.on('dialog',d=>d.accept());await page.locator('#sidebar-resign').click();
+  await page.waitForFunction(()=>document.getElementById('chess-personal-rank').textContent.includes('990 PH'));
+  assert((await page.locator('#chess-message').textContent()).includes('-10 PH'));
+  await page.locator('[data-chess-level=easy]').click();await page.locator('#sidebar-new').click();await page.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);
+  await page.waitForFunction(()=>document.getElementById('chess-status').textContent!=='Vez do Computador');await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);
+  assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
+  // Two isolated accounts play a real online game with a shared queue.
+  const second=await browser.newPage({viewport:{width:1280,height:800}});second.on('pageerror',e=>errors.push(e.message));await second.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
+  await second.addInitScript(()=>{localStorage.setItem('damas-name','Teste Rival');localStorage.setItem('damas-profile-token','chess-rival-test-token-012345678901234567890123')});
+  await second.goto(base,{waitUntil:'domcontentloaded'});await second.waitForFunction(()=>!document.getElementById('clubmenu').classList.contains('hidden'));await second.locator('#enter-xadrez').click();await second.waitForURL('**/xadrez.html');await second.waitForFunction(()=>document.getElementById('chess-profile').textContent==='Teste Rival');
+  for(const p of [page,second]){await p.locator('[data-chess-mode=online]').click();await p.locator('#chess-time').selectOption('3');await p.locator('#chess-ranked').selectOption('casual');await p.locator('#chess-search').click()}
+  await page.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);await second.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);
+  const white=(await page.locator('#chess-side-hint').textContent()).includes('brancas')?page:second,black=white===page?second:page;
+  await white.locator('[data-square=e2]').click();await white.locator('[data-square=e4]').click();await black.waitForFunction(()=>document.querySelector('[data-square=e4] .chess-piece')?.dataset.piece==='P');
+  await black.locator('[data-square=e7]').click();await black.locator('[data-square=e5]').click();await white.waitForFunction(()=>document.querySelector('[data-square=e5] .chess-piece')?.dataset.piece==='p');
+  await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
+  await second.close();await page.locator('[data-chess-mode=local]').click();
   await page.locator('#return-damas').click();await page.waitForURL(base+'/');assert.equal(await page.locator('h1').first().textContent(),'Casa de Damas');
-  assert.deepEqual(errors,[]);console.log('CHESS UI OK: portal, separate menu, 64 squares, legal moves, rotation, save, mobile and return');
+  assert.deepEqual(errors,[]);console.log('CHESS UI OK: portal, SVG, local, AI rewards, two-account online and ranking');
  }finally{if(browser)await browser.close();server.kill()}
 })().catch(e=>{console.error(e);process.exitCode=1});
