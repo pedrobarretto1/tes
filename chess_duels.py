@@ -46,6 +46,8 @@ def finish(s,db,g,winner,reason):
             inserted=s.sql(db,'INSERT INTO chess_history VALUES(?,?,?,?,?,?,?) ON CONFLICT(match_id,player_id) DO NOTHING',(g['id'],pid,g['names'][opposite(c)],outcome,delta,coins,time.time())).rowcount
             if inserted:s.sql(db,'UPDATE chess_profiles SET points=points+?,coins=coins+?,wins=wins+?,losses=losses+?,draws=draws+? WHERE player_id=?',(delta,coins,int(outcome=='win'),int(outcome in ('loss','resign')),int(outcome=='draw'),pid))
             else:delta=coins=0
+        else:
+            s.sql(db,'INSERT INTO chess_history VALUES(?,?,?,?,?,?,?) ON CONFLICT(match_id,player_id) DO NOTHING',(g['id'],pid,g['names'][opposite(c)],outcome,0,0,time.time()))
         result['rewards'][c]=dict(delta=delta,coins=coins,outcome=outcome)
     g['result']=result;save(db,s.sql,g)
 def tick(s,db,g,b):
@@ -136,6 +138,13 @@ def action(s,path,d,pid,now):
     def err(msg,code=409):return code,{'error':msg}
     with s.database() as db:
         sql=s.sql
+        if op=='history':
+            rows=sql(db,'SELECT h.opponent,h.outcome,h.delta,h.coins,h.played_at,m.payload FROM chess_history h JOIN chess_matches m ON m.id=h.match_id WHERE h.player_id=? AND m.finished=1 ORDER BY h.played_at DESC LIMIT 20',(pid,)).fetchall()
+            result=[]
+            for r in rows:
+                g=json.loads(r[5])
+                result.append(dict(opponent=r[0],outcome=r[1],delta=r[2],coins=r[3],played_at=r[4],ranked=g['ranked'],moves=g['moves'],mode=g['mode']))
+            return 200,dict(history=result)
         sql(db,'UPDATE chess_guard SET id=id WHERE id=1')
         g=current(db,sql,pid)
         if g and not g['result']:
