@@ -8,7 +8,7 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
 ## 15/11/2026 — Resultados animados do Xadrez
 - Pedido: trazer telas de vitória, derrota e desistência das Damas ao Xadrez. CSS original de resultados e keyframes movido de index.html para clube.css, sem alterar visual de Damas. Xadrez usa a mesma estrutura, modal nativo, partículas limitadas, redução de movimento e fechamento para a mesa.
 - xadrez.js: resultado do servidor por match id (uma vez), vitória/derrota/desistência/empate conforme lado do jogador; PH/moedas confirmados, Jornada preservada; local usa estado do motor e relógio, rendição reinicia como antes. Mostra após animação final; botão Continuar e salões da Jornada. Sem mudança em API/banco.
-- Testes: regressão UI de desistência local/IA/online/Jornada, vitória do adversário e fechamento; CI pendente. Rollback: reverter commit.
+- Testes: regressão UI de desistência local/IA/online/Jornada, vitória do adversário e fechamento; xeque-mate local e online com derrota na outra conta; empate por repetição quíntupla e redução de movimento. CI pendente. Rollback: reverter commit.
  
 ## 15/11/2026 — Interface compartilhada dos dois reinos
 - Pedido: usar praticamente o mesmo CSS/HTML de Damas no Xadrez, em vez de duplicar aparência. clube.css torna-se fonte visual comum, incluindo o seletor de universos (Damas deixa de carregar xadrez.css, evitando interferência dos cenários de xadrez e download desnecessário), com primitivas de botões, eyebrow, sub e ações extraídas de index.html. Damas mantém sua estrutura e todas as regras.

@@ -115,7 +115,7 @@ function presentResult(){
  const title=kind==='victory'?'Você venceu!':kind==='defeat'?'Você perdeu':kind==='resign'?'Você desistiu':'Empate!';
  let detail=remoteText(r)+(kind==='resign'?'. O tabuleiro foi reiniciado.':kind==='victory'&&r.reason==='resign'?'. O adversário desistiu.':'.');
  if(g.journey)detail+=won?' Coroa conquistada!':' Suas coroas conquistadas continuam salvas.';
- const points=g.journey?(won?'Coroa conquistada':'Jornada do Mestre'):g.ranked&&reward?(reward.delta>=0?'+':'')+reward.delta+' PH · +'+reward.coins+' moedas':'Partida encerrada';
+ const points=g.journey?(won?'Coroa conquistada':'Jornada do Mestre'):g.ranked&&reward?(reward.delta>=0?'+':'')+reward.delta+' PH · +'+reward.coins+' moedas':kind==='victory'?'Vitória':kind==='defeat'?'Derrota':kind==='draw'?'Empate':'Partida encerrada';
  showChessResult(kind,title,detail,points,!!g.journey);
 }
 $('closevictory').onclick=()=>$('victory').close();
