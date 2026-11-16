@@ -5,6 +5,11 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Emblema do Xadrez centralizado
+- Pedido: cavalo do cabeçalho aparece pequeno no canto da moldura dourada. Após compartilhamento do CSS, display grid, centralização e fonte estavam apenas no estilo inline de Damas.
+- clube.css: emblema compartilhado recebe grid, place-items center, fonte 29px, line-height 1 e flex sem encolhimento; regra mobile existente mantém 42px/25px. xadrez.html: mesma estrutura div das Damas com span do símbolo. Versão de clube.css atualizada em ambas as páginas. Sem alterações em regras, contas, banco ou partidas.
+- Teste UI: mede centralização, tamanho da moldura e fonte desktop/mobile. CI pendente. Rollback: reverter commit.
+ 
 ## 15/11/2026 — Resultados animados do Xadrez
 - Pedido: trazer telas de vitória, derrota e desistência das Damas ao Xadrez. CSS original de resultados e keyframes movido de index.html para clube.css, sem alterar visual de Damas. Xadrez usa a mesma estrutura, modal nativo, partículas limitadas, redução de movimento e fechamento para a mesa.
 - xadrez.js: resultado do servidor por match id (uma vez), vitória/derrota/desistência/empate conforme lado do jogador; PH/moedas confirmados, Jornada preservada; local usa estado do motor e relógio, rendição reinicia como antes. Mostra após animação final; botão Continuar e salões da Jornada. Sem mudança em API/banco.
