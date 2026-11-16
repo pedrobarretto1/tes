@@ -33,6 +33,7 @@ class ChessDuelsTest(unittest.TestCase):
         for i,(t,m) in enumerate([(w,'f2f3'),(b,'e7e5'),(w,'g2g4'),(b,'d8h4')]):g=self.ok(t,'move',match=mid,sequence=i,move=m)['match']
         self.assertEqual(g['result']['winner'],'b');self.assertEqual(g['result']['reason'],'checkmate')
         self.assertEqual(self.ok(b,'state')['profile']['points'],1025);self.assertEqual(self.ok(w,'state')['profile']['points'],985)
+        hist=self.ok(b,'history')['history'];self.assertEqual(hist[0]['moves'],['f2f3','e7e5','g2g4','d8h4']);self.assertEqual(hist[0]['outcome'],'win');self.assertEqual(self.ok(self.z,'history')['history'],[])
         self.ok(b,'move',match=mid,sequence=3,move='d8h4')
         self.assertEqual(self.ok(b,'state')['profile']['points'],1025)
         with s.database() as db:
@@ -62,6 +63,7 @@ class ChessDuelsTest(unittest.TestCase):
         g=self.ok(self.a,'state')['match'];self.assertEqual(g['mode'],'online');self.assertFalse(g['ranked'])
         self.assertEqual(self.ok(self.b,'state')['match']['id'],g['id'])
         self.ok(self.a,'resign',match=g['id']);self.assertEqual(self.ok(self.b,'state')['profile']['points'],1000)
+        hist=self.ok(self.a,'history')['history'];self.assertEqual(len(hist),1);self.assertFalse(hist[0]['ranked']);self.assertEqual(hist[0]['delta'],0);self.assertEqual(self.ok(self.z,'history')['history'],[])
     def test_timeout(self):
         g=self.start('hard',minutes=1)
         with s.database() as db:

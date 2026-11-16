@@ -5,6 +5,12 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Menu expandido, Escola, replay e preferências do Xadrez
+- Pedido: adaptar as demais áreas do menu de Damas ao Xadrez. Primeira etapa: quatro seções, atalhos funcionais de busca, desafios, ranking, Escola, replay, amigos, perfil e configurações. Campanha, clãs, loja, Copa, Salão ao Vivo, sala privada e música ainda não disponíveis; nenhuma opção falsa.
+- xadrez.html/css/js: seis exercícios legais com dicas, validação e progresso local; tabuleiros isolados da mesa; replay do jogo atual e últimos 20 registros online, navegação por lance; três acabamentos gratuitos, animações opcionais e efeitos sonoros sintetizados opcionais com volume. Preferências locais do navegador, sem PH/recompensas. Sem alterações no motor ou Damas.
+- chess_duels.py: histórico autenticado por jogador, retorna somente seus jogos concluídos, sem tokens/IDs de outros jogadores. Registra também novos jogos casuais, sem pontuação; históricos casuais anteriores não são migrados. Mantém transações e registros competitivos existentes.
+- Testes: test_chess_ui.js e test_chess_duels.py ampliados; CI pendente. Rollback: reverter alteração, preservar registros; sem migração destrutiva.
+
 ## 15/11/2026 — Animações das peças do Xadrez
 - Pedido: movimentos suaves das peças, captura, cavalo, roque e promoção, preservando o visual rústico e desempenho.
 - xadrez.js/css/html: camada transitória de SVG sobre o tabuleiro, animações Web Animations com transform/opacity, destino oculto até pouso; captura normal/en passant, salto do cavalo, roque simultâneo e promoção. Giro automático ocorre após pouso; estado e salvamento continuam imediatos. Local, IA e online animam um lance confirmado; histórico recuperado ou múltiplos lances perdidos entram diretamente no estado atual. Redimensionamento, desfazer e troca de modo limpam a camada; movimento reduzido respeitado. Nenhum filtro ou animação contínua; sem alteração de regras/banco.
