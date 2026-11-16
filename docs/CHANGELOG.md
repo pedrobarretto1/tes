@@ -5,6 +5,11 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Retorno do Xadrez às Damas
+- Pedido: portal bloqueava saída durante partida IA/Jornada ou busca. xadrez.js/html: saída assíncrona sincroniza o lance pendente, cancela busca, pausa IA/campanha sem desistir e abre Damas; convite de Damas usa o mesmo fluxo. Duelo online exige confirmação, continua ativo e relógio não pausa. Sem token, navega diretamente. Em falha de rede, avisa e permite tentar novamente. Menu permanece fechado.
+- chess_duels.py: leave autenticado e transacional; flag paused na partida existente, relógio congelado, bloqueio de lances enquanto pausado, state retoma com relógio reiniciado. servidor.py: chess_active ignora IA pausada apenas para conflito entre universos; jogo online continua protegido. Sem migração ou exclusão de dados.
+- Testes API e navegador: pausa/retomada, relógio, fila, confirmação online, jornada e retorno real ao portal. CI pendente. Rollback: reverter commit; flag persistida é compatível com versão anterior (retomar antes de rollback).
+
 ## 15/11/2026 — Jornada do Mestre do Xadrez: As Cinco Coroas
 - Pedido: campanha própria, partidas tradicionais completas, mestres com personalidade/dificuldade crescente e recompensas exclusivas. Cinco estágios, brancas, sem relógio; vitória libera próxima coroa e título, derrota/empate permite repetir. Tabuleiro Cinco Coroas exclusivo após as cinco vitórias.
 - chess_duels.py: catálogo e progresso autenticados, tabela chess_journey aditiva, vitória registrada no finish da partida sob guard, start validado/idempotente; usa as partidas AI existentes, níveis de busca distintos e limitados, sem PH/moedas/ranking; histórico identifica campanha. Sem alterar Damas, contas, cosméticos existentes ou regras.
