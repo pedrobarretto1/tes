@@ -30,7 +30,7 @@ function pieceArt(p){
 installArt();
 const pieceNames={k:'Rei',q:'Dama',r:'Torre',b:'Bispo',n:'Cavalo',p:'Peão'};
 const start=()=>C.parseFen(C.START),savedKey='chess-local-v1';
-let history=[start()],moves=[],selected=-1,promotion=null,flipped=false,claimed='',auto=true,profile=null,fetching=false,mode='local',level='medium',remote=null,queued=false,localMinutes=0,localRemaining={w:0,b:0},localClockAt=performance.now(),clockStarted=false,clockAt=performance.now(),botTimer=null,rankData=null;
+let history=[start()],moves=[],selected=-1,promotion=null,flipped=false,claimed='',auto=true,profile=null,fetching=false,mode='local',level='medium',remote=null,queued=false,localMinutes=0,localRemaining={w:0,b:0},localClockAt=performance.now(),clockStarted=false,clockAt=performance.now(),botTimer=null,rankData=null,motionRun=null,deferredData=null;
 const sideKey=()=>game().t===1?'w':'b',game=()=>history.at(-1);
 function rebuild(keys){let h=[start()],ms=[];for(let u of keys){let g=h.at(-1),m=C.legal(g).find(m=>C.key(m)===u);if(!m)throw Error('Lance inválido no histórico');ms.push({key:u,label:C.san(g,m),side:g.t,full:g.full,from:m[0],to:m[1]});h.push(C.apply(g,m))}history=h;moves=ms}
 function restore(){history=[start()];moves=[];claimed='';selected=-1;promotion=null;flipped=false;clockStarted=false;localMinutes=0;localRemaining={w:0,b:0};
@@ -60,11 +60,42 @@ function updateControls(){
  $('chess-draw-actions').hidden=mode!=='online'||!playing;$('chess-offer').textContent=remote?.offer&&remote.offer!==remote.side?'Aceitar empate':'Oferecer empate';$('chess-offer').disabled=!!remote?.offer&&remote.offer===remote.side;$('chess-decline').hidden=!(remote?.offer&&remote.offer!==remote.side);
  $('white-name').textContent=mode==='local'?(profile?.name||'Brancas'):(remote?.names.w||'Brancas');$('black-name').textContent=mode==='local'?'Pretas':(remote?.names.b||'Pretas');
 }
-function render(){
+// The game state is authoritative; only transient SVG copies move above the grid.
+function stopMotion(){
+ if(!motionRun)return;const run=motionRun;motionRun=null;for(const a of run.animations)a.cancel();run.layer.remove();for(const p of run.hidden)p.style.visibility='';
+ const data=deferredData;deferredData=null;if(data)queueMicrotask(()=>{if(remote?.id===data.match?.id&&data.match.moves.length>moves.length)applyData(data)});
+}
+function animateMove(board,{before,move,viewFlip}){
+ if(document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches||!Element.prototype.animate)return false;
+ const [from,to,promo,flag]=move,p=before.b[from],br=board.getBoundingClientRect();
+ if(!br.width)return false;
+ const cell=i=>board.querySelector('[data-square="'+C.sq(i)+'"]');
+ const rect=i=>{const r=cell(i).getBoundingClientRect();return{x:r.left-br.left-board.clientLeft,y:r.top-br.top-board.clientTop,w:r.width,h:r.height}};
+ const layer=element('div','chess-motion-layer');layer.setAttribute('aria-hidden','true');board.append(layer);
+ const run={layer,animations:[],hidden:[]};motionRun=run;
+ const ghost=(piece,i)=>{const r=rect(i),el=element('div','chess-motion-ghost');el.style.cssText='left:'+(r.x+r.w*.06)+'px;top:'+(r.y+r.h*.04)+'px;width:'+(r.w*.88)+'px;height:'+(r.h*.92)+'px';el.append(pieceArt(piece));layer.append(el);return el};
+ const hide=i=>{const el=cell(i).querySelector('.chess-piece');if(el){el.style.visibility='hidden';run.hidden.push(el)}};
+ const duration=p.toLowerCase()==='n'?400:340;
+ const captured=flag==='ep'?to+16*before.t:to;
+ if(before.b[captured]!=='.'){const el=ghost(before.b[captured],captured);run.animations.push(el.animate([{opacity:1,transform:'scale(1)'},{opacity:1,offset:.45,transform:'scale(1)'},{opacity:0,transform:'scale(.7) translateY(6px)'}],{duration,fill:'forwards',easing:'ease-out'}))}
+ const slide=(piece,a,b,jump=false,promote=false)=>{
+  const r=rect(a),d=rect(b),dx=d.x-r.x,dy=d.y-r.y,el=ghost(piece,a);hide(b);
+  const dest='translate('+dx+'px,'+dy+'px)';
+  let frames=jump?[{transform:'translate(0px,0px)'},{transform:'translate('+dx*.5+'px,'+(dy*.5-r.h*.20)+'px) scale(1.07)',offset:.5},{transform:dest}]:[{transform:'translate(0px,0px)'},{transform:dest}];
+  if(promote){frames=[{transform:'translate(0px,0px)'},{transform:dest,offset:.78,opacity:1},{transform:dest+' scale(.8)',opacity:0}];const crowned=ghost(game().b[b],b);run.animations.push(crowned.animate([{opacity:0,transform:'scale(.75)'},{opacity:0,transform:'scale(.75)',offset:.72},{opacity:1,transform:'scale(1.12)',offset:.9},{opacity:1,transform:'scale(1)'}],{duration:duration+120,fill:'forwards',easing:'ease-out'}))}
+  run.animations.push(el.animate(frames,{duration:promote?duration+120:duration,easing:'cubic-bezier(.25,.7,.2,1)',fill:'forwards'}));
+ };
+ slide(p,from,to,p.toLowerCase()==='n',!!promo);
+ if(flag==='castle'){const a=to>from?from+3:from-4,b=to>from?from+1:from-1;slide(before.b[a],a,b)}
+ Promise.allSettled(run.animations.map(a=>a.finished)).then(()=>{if(motionRun!==run)return;stopMotion();if(viewFlip!==flipped)render();});
+ return true;
+}
+function render(motion=null){
+ stopMotion();
  const g=game(),st=C.status(history),done=ended(),legal=canPlay()?C.legal(g):[],targets=new Set(legal.filter(m=>m[0]===selected).map(m=>m[1])),last=moves.at(-1),board=$('chess-board'),playable=new Set(legal.map(m=>m[0]));
- const check=C.checked(g)?g.b.indexOf(g.t===1?'K':'k'):-1;
+ const check=C.checked(g)?g.b.indexOf(g.t===1?'K':'k'):-1,viewFlip=motion?motion.viewFlip:flipped;
  board.replaceChildren();
- for(let n=0;n<64;n++){let j=flipped?63-n:n,i=(j>>3)*16+(j&7),p=g.b[i],coord=C.sq(i);
+ for(let n=0;n<64;n++){let j=viewFlip?63-n:n,i=(j>>3)*16+(j&7),p=g.b[i],coord=C.sq(i);
  let cell=button('',()=>click(i),'chess-square '+(((i>>4)+(i&7))%2?'dark':'light'));
  cell.dataset.square=coord;cell.setAttribute('aria-label',coord+(p!=='.'?' '+pieceNames[p.toLowerCase()]+' '+(C.side(p)===1?'branco':'preto'):' vazia'));
  if(p!=='.'){cell.classList.add('occupied');cell.append(pieceArt(p))}
@@ -78,6 +109,7 @@ function render(){
  if(promotion){for(let m of promotion){let choice=button('',()=>play(m),'chess-promotion-choice');choice.append(pieceArt(g.t===1?m[2].toUpperCase():m[2]),element('span','',pieceNames[m[2]]));$('promotion-choices').append(choice)}$('promotion-choices').append(button('Cancelar',()=>{promotion=null;render()}))}
  const log=$('chess-history');log.replaceChildren();if(!moves.length)log.append(element('li','','Nenhum lance registrado.'));for(let m of moves.slice(-60))log.append(element('li','',m.full+(m.side===1?'. ':'... ')+m.label));log.scrollTop=log.scrollHeight;
  updateControls();paintClock();save();
+ if(motion&&!animateMove(board,motion)&&viewFlip!==flipped)render();
 }
 function paintClock(){
  let minutes=mode==='local'?localMinutes:remote?.minutes||0,remaining=mode==='local'?localRemaining:remote?.remaining;
@@ -85,11 +117,11 @@ function paintClock(){
 }
 function tickLocal(){if(mode!=='local'||!localMinutes||!clockStarted||ended())return;let now=performance.now(),c=sideKey();localRemaining[c]=Math.max(0,localRemaining[c]-(now-localClockAt)/1000);localClockAt=now;if(localRemaining[c]<=0){claimed=(c==='w'?'Pretas':'Brancas')+' venceram por tempo.';selected=-1;promotion=null;render()}else paintClock()}
 setInterval(()=>{if(mode==='local')tickLocal();else paintClock()},200);
-function click(i){if(!canPlay()||promotion)return;let g=game(),legal=C.legal(g);if(C.side(g.b[i])===g.t){selected=selected===i?-1:i;render();return}let choices=legal.filter(m=>m[0]===selected&&m[1]===i);if(choices.length>1){promotion=choices;render()}else if(choices.length)play(choices[0])}
-function play(m){let g=game(),found=C.legal(g).find(x=>C.key(x)===C.key(m));if(!found||!canPlay())return;
+function click(i){if(motionRun||!canPlay()||promotion)return;let g=game(),legal=C.legal(g);if(C.side(g.b[i])===g.t){selected=selected===i?-1:i;render();return}let choices=legal.filter(m=>m[0]===selected&&m[1]===i);if(choices.length>1){promotion=choices;render()}else if(choices.length)play(choices[0])}
+function play(m){let g=game(),found=C.legal(g).find(x=>C.key(x)===C.key(m));if(motionRun||!found||!canPlay())return;
  if(mode!=='local'){promotion=null;selected=-1;request('move',{match:remote.id,sequence:moves.length,move:C.key(found)});return}
  tickLocal();if(ended())return;localClockAt=performance.now();clockStarted=true;
- moves.push({key:C.key(found),label:C.san(g,found),side:g.t,full:g.full,from:found[0],to:found[1]});history.push(C.apply(g,found));selected=-1;promotion=null;if(auto&&!ended())flipped=game().t===-1;render();poll()}
+ const viewFlip=flipped;moves.push({key:C.key(found),label:C.san(g,found),side:g.t,full:g.full,from:found[0],to:found[1]});history.push(C.apply(g,found));selected=-1;promotion=null;if(auto&&!ended())flipped=game().t===-1;render({before:g,move:found,viewFlip});poll()}
 function resetLocal(){if(moves.length&&!ended()&&!confirm('Começar uma nova partida?'))return;history=[start()];moves=[];claimed='';selected=-1;promotion=null;flipped=false;localMinutes=Number($('chess-time').value);localRemaining={w:localMinutes*60,b:localMinutes*60};clockStarted=true;localClockAt=performance.now();render();poll()}
 function switchMode(next){if(next===mode)return true;if(activeRemote()||queued){msg('Conclua a partida ou cancele a busca antes de trocar de modo.');return false}if(mode==='local'){tickLocal();save()}mode=next;remote=null;selected=-1;promotion=null;claimed='';history=[start()];moves=[];flipped=false;if(mode==='local')restore();render();return true}
 function newGame(){if(mode==='local')resetLocal();else if(mode==='ai'&&!activeRemote())request('start',{level,minutes:Number($('chess-time').value),nonce:crypto.randomUUID()})}
@@ -122,20 +154,22 @@ function drawSocial(data){profile=data.me;$('chess-profile').textContent=profile
  for(let x of data.invites||[]){let card=element('div','chess-invite');card.append(element('b','','Convite de Damas · '+x.name),element('p','','Abra Damas para escolher a modalidade e aceitar.'),button('Ver convite em Damas',()=>{if(activeRemote()||queued){msg('Conclua a partida atual.');return}tickLocal();save();sessionStorage.setItem('damas-open-friends','1');location.href='/'}));invites.append(card)}
  $('chess-social-status').textContent='Conectado · lista compartilhada';
 }
-function applyData(data){drawRanking(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
+function applyData(data){if(motionRun&&remote&&data.match?.id===remote.id&&data.match.moves.length>moves.length){deferredData=data;return}drawRanking(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
  if(g&&(!g.result||mode!=='local'&&remote?.id===g.id)){
+  const same=remote?.id===g.id, before=game(), viewFlip=flipped, nextMove=same&&g.moves.length===moves.length+1?C.legal(before).find(m=>C.key(m)===g.moves.at(-1)):null;
   const changed=!remote||remote.id!==g.id||remote.moves.length!==g.moves.length||JSON.stringify(remote.result)!==JSON.stringify(g.result)||remote.offer!==g.offer;
   if(mode==='local'){tickLocal();save()}
   if(!remote||remote.id!==g.id){flipped=g.side==='b';selected=-1;promotion=null}
   remote=g;mode=g.mode;level=g.level||level;clockAt=performance.now();$('chess-time').value=String(g.minutes);$('chess-ranked').value=g.ranked?'ranked':'casual';
-  if(changed){rebuild(g.moves);selected=-1;promotion=null;claimed='';if(g.result){let r=g.result.rewards[g.side];msg(remoteText(g.result)+(g.ranked&&r?' · '+(r.delta>=0?'+':'')+r.delta+' PH · +'+r.coins+' moedas':''))}else msg('');render()}else{updateControls();paintClock()}
+  if(changed){rebuild(g.moves);selected=-1;promotion=null;claimed='';if(g.result){let r=g.result.rewards[g.side];msg(remoteText(g.result)+(g.ranked&&r?' · '+(r.delta>=0?'+':'')+r.delta+' PH · +'+r.coins+' moedas':''))}else msg('');render(nextMove?{before,move:nextMove,viewFlip}:null)}else{updateControls();paintClock()}
  }else{if(mode==='local')$('white-name').textContent=profile?.name||'Brancas';updateControls();paintClock()}
- if(g&&g.mode==='ai'&&!g.result&&sideKey()!==g.side){clearTimeout(botTimer);botTimer=setTimeout(()=>request('bot',{match:g.id,sequence:g.moves.length}),120)}
+ if(g&&g.mode==='ai'&&!g.result&&sideKey()!==g.side){clearTimeout(botTimer);botTimer=setTimeout(()=>request('bot',{match:g.id,sequence:g.moves.length}),motionRun?520:120)}
 }
 async function request(op,body={}){if(fetching){if(op!=='state')msg('Aguarde a sincronização e tente novamente.');return}const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op!=='state')setTimeout(poll,80)}catch(e){msg(e.message);$('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false}}
 function poll(){if(!fetching&&!document.hidden)request('state')}
 window.addEventListener('focus',poll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();else if(mode==='local'){tickLocal();save()}});setInterval(poll,1800);
 $('white-icon').append(pieceArt('K'));$('black-icon').append(pieceArt('k'));
-$('chess-focus').onclick=()=>{let on=document.body.classList.toggle('chess-focus');$('chess-focus').textContent=on?'Mostrar painéis':'Modo concentração';$('chess-focus').setAttribute('aria-pressed',String(on));if(on)window.scrollTo(0,0)};
+$('chess-focus').onclick=()=>{let on=document.body.classList.toggle('chess-focus');$('chess-focus').textContent=on?'Mostrar painéis':'Modo concentração';$('chess-focus').setAttribute('aria-pressed',String(on));if(on)window.scrollTo(0,0);if(motionRun)render()};
+window.addEventListener('resize',()=>{if(motionRun)render()});
 restore();render();if(sessionStorage.getItem('chess-open-friends')==='1'){sessionStorage.removeItem('chess-open-friends');open('friends-dialog')}poll();
 })();
