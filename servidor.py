@@ -103,6 +103,8 @@ def setup():
         clas.setup(db,sql)
         import bot_duels
         bot_duels.setup(db,sql)
+        import chess_duels
+        chess_duels.setup(db,sql)
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 def identity(d):
@@ -556,8 +558,10 @@ def social_state(pid,now):
         clan_cid=clas.member(db,sql,pid)
         clan_identity=clas.public_identity(db,sql,pid)
         clan_role=clan_identity['role'] if clan_identity else None
+        import chess_duels
+        chess_invites=chess_duels.incoming(db,sql,pid)
     people.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold(),p['id']))
-    return dict(me=dict(zip(('name','points','wins','losses','draws'),me),**cosmetics,level=level,clan=clan_identity,account=account[0] if account else None),clan_requests=clan_notices,clan_owner=clan_owner,clan_role=clan_role,persistent=bool(DATABASE_URL),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at','match_id'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread,matchmaking=pid in MATCH_QUEUE)
+    return dict(chess_invites=chess_invites,me=dict(zip(('name','points','wins','losses','draws'),me),**cosmetics,level=level,clan=clan_identity,account=account[0] if account else None),clan_requests=clan_notices,clan_owner=clan_owner,clan_role=clan_role,persistent=bool(DATABASE_URL),players=people[:200],challenges=challenges,session=session,history=[dict(zip(('opponent','outcome','delta','played_at','match_id'),x)) for x in hist],notifications=[dict(zip(('id','kind','actor','name','created_at','seen'),x)) for x in notices],unread=unread,matchmaking=pid in MATCH_QUEUE)
 def search_key(value):
     return ''.join(c for c in unicodedata.normalize('NFKD',str(value).casefold()) if not unicodedata.combining(c))
 def public_player(db,pid,row,now):
@@ -1244,11 +1248,16 @@ def social_action(path,d,now):
     PRESENCE[pid]=now
     if path in ('/api/social/register','/api/social/state'):
         PRESENCE_GAME[pid]=('damas',False)
-    if path=='/api/social/chess/state':
-        # Chess Local is a client-only presence hint, never a result or reward.
+    if path.startswith('/api/social/chess/'):
+        import chess_duels
         PRESENCE_GAME[pid]=('chess',d.get('busy') is True)
         MATCH_QUEUE.pop(pid,None)
-        return 200,chess_state(pid,now)
+        code,data=chess_duels.action(sys.modules[__name__],path,d,pid,now)
+        if code==200:
+            if data.get('match') and not data['match']['result']:PRESENCE_GAME[pid]=('chess',True)
+            if path=='/api/social/chess/state':
+                social=chess_state(pid,now);data['chess_invites']=data.pop('invites');data.update(social)
+        return code,data
     if path=='/api/social/save/state':return 200,progress_snapshot(pid)
     if path.startswith('/api/social/save/'):return 404,{'error':'Ação de salvamento inválida.'}
     if path.startswith('/api/social/clans/'):
@@ -1330,7 +1339,7 @@ def social_action(path,d,now):
             v['state']='declined'
             with database() as db: notify(db,v['sender'],pid,'challenge_declined')
             return 200,social_state(pid,now)
-        if active_room(pid,now) or active_room(v['sender'],now): return 409,{'error':'Um jogador está em outra sala.'}
+        if presence_busy(pid,now) or presence_busy(v['sender'],now): return 409,{'error':'Um jogador está em outra sala.'}
         if now-PRESENCE.get(v['sender'],-1000)>25: return 409,{'error':'Adversário desconectado.'}
         if len(ROOMS)>=1000: return 503,{'error':'Servidor cheio.'}
         # The invited player selects the final rule; legacy clients keep the suggestion.
