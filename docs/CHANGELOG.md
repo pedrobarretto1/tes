@@ -5,6 +5,11 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Animações das peças do Xadrez
+- Pedido: movimentos suaves das peças, captura, cavalo, roque e promoção, preservando o visual rústico e desempenho.
+- xadrez.js/css/html: camada transitória de SVG sobre o tabuleiro, animações Web Animations com transform/opacity, destino oculto até pouso; captura normal/en passant, salto do cavalo, roque simultâneo e promoção. Giro automático ocorre após pouso; estado e salvamento continuam imediatos. Local, IA e online animam um lance confirmado; histórico recuperado ou múltiplos lances perdidos entram diretamente no estado atual. Redimensionamento, desfazer e troca de modo limpam a camada; movimento reduzido respeitado. Nenhum filtro ou animação contínua; sem alteração de regras/banco.
+- Testes: test_chess_ui.js verifica camada transitória, giro após movimento, roque, en passant, promoção e reduced-motion; CI pendente, publicação não confirmada. Rollback: reverter este commit.
+
 ## 15/11/2026 — Menu fechado ao iniciar e trocar de reino
 - Pedido: impedir abertura automática do menu ao carregar Damas ou retornar do Xadrez.
 - clube.js: cadastro silencioso para nome salvo; primeiro acesso ou sessão inválida ainda mostra identificação. Após cadastro/login, fecha identificação sem abrir menu; abertura manual durante conexão é atendida após sucesso. Atalhos explícitos de amigos continuam abrindo o painel correto e o parâmetro é consumido. Navegação manual existente preservada.
