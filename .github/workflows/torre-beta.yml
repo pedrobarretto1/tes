@@ -11,8 +11,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m py_compile servidor.py torre.py clas.py bot_duels.py
-      - run: python -m unittest test_torre.py test_torre_api.py test_clas.py test_bot_duels.py test_chess_social.py -v
+      - run: pip install -r requirements.txt
+      - run: python -m py_compile servidor.py torre.py clas.py bot_duels.py chess_duels.py
+      - run: python -m unittest test_torre.py test_torre_api.py test_clas.py test_bot_duels.py test_chess_social.py test_chess_duels.py -v
       - run: python -c "import servidor,selftest; selftest.run(servidor)"
       - run: python -c "import re,pathlib; pathlib.Path('/tmp/tower.js').write_text(re.findall(r'<script>(.*?)</script>',pathlib.Path('torre.html').read_text(),re.S)[-1])"
       - run: node --check /tmp/tower.js
