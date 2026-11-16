@@ -53,7 +53,7 @@ class ChessDuelsTest(unittest.TestCase):
         self.ok(self.a,'shop-buy',item='board-obsidian');self.ok(self.a,'shop-equip',item='board-obsidian')
         self.assertEqual(self.ok(self.a,'state')['profile']['coins'],50)
         self.assertEqual(self.ok(self.a,'shop-equip',item='pieces-classic')['shop']['equipped']['pieces'],'pieces-classic')
-        with s.database() as db:self.assertEqual(s.sql(db,'SELECT points,coins FROM players WHERE id=?',(self.pa,)).fetchone(),(1000,0))
+        with s.database() as db:self.assertEqual(s.sql(db,'SELECT points,COALESCE((SELECT coins FROM wallets WHERE player_id=players.id),0) FROM players WHERE id=?',(self.pa,)).fetchone(),(1000,0))
     def test_ai_levels_and_retries(self):
         g=self.start('medium');mid=g['id'];side=g['side']
         self.assertEqual(self.ok(self.a,'start',level='hard',minutes=0,nonce='a'*16)['match']['id'],mid)
