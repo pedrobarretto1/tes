@@ -472,9 +472,9 @@ def session_for(pid,now):
 def matchmake(pid,now):
     q=MATCH_QUEUE.get(pid)
     if not q:return
-    if active_room(pid,now): MATCH_QUEUE.pop(pid,None);return
+    if active_room(pid,now) or chess_active(pid): MATCH_QUEUE.pop(pid,None);return
     for other,o in list(MATCH_QUEUE.items()):
-        if now-o['seen']>25 or active_room(other,now): MATCH_QUEUE.pop(other,None);continue
+        if now-o['seen']>25 or active_room(other,now) or chess_active(other): MATCH_QUEUE.pop(other,None);continue
         if other==pid or (q['rule'],q['ranked'],q['minutes'])!=(o['rule'],o['ranked'],o['minutes']):continue
         window=200+int(max(now-q['start'],now-o['start'])//10)*100
         if abs(q['points']-o['points'])>window:continue
@@ -496,8 +496,12 @@ def live_for(pid,now):
         return dict(code=v['code'],mode=v['mode'])
     return None
 
-def presence_busy(pid,now):
-    return active_room(pid,now) or bool(live_for(pid,now)) or (now-PRESENCE.get(pid,-1000)<=25 and PRESENCE_GAME.get(pid,('damas',False))==('chess',True))
+def chess_active(pid,db=None):
+    import chess_duels
+    if db is not None:return chess_duels.active(db,sql,pid)
+    with database() as conn:return chess_duels.active(conn,sql,pid)
+def presence_busy(pid,now,db=None):
+    return active_room(pid,now) or bool(live_for(pid,now)) or (now-PRESENCE.get(pid,-1000)<=25 and PRESENCE_GAME.get(pid,('damas',False))==('chess',True)) or chess_active(pid,db)
 def chess_state(pid,now):
     # Shared social graph; deliberately no Damas competitive data.
     with database() as db:
@@ -507,14 +511,19 @@ def chess_state(pid,now):
         friends=[]
         for other,name,sender,status in rows:
             online=now-PRESENCE.get(other,-1000)<=25
-            friends.append(dict(id=other,name=name,relation='friend' if status=='accepted' else 'outgoing' if sender==pid else 'incoming',online=online,game=PRESENCE_GAME.get(other,('damas',False))[0] if online else None,busy=online and presence_busy(other,now)))
+            friends.append(dict(id=other,name=name,relation='friend' if status=='accepted' else 'outgoing' if sender==pid else 'incoming',online=online,game=PRESENCE_GAME.get(other,('damas',False))[0] if online else None,busy=online and presence_busy(other,now,db)))
+        players=[]
+        for other in list(PRESENCE):
+            if other==pid or now-PRESENCE[other]>25:continue
+            p=sql(db,'SELECT name FROM players WHERE id=?',(other,)).fetchone()
+            if p:players.append(dict(id=other,name=p[0],relation='none',online=True,game=PRESENCE_GAME.get(other,('damas',False))[0],busy=presence_busy(other,now,db)))
         invites=[]
         for key,v in INVITES.items():
             if v['receiver']==pid and v['state']=='pending' and now-v['time']<60:
                 p=sql(db,'SELECT name FROM players WHERE id=?',(v['sender'],)).fetchone()
                 if p:invites.append(dict(id=key,name=p[0],game='damas'))
     friends.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold()))
-    return dict(me=dict(name=me[0]),friends=friends,invites=invites)
+    return dict(me=dict(name=me[0]),friends=friends,players=players[:100],invites=invites)
 def social_state(pid,now):
     for event in list(TOURNAMENTS.values()):event_tick(event,now)
     for k,v in list(PRESENCE.items()):
@@ -534,7 +543,7 @@ def social_state(pid,now):
             if other==pid: continue
             p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(other,)).fetchone()
             if not p: continue
-            people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,game=PRESENCE_GAME.get(other,('damas',False))[0] if other in PRESENCE else None,busy=presence_busy(other,now),live=live_for(other,now),relation=rel.get(other,'none')))
+            people.append(dict(id=other,name=p[0],points=p[1],wins=p[2],losses=p[3],draws=p[4],online=other in PRESENCE,game=PRESENCE_GAME.get(other,('damas',False))[0] if other in PRESENCE else None,busy=presence_busy(other,now,db),live=live_for(other,now),relation=rel.get(other,'none')))
         challenges=[]; session=session_for(pid,now)
         for key,v in INVITES.items():
             if pid not in (v['sender'],v['receiver']): continue
@@ -569,7 +578,7 @@ def public_player(db,pid,row,now):
     rel=sql(db,'SELECT sender,receiver,state FROM friendships WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)',(pid,other,other,pid)).fetchone()
     relation='none' if not rel else 'friend' if rel[2]=='accepted' else 'outgoing' if rel[0]==pid else 'incoming'
     online=now-PRESENCE.get(other,-1000)<=25
-    return dict(id=other,name=n,points=points,wins=wins,losses=losses,draws=draws,relation=relation,online=online,game=PRESENCE_GAME.get(other,('damas',False))[0] if online else None,busy=online and presence_busy(other,now),live=live_for(other,now) if online else None)
+    return dict(id=other,name=n,points=points,wins=wins,losses=losses,draws=draws,relation=relation,online=online,game=PRESENCE_GAME.get(other,('damas',False))[0] if online else None,busy=online and presence_busy(other,now,db),live=live_for(other,now) if online else None)
 def social_lookup(path,d,pid,now):
     with database() as db:
         if path=='/api/social/search':
@@ -1277,7 +1286,7 @@ def social_action(path,d,now):
     if path in ('/api/social/register','/api/social/state'):
         return 200,social_state(pid,now)
     if path=='/api/social/matchmaking/start':
-        if active_room(pid,now):return 409,{'error':'Saia da sala atual antes de buscar partida.'}
+        if active_room(pid,now) or chess_active(pid):return 409,{'error':'Saia da sala atual antes de buscar partida.'}
         rule=d.get('rule','free')
         if not valid_rule(rule):return 400,{'error':'Regra inválida.'}
         with database() as db: points=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()[0]
@@ -1434,6 +1443,7 @@ class Handler(BaseHTTPRequestHandler):
                 while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
                 token=secrets.token_urlsafe(24); side=secrets.choice((1,-1))
                 pid=profile(d)
+                if pid and chess_active(pid):return self.reply(409,{'error':'Conclua a partida de Xadrez antes de entrar em Damas.'})
                 if d.get('ranked') is not False and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 rule=d.get('rule','free')
                 if not valid_rule(rule): return self.reply(400,{'error':'Regra inválida.'})
@@ -1448,6 +1458,7 @@ class Handler(BaseHTTPRequestHandler):
                 side=-r['host']
                 if len(r['tokens'])==2: return self.reply(409,{'error':'Sala cheia.'})
                 pid=profile(d)
+                if pid and chess_active(pid):return self.reply(409,{'error':'Conclua a partida de Xadrez antes de entrar em Damas.'})
                 if r.get('ranked',True) and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
                 if pid and pid==r['profiles'].get(r['host']): return self.reply(409,{'error':'Use outro perfil ou navegador para o adversário.'})
                 r['profiles'][side]=pid
