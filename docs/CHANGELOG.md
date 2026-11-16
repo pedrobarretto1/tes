@@ -5,6 +5,12 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Xadrez: mesa rústica e peças entalhadas
+- Pedido: aproximar layout da Casa de Xadrez ao visual rústico aprovado das Damas e refinar peças.
+- xadrez.html/css: cabeçalho, navegação, mesa, cartas, moldura de madeira com cantos de latão, painéis e menu com a paleta e dimensões das Damas. Retira banner de apresentação para priorizar tabuleiro; painel de regras útil, expansões futuras informativas no menu. Modo concentração reversível, sem mudar estado da partida. Breakpoints 850/520 px, coordenadas separadas e contraste por casa. Portal compartilhado preservado.
+- xadrez.js: 12 símbolos SVG originais (6 tipos x marfim/madeira escura), definições únicas reutilizadas via use, gradientes estáticos, sombras vetoriais sem filtros; desenhos distintos com bases/entalhes. Cartas e promoção usam mesmas peças. Mantém aria-label das casas, seleção, destinos, último lance, xeque, giro e salvamento. Sem alterar motor, identidade, servidor, banco ou Damas.
+- Testes: test_chess_ui.js verifica 32 peças, 12 símbolos, referências e dimensões, concentração, regras, lances/giro/salvamento e responsividade; CI/publicação pendentes. Branch xadrez-refino-rustico. Validação estética manual pendente. Rollback: reverter arquivos Xadrez/teste, sem mudança de dados.
+
 ## 15/11/2026 — Portal dos Dois Reinos, Xadrez v1
 - Pedido: universo Xadrez acessível fora do menu, menus independentes, mesma conta e amigos, indicador Damas/Xadrez; não incluir Torre dos Reis no Xadrez.
 - index.html: seletor no cabeçalho (visível também com menu inicial aberto), protege troca durante duelo online/IA remunerado/Jornada, confirma abandono Local. xadrez.html, xadrez.css e xadrez.js: mesa Local independente com 32 peças, giro por turno, histórico SAN, desfazer, desistência, promoção e salvamento em sessionStorage. Menu próprio Local/Amigos/Perfil/Regras; nenhuma Torre/Jornada ou link que simule sistema não implementado. Visual original em CSS/glyphs, sem imagens geradas.

@@ -15,16 +15,23 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   assert(await page.locator('#enter-xadrez').isVisible());await page.locator('#enter-xadrez').click();
   await page.waitForURL('**/xadrez.html');await page.waitForFunction(()=>document.getElementById('chess-profile').textContent==='Teste Portal');
   assert.equal(await page.locator('#chess-board button').count(),64);assert.equal(await page.locator('#chess-board button').first().getAttribute('data-square'),'a8');
-  assert.equal(await page.locator('[data-square=d1] .chess-piece').textContent(),'♕');
+  assert.equal(await page.locator('[data-square=d1] .chess-piece').getAttribute('data-piece'),'Q');
+  assert.equal(await page.locator('#chess-board .chess-piece').count(),32);
+  assert.equal(await page.locator('.chess-art-defs symbol').count(),12);
+  assert.equal(await page.locator('#chess-board .chess-piece use').count(),32);
+  assert(await page.evaluate(()=>{const pieces=[...document.querySelectorAll('#chess-board .chess-piece')];return pieces.every(p=>{const u=p.querySelector('use'),r=p.getBoundingClientRect(),cell=p.parentElement.getBoundingClientRect();return document.getElementById(u.getAttribute('href').slice(1))&&r.width>20&&r.height>20&&r.width<=cell.width&&r.height<=cell.height})}));
+  await page.locator('#chess-focus').click();assert(await page.locator('body').evaluate(el=>el.classList.contains('chess-focus')));assert(!(await page.locator('.chess-sidebar').isVisible()));await page.locator('#chess-focus').click();assert(await page.locator('.chess-sidebar').isVisible());
+  await page.locator('#sidebar-rules').click();assert(await page.locator('#rules-dialog').isVisible());await page.locator('[data-close=rules-dialog]').click();
   assert.equal(await page.locator('[data-square=h1]').evaluate(el=>el.classList.contains('light')),true);
   await page.locator('#chess-menu').click();assert(await page.getByRole('button',{name:'♞ Partida Local Dois jogadores'}).isVisible());assert.equal(await page.locator('#menu-dialog').getByText('Torre dos Reis').count(),0);await page.locator('[data-close=menu-dialog]').click();
   await page.locator('[data-square=e2]').click();assert(await page.locator('[data-square=e4]').evaluate(el=>el.classList.contains('target')));await page.locator('[data-square=e4]').click();
   assert.equal(await page.locator('#chess-board button').first().getAttribute('data-square'),'h1');assert.equal(await page.locator('#chess-status').textContent(),'Pretas jogam');
   await page.locator('[data-square=e7]').click();await page.locator('[data-square=e5]').click();assert.equal(await page.locator('#chess-board button').first().getAttribute('data-square'),'a8');
-  await page.reload();assert.equal(await page.locator('[data-square=e4] .chess-piece').textContent(),'♙');assert.equal(await page.locator('[data-square=e5] .chess-piece').textContent(),'♟︎');
+  await page.reload();assert.equal(await page.locator('[data-square=e4] .chess-piece').getAttribute('data-piece'),'P');assert.equal(await page.locator('[data-square=e5] .chess-piece').getAttribute('data-piece'),'p');
   await page.locator('#chess-back').click();assert.equal(await page.locator('#chess-status').textContent(),'Pretas jogam');
   await page.locator('#chess-friends').click();assert(await page.locator('#friends-dialog').isVisible());await page.locator('[data-close=friends-dialog]').click();
-  await page.setViewportSize({width:375,height:780});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.equal(await page.locator('#chess-board button').count(),64);
+  await page.setViewportSize({width:375,height:780});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.equal(await page.locator('#chess-board button').count(),64);assert(await page.evaluate(()=>{const board=document.getElementById('chess-board').getBoundingClientRect();return Math.abs(board.width-board.height)<2&&board.width<=innerWidth&&[...document.querySelectorAll('#chess-board .chess-piece')].every(p=>p.getBoundingClientRect().width>20)}));
+  await page.locator('#chess-menu').click();assert(await page.locator('#menu-dialog').isVisible());await page.locator('[data-close=menu-dialog]').click();
   await page.locator('#return-damas').click();await page.waitForURL(base+'/');assert.equal(await page.locator('h1').first().textContent(),'Casa de Damas');
   assert.deepEqual(errors,[]);console.log('CHESS UI OK: portal, separate menu, 64 squares, legal moves, rotation, save, mobile and return');
  }finally{if(browser)await browser.close();server.kill()}
