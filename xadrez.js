@@ -30,55 +30,112 @@ function pieceArt(p){
 installArt();
 const pieceNames={k:'Rei',q:'Dama',r:'Torre',b:'Bispo',n:'Cavalo',p:'Peão'};
 const start=()=>C.parseFen(C.START),savedKey='chess-local-v1';
-let history=[start()],moves=[],selected=-1,promotion=null,flipped=false,claimed='',auto=true,online=false,profile=null,fetching=false;
-try{let x=JSON.parse(sessionStorage.getItem(savedKey)||'null');if(x&&Array.isArray(x.moves)&&x.moves.length<=1000){let h=[start()],ms=[];for(let u of x.moves){let g=h.at(-1),m=C.legal(g).find(m=>C.key(m)===u);if(!m||C.status(h).done)throw Error('invalid save');ms.push({key:u,label:C.san(g,m),side:g.t,full:g.full,from:m[0],to:m[1]});h.push(C.apply(g,m))}history=h;moves=ms;auto=x.auto!==false;flipped=auto?history.at(-1).t===-1:!!x.flipped;claimed=typeof x.claimed==='string'?x.claimed.slice(0,100):''}}catch{}
-function save(){try{sessionStorage.setItem(savedKey,JSON.stringify({moves:moves.map(m=>m.key),auto,flipped,claimed}))}catch{}}
+let history=[start()],moves=[],selected=-1,promotion=null,flipped=false,claimed='',auto=true,profile=null,fetching=false,mode='local',level='medium',remote=null,queued=false,localMinutes=0,localRemaining={w:0,b:0},localClockAt=performance.now(),clockStarted=false,clockAt=performance.now(),botTimer=null,rankData=null;
+const sideKey=()=>game().t===1?'w':'b',game=()=>history.at(-1);
+function rebuild(keys){let h=[start()],ms=[];for(let u of keys){let g=h.at(-1),m=C.legal(g).find(m=>C.key(m)===u);if(!m)throw Error('Lance inválido no histórico');ms.push({key:u,label:C.san(g,m),side:g.t,full:g.full,from:m[0],to:m[1]});h.push(C.apply(g,m))}history=h;moves=ms}
+function restore(){history=[start()];moves=[];claimed='';selected=-1;promotion=null;flipped=false;clockStarted=false;localMinutes=0;localRemaining={w:0,b:0};
+ try{let x=JSON.parse(sessionStorage.getItem(savedKey)||'null');if(x&&Array.isArray(x.moves)&&x.moves.length<=1000){rebuild(x.moves);auto=x.auto!==false;flipped=auto?game().t===-1:!!x.flipped;claimed=typeof x.claimed==='string'?x.claimed.slice(0,100):'';localMinutes=[0,1,3,5,10,15,30].includes(x.minutes)?x.minutes:0;localRemaining={w:Math.max(0,Number(x.remaining?.w??localMinutes*60)),b:Math.max(0,Number(x.remaining?.b??localMinutes*60))};clockStarted=!!x.started}}catch{}localClockAt=performance.now();$('chess-time').value=String(localMinutes)}
+function save(){if(mode!=='local')return;try{sessionStorage.setItem(savedKey,JSON.stringify({moves:moves.map(m=>m.key),auto,flipped,claimed,minutes:localMinutes,remaining:localRemaining,started:clockStarted}))}catch{}}
 function element(tag,cls,text){let e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 function button(label,fn,cls){let b=element('button',cls,label);b.type='button';b.onclick=fn;return b}
-function open(id){for(let d of document.querySelectorAll('dialog[open]'))d.close();$(id).showModal();if(id==='friends-dialog')poll()}
-function game(){return history.at(-1)}
-function ended(){return !!claimed||C.status(history).done}
+function open(id){for(let d of document.querySelectorAll('dialog[open]'))d.close();$(id).showModal();if(id==='friends-dialog'||id==='ranking-dialog')poll()}
+const ended=()=>!!claimed||(mode==='local'?C.status(history).done:!!remote?.result);
+const canPlay=()=>!ended()&&(mode==='local'||!!remote&&sideKey()===remote.side&&!fetching);
+const activeRemote=()=>!!remote&&!remote.result;
+function msg(t){$('chess-message').textContent=t}
+function remoteText(r){if(!r)return '';let winner=r.winner==='w'?'Brancas':r.winner==='b'?'Pretas':'';const reasons={checkmate:'xeque-mate',timeout:'tempo',resign:'desistência',stalemate:'afogamento',insufficient_material:'material insuficiente',fivefold_repetition:'repetição quíntupla',seventyfive_moves:'75 lances',claimed_draw:'empate reivindicado',agreement:'acordo'};return winner?winner+' venceram · '+(reasons[r.reason]||r.reason):'Empate · '+(reasons[r.reason]||r.reason)}
+function statusText(){if(claimed)return claimed;if(remote?.result&&mode!=='local')return remoteText(remote.result);if(mode!=='local'&&!remote)return queued?'Buscando adversário…':'Escolha uma partida';if(mode==='ai'&&remote&&sideKey()!==remote.side)return 'Vez do Computador';return C.status(history).text}
+function updateControls(){
+ const playing=activeRemote(),locked=playing||queued;
+ $('chess-mode-label').textContent=mode==='ai'?'COMPUTADOR':mode==='online'?'ONLINE':'LOCAL';
+ document.querySelectorAll('[data-chess-mode]').forEach(b=>{let on=b.dataset.chessMode===mode;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));b.disabled=locked&&!on});
+ document.querySelectorAll('[data-chess-level]').forEach(b=>{let on=b.dataset.chessLevel===level;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));b.disabled=locked});
+ $('chess-difficulty').hidden=mode!=='ai';$('chess-online-settings').hidden=mode!=='online';$('chess-auto-field').hidden=mode!=='local';
+ $('chess-time').disabled=locked||mode==='local'&&clockStarted&&!ended();$('chess-ranked').disabled=locked;
+ $('chess-rewardhint').textContent=level==='easy'?'Fácil · treino, sem PH ou moedas.':level==='medium'?'Médio · 50% de PH e moedas.':'Difícil · 100% de PH e moedas.';
+ $('chess-side-hint').textContent=mode==='local'?'Local: as brancas começam.':remote?'Suas peças: '+(remote.side==='w'?'brancas':'pretas')+'.':'As cores serão sorteadas ao iniciar.';
+ $('chess-search').disabled=locked||fetching;$('chess-cancel-search').hidden=!queued;$('chess-challenge').disabled=locked||fetching;
+ $('sidebar-new').disabled=locked||mode==='online';$('chess-new').disabled=locked||mode==='online';$('sidebar-new').textContent=mode==='online'?'Use Buscar partida ou Desafiar':'Nova partida';
+ $('chess-back').disabled=mode!=='local'||!moves.length&&!claimed;$('chess-resign').disabled=$('sidebar-resign').disabled=mode==='local'?ended():!playing;
+ $('chess-draw-actions').hidden=mode!=='online'||!playing;$('chess-offer').textContent=remote?.offer&&remote.offer!==remote.side?'Aceitar empate':'Oferecer empate';$('chess-offer').disabled=!!remote?.offer&&remote.offer===remote.side;$('chess-decline').hidden=!(remote?.offer&&remote.offer!==remote.side);
+ $('white-name').textContent=mode==='local'?(profile?.name||'Brancas'):(remote?.names.w||'Brancas');$('black-name').textContent=mode==='local'?'Pretas':(remote?.names.b||'Pretas');
+}
 function render(){
- const g=game(),st=C.status(history),done=!!claimed||st.done,legal=done?[]:C.legal(g),targets=new Set(legal.filter(m=>m[0]===selected).map(m=>m[1])),last=moves.at(-1),board=$('chess-board');
- const check= C.checked(g)?g.b.indexOf(g.t===1?'K':'k'):-1;
+ const g=game(),st=C.status(history),done=ended(),legal=canPlay()?C.legal(g):[],targets=new Set(legal.filter(m=>m[0]===selected).map(m=>m[1])),last=moves.at(-1),board=$('chess-board'),playable=new Set(legal.map(m=>m[0]));
+ const check=C.checked(g)?g.b.indexOf(g.t===1?'K':'k'):-1;
  board.replaceChildren();
  for(let n=0;n<64;n++){let j=flipped?63-n:n,i=(j>>3)*16+(j&7),p=g.b[i],coord=C.sq(i);
  let cell=button('',()=>click(i),'chess-square '+(((i>>4)+(i&7))%2?'dark':'light'));
  cell.dataset.square=coord;cell.setAttribute('aria-label',coord+(p!=='.'?' '+pieceNames[p.toLowerCase()]+' '+(C.side(p)===1?'branco':'preto'):' vazia'));
  if(p!=='.'){cell.classList.add('occupied');cell.append(pieceArt(p))}
- if(last&&(last.from===i||last.to===i))cell.classList.add('last');if(i===selected)cell.classList.add('selected');if(legal.some(m=>m[0]===i))cell.classList.add('playable');if(targets.has(i))cell.classList.add('target');if(check===i)cell.classList.add('check');
+ if(last&&(last.from===i||last.to===i))cell.classList.add('last');if(i===selected)cell.classList.add('selected');if(playable.has(i))cell.classList.add('playable');if(targets.has(i))cell.classList.add('target');if(check===i)cell.classList.add('check');
  if(n%8===0)cell.append(element('span','chess-coordinate rank',coord[1]));if(n>=56)cell.append(element('span','chess-coordinate file',coord[0]));board.append(cell)}
- $('chess-status').textContent=claimed||st.text;$('white-player').classList.toggle('active',!done&&g.t===1);$('black-player').classList.toggle('active',!done&&g.t===-1);
- $('chess-hint').textContent=done?'Partida encerrada. Comece uma nova ou reveja os lances.':promotion?'Escolha a peça da promoção.':selected!==-1?'Escolha uma casa destacada.':'Selecione uma peça e escolha um destino disponível.';
- $('chess-back').disabled=!moves.length&&!claimed;$('chess-resign').disabled=done;$('chess-auto').checked=auto;
- $('chess-claim').hidden=done||!st.claim;$('chess-claim').textContent=st.claim?'Reivindicar empate · '+st.claim:'Reivindicar empate';
+ $('chess-status').textContent=$('chess-side-status').textContent=statusText();$('white-player').classList.toggle('active',!done&&g.t===1);$('black-player').classList.toggle('active',!done&&g.t===-1);
+ const hint=done?'Partida encerrada.':promotion?'Escolha a peça da promoção.':mode!=='local'&&!remote?'Inicie uma partida para jogar.':mode!=='local'&&sideKey()!==remote?.side?'Aguarde o adversário.':selected!==-1?'Escolha uma casa destacada.':'Selecione uma peça e escolha um destino disponível.';
+ $('chess-hint').textContent=$('chess-side-detail').textContent=hint;$('chess-auto').checked=auto;
+ $('chess-claim').hidden=done||!st.claim||!canPlay();$('chess-claim').textContent=st.claim?'Reivindicar empate · '+st.claim:'Reivindicar empate';
  $('chess-promote').hidden=!promotion;$('promotion-choices').replaceChildren();
  if(promotion){for(let m of promotion){let choice=button('',()=>play(m),'chess-promotion-choice');choice.append(pieceArt(g.t===1?m[2].toUpperCase():m[2]),element('span','',pieceNames[m[2]]));$('promotion-choices').append(choice)}$('promotion-choices').append(button('Cancelar',()=>{promotion=null;render()}))}
- const log=$('chess-history');log.replaceChildren();if(!moves.length)log.append(element('li','','Nenhum lance registrado.'));
- for(let m of moves.slice(-60))log.append(element('li','',m.full+(m.side===1?'. ':'... ')+m.label));log.scrollTop=log.scrollHeight;
- save();
+ const log=$('chess-history');log.replaceChildren();if(!moves.length)log.append(element('li','','Nenhum lance registrado.'));for(let m of moves.slice(-60))log.append(element('li','',m.full+(m.side===1?'. ':'... ')+m.label));log.scrollTop=log.scrollHeight;
+ updateControls();paintClock();save();
 }
-function click(i){if(ended()||promotion)return;let g=game(),legal=C.legal(g);if(C.side(g.b[i])===g.t){selected=selected===i?-1:i;render();return}let choices=legal.filter(m=>m[0]===selected&&m[1]===i);if(choices.length>1){promotion=choices;render()}else if(choices.length)play(choices[0])}
-function play(m){let g=game(),found=C.legal(g).find(x=>C.key(x)===C.key(m));if(!found||ended())return;moves.push({key:C.key(found),label:C.san(g,found),side:g.t,full:g.full,from:found[0],to:found[1]});history.push(C.apply(g,found));selected=-1;promotion=null;if(auto&&!ended())flipped=game().t===-1;render();poll()}
-function reset(){if(moves.length&&!ended()&&!confirm('Começar uma nova partida?'))return;history=[start()];moves=[];claimed='';selected=-1;promotion=null;flipped=false;render();poll()}
-$('chess-new').onclick=reset;$('menu-local').onclick=()=>{$('menu-dialog').close();reset()};
-$('chess-back').onclick=()=>{if(claimed)claimed='';else if(moves.length){history.pop();moves.pop()}selected=-1;promotion=null;if(auto)flipped=game().t===-1;render();poll()};
-$('chess-resign').onclick=()=>{if(!ended()&&confirm('Confirmar desistência das '+(game().t===1?'brancas':'pretas')+'?')){claimed=(game().t===1?'Pretas':'Brancas')+' venceram por desistência.';selected=-1;promotion=null;render();poll()}};
-$('chess-claim').onclick=()=>{let st=C.status(history);if(!ended()&&st.claim){claimed='Empate por '+st.claim+'.';selected=-1;promotion=null;render();poll()}};
+function paintClock(){
+ let minutes=mode==='local'?localMinutes:remote?.minutes||0,remaining=mode==='local'?localRemaining:remote?.remaining;
+ for(let c of ['w','b']){let el=$('chess-clock-'+c);el.hidden=!minutes;if(minutes&&remaining){let t=remaining[c];if(mode!=='local'&&!ended()&&sideKey()===c&&!(mode==='ai'&&c!==remote.side))t-=Math.max(0,(performance.now()-clockAt)/1000);let n=Math.max(0,Math.ceil(t));el.textContent=Math.floor(n/60)+':'+String(n%60).padStart(2,'0')}}
+}
+function tickLocal(){if(mode!=='local'||!localMinutes||!clockStarted||ended())return;let now=performance.now(),c=sideKey();localRemaining[c]=Math.max(0,localRemaining[c]-(now-localClockAt)/1000);localClockAt=now;if(localRemaining[c]<=0){claimed=(c==='w'?'Pretas':'Brancas')+' venceram por tempo.';selected=-1;promotion=null;render()}else paintClock()}
+setInterval(()=>{if(mode==='local')tickLocal();else paintClock()},200);
+function click(i){if(!canPlay()||promotion)return;let g=game(),legal=C.legal(g);if(C.side(g.b[i])===g.t){selected=selected===i?-1:i;render();return}let choices=legal.filter(m=>m[0]===selected&&m[1]===i);if(choices.length>1){promotion=choices;render()}else if(choices.length)play(choices[0])}
+function play(m){let g=game(),found=C.legal(g).find(x=>C.key(x)===C.key(m));if(!found||!canPlay())return;
+ if(mode!=='local'){promotion=null;selected=-1;request('move',{match:remote.id,sequence:moves.length,move:C.key(found)});return}
+ tickLocal();if(ended())return;localClockAt=performance.now();clockStarted=true;
+ moves.push({key:C.key(found),label:C.san(g,found),side:g.t,full:g.full,from:found[0],to:found[1]});history.push(C.apply(g,found));selected=-1;promotion=null;if(auto&&!ended())flipped=game().t===-1;render();poll()}
+function resetLocal(){if(moves.length&&!ended()&&!confirm('Começar uma nova partida?'))return;history=[start()];moves=[];claimed='';selected=-1;promotion=null;flipped=false;localMinutes=Number($('chess-time').value);localRemaining={w:localMinutes*60,b:localMinutes*60};clockStarted=true;localClockAt=performance.now();render();poll()}
+function switchMode(next){if(next===mode)return true;if(activeRemote()||queued){msg('Conclua a partida ou cancele a busca antes de trocar de modo.');return false}if(mode==='local'){tickLocal();save()}mode=next;remote=null;selected=-1;promotion=null;claimed='';history=[start()];moves=[];flipped=false;if(mode==='local')restore();render();return true}
+function newGame(){if(mode==='local')resetLocal();else if(mode==='ai'&&!activeRemote())request('start',{level,minutes:Number($('chess-time').value),nonce:crypto.randomUUID()})}
+function resign(){if(ended()||mode!=='local'&&!activeRemote())return;if(!confirm('Confirmar desistência?'))return;if(mode==='local'){claimed=(game().t===1?'Pretas':'Brancas')+' venceram por desistência.';selected=-1;promotion=null;render();poll()}else request('resign',{match:remote.id})}
+$('chess-new').onclick=$('sidebar-new').onclick=newGame;
+$('menu-local').onclick=()=>{$('menu-dialog').close();if(switchMode('local'))resetLocal()};
+$('menu-computer').onclick=()=>{$('menu-dialog').close();switchMode('ai')};$('menu-online').onclick=()=>{$('menu-dialog').close();switchMode('online')};
+document.querySelectorAll('[data-chess-mode]').forEach(b=>b.onclick=()=>switchMode(b.dataset.chessMode));document.querySelectorAll('[data-chess-level]').forEach(b=>b.onclick=()=>{if(!activeRemote()){level=b.dataset.chessLevel;updateControls()}});
+$('chess-time').onchange=()=>{if(mode==='local'&&!clockStarted){localMinutes=Number($('chess-time').value);localRemaining={w:localMinutes*60,b:localMinutes*60};render()}};
+$('chess-back').onclick=()=>{if(mode!=='local')return;if(claimed)claimed='';else if(moves.length){history.pop();moves.pop()}selected=-1;promotion=null;if(auto)flipped=game().t===-1;localClockAt=performance.now();render();poll()};
+$('chess-resign').onclick=$('sidebar-resign').onclick=resign;
+$('chess-claim').onclick=()=>{let st=C.status(history);if(!ended()&&st.claim){if(mode!=='local')request('claim',{match:remote.id,sequence:moves.length});else{claimed='Empate por '+st.claim+'.';selected=-1;promotion=null;render();poll()}}};
+$('chess-offer').onclick=()=>request('draw',{match:remote.id,accept:true});$('chess-decline').onclick=()=>request('draw',{match:remote.id,accept:false});
+$('chess-search').onclick=()=>request('queue',{minutes:Number($('chess-time').value),ranked:$('chess-ranked').value==='ranked'});
+$('chess-cancel-search').onclick=()=>request('cancel');$('chess-challenge').onclick=()=>open('friends-dialog');
 $('chess-flip').onclick=()=>{flipped=!flipped;render()};$('chess-auto').onchange=()=>{auto=$('chess-auto').checked;if(auto)flipped=game().t===-1;render()};
 $('chess-menu').onclick=()=>open('menu-dialog');$('chess-friends').onclick=$('menu-friends').onclick=()=>open('friends-dialog');$('chess-profile').onclick=$('menu-profile').onclick=()=>open('profile-dialog');$('menu-rules').onclick=$('sidebar-rules').onclick=()=>open('rules-dialog');
-document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>$(e.dataset.close).close());
+$('chess-ranking-open').onclick=()=>open('ranking-dialog');document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>$(e.dataset.close).close());
+$('return-damas').onclick=e=>{if(activeRemote()||queued){e.preventDefault();msg('Conclua a partida ou cancele a busca antes de retornar às Damas.')}else{tickLocal();save()}};
 function label(p){return !p.online?'Offline':(p.game==='chess'?'Xadrez':'Damas')+' · '+(p.busy?'Em partida':'Disponível')}
-function drawSocial(data){profile=data.me;online=true;$('chess-profile').textContent=profile.name;$('chess-profile-name').textContent=profile.name;$('white-name').textContent=profile.name;
+function rankRows(id,rows){let el=$(id);el.replaceChildren();if(!rows.length){el.append(element('p','chess-note','Nenhum jogador no ranking ainda.'));return}rows.forEach((p,i)=>{let row=element('div','chess-rank-row'+(p.own?' own':'')),info=element('div');info.append(element('b','',p.name),element('small','',p.wins+' V · '+p.losses+' D · '+p.draws+' E'+(p.own?' · SEU PERFIL':'')));row.append(element('span','rank-medal',i+1),info,element('strong','',p.points.toLocaleString('pt-BR')+' PH'));el.append(row)})}
+function drawRanking(data){if(!data.profile)return;rankData=data.profile;let p=data.profile,text='Sua posição: #'+p.rank+' · '+p.points.toLocaleString('pt-BR')+' PH';$('chess-rank-own').textContent=$('chess-rank-full-own').textContent=$('chess-personal-rank').textContent=text;$('chess-profile-stats').textContent=p.points+' PH · '+p.coins+' moedas · '+p.wins+' V / '+p.losses+' D / '+p.draws+' E';rankRows('chess-ranking-top',data.ranking.slice(0,3));rankRows('chess-ranking-full',data.ranking)}
+function drawSocial(data){profile=data.me;$('chess-profile').textContent=profile.name;$('chess-profile-name').textContent=profile.name;$('chess-player-name').value=profile.name;
  const list=$('chess-friend-list');list.replaceChildren();let accepted=data.friends.filter(p=>p.relation==='friend');$('friend-count').textContent=accepted.filter(p=>p.online).length?'('+accepted.filter(p=>p.online).length+' online)':'';
- for(let p of data.friends){let row=element('div','chess-friend-row'),info=element('div');info.append(element('b','',p.name),element('small','',label(p)+(p.relation==='incoming'?' · Pedido de amizade':p.relation==='outgoing'?' · Pedido enviado':'')));row.append(element('span','chess-dot '+(p.online?(p.busy?'busy':'online'):'')),info);list.append(row)}
- if(!data.friends.length)list.append(element('p','','Nenhum amigo adicionado. Use o Clube de Honra para encontrar jogadores.'));
- const invites=$('chess-invites');invites.replaceChildren();for(let x of data.invites){let card=element('div','chess-invite');card.append(element('b','','Convite de Damas · '+x.name),element('p','','Abra o universo Damas para escolher a modalidade e aceitar.'),button('Ver convite em Damas',()=>{if(moves.length&&!ended()&&!confirm('Sua partida Local ficará salva nesta aba. Ir para Damas?'))return;sessionStorage.setItem('damas-open-friends','1');location.href='/'}));invites.append(card)}
+ const people=[...data.friends,...(data.players||[]).filter(p=>!data.friends.some(f=>f.id===p.id))];
+ for(let p of people){let row=element('div','chess-friend-row'),info=element('div');info.append(element('b','',p.name),element('small','',label(p)+(p.relation==='incoming'?' · Pedido de amizade':p.relation==='outgoing'?' · Pedido enviado':p.relation==='friend'?' · Amigo':'')));row.append(element('span','chess-dot '+(p.online?(p.busy?'busy':'online'):'')),info);let invite=button('Desafiar',()=>{if(switchMode('online'))request('invite',{target:p.id,minutes:Number($('chess-time').value),ranked:$('chess-ranked').value==='ranked'})});invite.disabled=!p.online||p.busy||activeRemote()||queued;row.append(invite);list.append(row)}
+ if(!people.length)list.append(element('p','','Nenhum jogador disponível.'));
+ const invites=$('chess-invites');invites.replaceChildren();
+ for(let x of data.chess_invites||[]){let card=element('div','chess-invite');card.append(element('b','','Convite de Xadrez · '+x.name),element('p','',(x.ranked?'Ranqueada':'Casual')+' · '+(x.minutes?x.minutes+' min':'Sem limite')),button('Aceitar',()=>{if(activeRemote()||queued)return;if(mode==='local'&&moves.length&&!ended()&&!confirm('Sua partida Local ficará salva. Aceitar desafio?'))return;request('respond',{invite:x.id,accept:true})},'gold'),button('Recusar',()=>request('respond',{invite:x.id,accept:false})));invites.append(card)}
+ for(let x of data.invites||[]){let card=element('div','chess-invite');card.append(element('b','','Convite de Damas · '+x.name),element('p','','Abra Damas para escolher a modalidade e aceitar.'),button('Ver convite em Damas',()=>{if(activeRemote()||queued){msg('Conclua a partida atual.');return}tickLocal();save();sessionStorage.setItem('damas-open-friends','1');location.href='/'}));invites.append(card)}
  $('chess-social-status').textContent='Conectado · lista compartilhada';
 }
-async function poll(){if(fetching||document.hidden)return;const token=localStorage.getItem('damas-profile-token');if(!token){$('chess-social-status').textContent='Entre no Clube de Honra das Damas para conectar sua conta.';return}fetching=true;try{let r=await fetch('/api/social/chess/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:moves.length>0&&!ended()})});if(!r.ok)throw Error('Perfil indisponível');drawSocial(await r.json())}catch{online=false;$('chess-social-status').textContent='Não foi possível conectar ao clube. Sua partida Local continua funcionando.'}finally{fetching=false}}
-window.addEventListener('focus',poll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});setInterval(poll,3000);
+function applyData(data){drawRanking(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
+ if(g&&(!g.result||mode!=='local'&&remote?.id===g.id)){
+  const changed=!remote||remote.id!==g.id||remote.moves.length!==g.moves.length||JSON.stringify(remote.result)!==JSON.stringify(g.result)||remote.offer!==g.offer;
+  if(mode==='local'){tickLocal();save()}
+  if(!remote||remote.id!==g.id){flipped=g.side==='b';selected=-1;promotion=null}
+  remote=g;mode=g.mode;level=g.level||level;clockAt=performance.now();$('chess-time').value=String(g.minutes);$('chess-ranked').value=g.ranked?'ranked':'casual';
+  if(changed){rebuild(g.moves);selected=-1;promotion=null;claimed='';if(g.result){let r=g.result.rewards[g.side];msg(remoteText(g.result)+(g.ranked&&r?' · '+(r.delta>=0?'+':'')+r.delta+' PH · +'+r.coins+' moedas':''))}else msg('');render()}else{updateControls();paintClock()}
+ }else{if(mode==='local')$('white-name').textContent=profile?.name||'Brancas';updateControls();paintClock()}
+ if(g&&g.mode==='ai'&&!g.result&&sideKey()!==g.side){clearTimeout(botTimer);botTimer=setTimeout(()=>request('bot',{match:g.id,sequence:g.moves.length}),120)}
+}
+async function request(op,body={}){if(fetching)return;const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op!=='state')poll()}catch(e){msg(e.message);$('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false}}
+function poll(){if(!fetching&&!document.hidden)request('state')}
+window.addEventListener('focus',poll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();else if(mode==='local'){tickLocal();save()}});setInterval(poll,1800);
 $('white-icon').append(pieceArt('K'));$('black-icon').append(pieceArt('k'));
 $('chess-focus').onclick=()=>{let on=document.body.classList.toggle('chess-focus');$('chess-focus').textContent=on?'Mostrar painéis':'Modo concentração';$('chess-focus').setAttribute('aria-pressed',String(on));if(on)window.scrollTo(0,0)};
-render();poll();
+restore();render();poll();
 })();
