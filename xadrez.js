@@ -35,7 +35,7 @@ let soundCtx=null;function unlockSound(){if(!prefs.sound)return;try{const Audio=
 function playSound(capture=false,castle=false){if(!prefs.sound||!soundCtx||soundCtx.state!=='running'||!prefs.volume)return;try{const t=soundCtx.currentTime;for(let i=0;i<(castle?2:1);i++){const o=soundCtx.createOscillator(),g=soundCtx.createGain(),at=t+i*.075;o.type='triangle';o.frequency.setValueAtTime(capture?180:350,at);o.frequency.exponentialRampToValueAtTime(capture?75:140,at+.10);g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(.12*prefs.volume/100,at+.009);g.gain.exponentialRampToValueAtTime(.0001,at+.13);o.connect(g);g.connect(soundCtx.destination);o.start(at);o.stop(at+.14)}}catch{}}
 document.addEventListener('pointerdown',unlockSound,{passive:true});document.addEventListener('keydown',unlockSound);
 const start=()=>C.parseFen(C.START),savedKey='chess-local-v1';
-let history=[start()],moves=[],selected=-1,promotion=null,flipped=false,claimed='',auto=true,profile=null,fetching=false,mode='local',level='medium',remote=null,queued=false,localMinutes=0,localRemaining={w:0,b:0},localClockAt=performance.now(),clockStarted=false,clockAt=performance.now(),botTimer=null,rankData=null,motionRun=null,deferredData=null,leaving=false,fetchOp='',pendingAction=null;
+let history=[start()],moves=[],selected=-1,promotion=null,flipped=false,claimed='',auto=true,profile=null,fetching=false,mode='local',level='medium',remote=null,queued=false,localMinutes=0,localRemaining={w:0,b:0},localClockAt=performance.now(),clockStarted=false,clockAt=performance.now(),botTimer=null,rankData=null,motionRun=null,deferredData=null,leaving=false,fetchOp='',pendingAction=null,idlePortal=false,requestDone=Promise.resolve();
 const sideKey=()=>game().t===1?'w':'b',game=()=>history.at(-1);
 function rebuild(keys){let h=[start()],ms=[];for(let u of keys){let g=h.at(-1),m=C.legal(g).find(m=>C.key(m)===u);if(!m)throw Error('Lance inválido no histórico');ms.push({key:u,label:C.san(g,m),side:g.t,full:g.full,from:m[0],to:m[1]});h.push(C.apply(g,m))}history=h;moves=ms}
 function restore(){history=[start()];moves=[];claimed='';selected=-1;promotion=null;flipped=false;clockStarted=false;localMinutes=0;localRemaining={w:0,b:0};
@@ -145,23 +145,27 @@ $('chess-cancel-search').onclick=()=>request('cancel');$('chess-challenge').oncl
 $('chess-flip').onclick=()=>{flipped=!flipped;render()};$('chess-auto').onchange=()=>{auto=$('chess-auto').checked;if(auto)flipped=game().t===-1;render()};
 $('chess-menu').onclick=()=>open('menu-dialog');$('chess-friends').onclick=$('menu-friends').onclick=()=>open('friends-dialog');$('chess-profile').onclick=$('menu-profile').onclick=()=>open('profile-dialog');$('menu-rules').onclick=$('sidebar-rules').onclick=()=>open('rules-dialog');
 $('chess-ranking-open').onclick=$('menu-ranking').onclick=()=>open('ranking-dialog');$('menu-challenge').onclick=()=>{if(switchMode('online'))open('friends-dialog');else $('menu-dialog').close()};document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>$(e.dataset.close).close());
+function setPortalBusy(on){for(const id of ['return-damas','menu-return-damas']){const el=$(id);el.setAttribute('aria-busy',String(on));el.querySelector('small').textContent=on?'Entrando nas Damas…':'Entrar no reino'}if(on)msg('Salvando e entrando nas Damas…')}
 async function returnDamas(friends=false){
  if(leaving)return;
- leaving=true;clearTimeout(botTimer);
+ leaving=true;clearTimeout(botTimer);setPortalBusy(true);
  const token=localStorage.getItem('damas-profile-token'),go=()=>{tickLocal();save();if(friends)sessionStorage.setItem('damas-open-friends','1');location.href='/'};
  try{
   if(!token){go();return}
-  // Finish any in-flight state/move before pausing. Never race a late state against leave.
-  for(let i=0;fetching&&i<100;i++)await new Promise(r=>setTimeout(r,50));
-  if(fetching)throw Error('A conexão ainda está sincronizando. Tente voltar novamente.');
+  // An authoritative idle snapshot has no game, queue or outgoing invite to save.
+  if(idlePortal&&!activeRemote()&&!queued&&!pendingAction&&(!fetching||fetchOp==='state')){go();return}
+  // Only a pending server action needs to finish; no polling sleep or artificial delay.
+  const deadline=performance.now()+5000;
+  while(fetching){const remaining=deadline-performance.now();if(remaining<=0)throw Error('A conexão ainda está sincronizando. Tente voltar novamente.');let timeout;try{await Promise.race([requestDone,new Promise((_,reject)=>timeout=setTimeout(()=>reject(Error('A conexão ainda está sincronizando. Tente voltar novamente.')),remaining))])}finally{clearTimeout(timeout)}}
+  if(idlePortal&&!activeRemote()&&!queued){go();return}
   let allowOnline=false;
-  if(activeRemote()&&remote.mode==='online'){if(!confirm('O duelo online continuará ativo e o relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;poll();return}allowOnline=true}
+  if(activeRemote()&&remote.mode==='online'){if(!confirm('O duelo online continuará ativo e o relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;setPortalBusy(false);poll();return}allowOnline=true}
   const leave=async()=>{const r=await fetch('/api/social/chess/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,allowOnline})});return {r,data:await r.json()}};
   let result=await leave();
-  if(result.r.status===409&&!allowOnline){if(!confirm('Um duelo online está em andamento. O relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;poll();return}allowOnline=true;result=await leave()}
+  if(result.r.status===409&&!allowOnline){if(!confirm('Um duelo online está em andamento. O relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;setPortalBusy(false);poll();return}allowOnline=true;result=await leave()}
   if(!result.r.ok)throw Error(result.data.error||'Não foi possível salvar a partida.');
   go();
- }catch(e){leaving=false;msg(e.message);poll()}
+ }catch(e){leaving=false;setPortalBusy(false);msg(e.message);poll()}
 }
 $('return-damas').onclick=e=>{e.preventDefault();returnDamas()};
 $('menu-return-damas').onclick=e=>{e.preventDefault();$('menu-dialog').close();returnDamas()};
@@ -180,7 +184,7 @@ function drawSocial(data){profile=data.me;$('menu-identity').textContent=profile
  for(let x of data.invites||[]){let card=element('div','chess-invite');card.append(element('b','','Convite de Damas · '+x.name),element('p','','Abra Damas para escolher a modalidade e aceitar.'),button('Ver convite em Damas',()=>{returnDamas(true)}));invites.append(card)}
  $('chess-social-status').textContent='Conectado · lista compartilhada';
 }
-function applyData(data){if(data.journey)updateJourney(data.journey);if(motionRun&&remote&&data.match?.id===remote.id&&data.match.moves.length>moves.length){deferredData=data;return}drawRanking(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
+function applyData(data){idlePortal=data.idle_portal===true;if(data.journey)updateJourney(data.journey);if(motionRun&&remote&&data.match?.id===remote.id&&data.match.moves.length>moves.length){deferredData=data;return}drawRanking(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
  if(g&&(!g.result||mode!=='local'&&remote?.id===g.id)){
   const same=remote?.id===g.id, before=game(), viewFlip=flipped, nextMove=same&&g.moves.length===moves.length+1?C.legal(before).find(m=>C.key(m)===g.moves.at(-1)):null;
   const changed=!remote||remote.id!==g.id||remote.moves.length!==g.moves.length||JSON.stringify(remote.result)!==JSON.stringify(g.result)||remote.offer!==g.offer;
@@ -191,7 +195,7 @@ function applyData(data){if(data.journey)updateJourney(data.journey);if(motionRu
  }else{if(mode==='local')$('white-name').textContent=profile?.name||'Brancas';updateControls();paintClock()}
  if(!leaving&&g&&g.mode==='ai'&&!g.paused&&!g.result&&sideKey()!==g.side){clearTimeout(botTimer);botTimer=setTimeout(()=>request('bot',{match:g.id,sequence:g.moves.length}),motionRun?520:120)}
 }
-async function request(op,body={},drain=false){if(leaving&&!drain)return;if(fetching){if(op==='state')return;if(fetchOp==='state'&&!pendingAction){pendingAction={op,body};return}msg('Aguarde a sincronização e tente novamente.');return}const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;fetchOp=op;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op==='journey-start'&&data.match?.journey){$('journey-dialog').close();window.scrollTo(0,0)}if(op!=='state')setTimeout(poll,80)}catch(e){msg(e.message);if(op==='journey-start')$('journey-error').textContent=e.message;$('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false;fetchOp='';const action=pendingAction;pendingAction=null;if(action)request(action.op,action.body,true)}}
+async function request(op,body={},drain=false){if(leaving&&!drain)return;if(fetching){if(op==='state')return;if(fetchOp==='state'&&!pendingAction){pendingAction={op,body};return}msg('Aguarde a sincronização e tente novamente.');return}const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;fetchOp=op;let settle;requestDone=new Promise(r=>settle=r);if(op!=='state')idlePortal=false;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op==='journey-start'&&data.match?.journey){$('journey-dialog').close();window.scrollTo(0,0)}if(op!=='state')setTimeout(poll,80)}catch(e){msg(e.message);if(op==='journey-start')$('journey-error').textContent=e.message;$('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false;fetchOp='';const action=pendingAction;pendingAction=null;if(action)request(action.op,action.body,true);settle()}}
 function poll(){if(!leaving&&!fetching&&!document.hidden)request('state')}
 window.addEventListener('focus',poll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();else if(mode==='local'){tickLocal();save()}});setInterval(poll,1800);
 $('white-icon').append(pieceArt('K'));$('black-icon').append(pieceArt('k'));

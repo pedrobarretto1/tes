@@ -155,7 +155,9 @@ def snapshot(s,db,pid,g):
     me['rank']=rank
     rows=s.sql(db,'SELECT p.name,c.points,c.wins,c.losses,c.draws,c.player_id FROM chess_profiles c JOIN players p ON p.id=c.player_id ORDER BY c.points DESC,c.wins DESC,c.player_id LIMIT 100').fetchall()
     ranking=[dict(name=x[0],points=x[1],wins=x[2],losses=x[3],draws=x[4],own=x[5]==pid) for x in rows]
-    return dict(profile=me,ranking=ranking,match=view(g,pid),journey=journey_progress(db,s.sql,pid),queued=bool(s.sql(db,'SELECT 1 FROM chess_queue WHERE player_id=?',(pid,)).fetchone()),invites=incoming(db,s.sql,pid))
+    queued=bool(s.sql(db,'SELECT 1 FROM chess_queue WHERE player_id=?',(pid,)).fetchone())
+    outgoing=bool(s.sql(db,"SELECT 1 FROM chess_invites WHERE sender=? AND status='pending' AND expires>?",(pid,time.time())).fetchone())
+    return dict(profile=me,ranking=ranking,match=view(g,pid),journey=journey_progress(db,s.sql,pid),queued=queued,invites=incoming(db,s.sql,pid),idle_portal=not queued and not outgoing and (not g or bool(g['result'])))
 def action(s,path,d,pid,now):
     op=path.rsplit('/',1)[-1]
     def err(msg,code=409):return code,{'error':msg}

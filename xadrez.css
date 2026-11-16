@@ -71,3 +71,5 @@ body:has(#clubmenu:not(.hidden)) #clubmenu .club-card{max-height:calc(100dvh - 1
 .chess-main-menu .chess-menu-section h3{font:600 12px Arial,sans-serif;color:#e5bc82;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid #ad805447}
 .chess-main-menu .chess-menu-grid{margin-top:0;gap:8px}.chess-main-menu .chess-menu-grid button{min-height:72px;display:flex;flex-direction:column;justify-content:center;gap:7px;border-radius:11px;white-space:normal}.chess-main-menu .chess-menu-grid b{letter-spacing:-.2px}.chess-main-menu .chess-menu-grid small{margin-top:0;line-height:1.4}
 @media(max-width:520px){.chess-page .chess-nav button{min-width:0;flex:1 1 30%}.chess-page .chess-nav #chess-profile{flex:1 1 30%;min-width:0}.chess-main-menu .chess-menu-portal{margin:0 -7px 13px}.chess-main-menu .chess-menu-grid{grid-template-columns:1fr}.chess-main-menu .chess-menu-grid button{min-height:58px}.chess-main-menu .chess-menu-identity b{font-size:16px}}
+
+.chess-page .universe-link[aria-busy=true]{cursor:progress;border-color:#e7c287;background:#59402b}.chess-page .universe-link[aria-busy=true] small{color:#f5dba9}

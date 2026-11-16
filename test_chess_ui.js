@@ -86,7 +86,10 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
   await page.locator('#journey-continue').click();assert(await page.locator('.journey-card.stage-2 button').isDisabled());await page.locator('[data-close=journey-dialog]').click();
   await page.locator('[data-chess-mode=local]').click();
-  await page.locator('#return-damas').click();await page.waitForURL(base+'/');assert.equal(await page.locator('h1').first().textContent(),'Casa de Damas');
+  // An idle switch must not wait for a new leave round-trip.
+  await page.waitForResponse(r=>r.url().endsWith('/api/social/chess/state')&&r.ok());
+  let leaveCalls=0;await page.route('**/api/social/chess/leave',r=>{leaveCalls++;return r.continue()});
+  await page.locator('#return-damas').click();await page.waitForURL(base+'/');assert.equal(leaveCalls,0);assert.equal(await page.locator('h1').first().textContent(),'Casa de Damas');
   await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));assert(!(await page.locator('#clubmenu').isVisible()));assert(!(await page.locator('#clubwelcome').isVisible()));
   await page.reload();await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));assert(!(await page.locator('#clubmenu').isVisible()));
   await page.goto(base+'/?friends=1');await page.waitForFunction(()=>!document.getElementById('cluboverlay').classList.contains('hidden'));assert(!(await page.locator('#clubmenu').isVisible()));assert.equal(new URL(page.url()).searchParams.has('friends'),false);
