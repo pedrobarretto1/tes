@@ -56,7 +56,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   page.on('dialog',d=>d.accept());await page.locator('#sidebar-resign').click();
   await page.waitForFunction(()=>document.getElementById('chess-personal-rank').textContent.includes('990 PH'));
   assert((await page.locator('#chess-message').textContent()).includes('-10 PH'));
-  await page.locator('[data-chess-level=easy]').click();await page.locator('#sidebar-new').click();await page.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);
+  await page.locator('[data-chess-level=easy]').click();await page.waitForResponse(r=>r.url().endsWith('/api/social/chess/state')&&r.ok());assert.equal(await page.locator('[data-chess-level=easy]').getAttribute('aria-pressed'),'true');await page.locator('#sidebar-new').click();await page.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);
   await page.waitForFunction(()=>document.getElementById('chess-status').textContent!=='Vez do Computador');await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);
   assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
   // Two isolated accounts play a real online game with a shared queue.
