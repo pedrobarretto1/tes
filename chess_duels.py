@@ -4,9 +4,23 @@ import chess
 
 LEVELS=('easy','medium','hard')
 MINUTES=(0,1,3,5,10,15,30)
+JOURNEY=(
+    dict(id=1,name='O Escudeiro',hall='Pátio de Carvalho',title='Escudeiro da Coroa',level='easy',description='O primeiro guardião testa os fundamentos. Desenvolva suas peças e proteja o rei.'),
+    dict(id=2,name='O Guardião',hall='Fortaleza de Pedra',title='Guardião do Salão',level='medium',description='Um defensor atento ao material. Evite deixar peças desprotegidas.'),
+    dict(id=3,name='O Estrategista',hall='Biblioteca Real',title='Estrategista Real',level='medium',description='Calcula respostas e contra-ataques. Pense antes de comprometer suas peças.'),
+    dict(id=4,name='O Rei de Ferro',hall='Salão de Ferro',title='Vencedor de Ferro',level='hard',description='Uma busca mais profunda favorece combinações e ameaças táticas.'),
+    dict(id=5,name='O Mestre das Coroas',hall='Trono das Cinco Coroas',title='Mestre das Cinco Coroas',level='hard',description='O adversário final usa o maior orçamento de busca da campanha.'),
+)
+def journey_progress(db,sql,pid):
+    wins={r[0] for r in sql(db,'SELECT stage FROM chess_journey WHERE player_id=?',(pid,)).fetchall()}
+    unlocked=1
+    while unlocked<=len(JOURNEY) and unlocked in wins:unlocked+=1
+    return dict(stages=JOURNEY,won=sorted(wins),unlocked=min(unlocked,len(JOURNEY)),complete=unlocked>len(JOURNEY),title=JOURNEY[unlocked-2]['title'] if unlocked>1 else 'Aspirante às Coroas')
+
 def setup(db,sql):
     for q in (
         "CREATE TABLE IF NOT EXISTS chess_guard (id INTEGER PRIMARY KEY)",
+        "CREATE TABLE IF NOT EXISTS chess_journey (player_id TEXT NOT NULL, stage INTEGER NOT NULL, won_at DOUBLE PRECISION NOT NULL, PRIMARY KEY(player_id,stage))",
         "CREATE TABLE IF NOT EXISTS chess_profiles (player_id TEXT PRIMARY KEY, points INTEGER NOT NULL DEFAULT 1000, coins INTEGER NOT NULL DEFAULT 0, wins INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS chess_matches (id TEXT PRIMARY KEY, payload TEXT NOT NULL, finished INTEGER NOT NULL DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS chess_seats (player_id TEXT PRIMARY KEY, match_id TEXT NOT NULL REFERENCES chess_matches(id))",
@@ -49,6 +63,10 @@ def finish(s,db,g,winner,reason):
         else:
             s.sql(db,'INSERT INTO chess_history VALUES(?,?,?,?,?,?,?) ON CONFLICT(match_id,player_id) DO NOTHING',(g['id'],pid,g['names'][opposite(c)],outcome,0,0,time.time()))
         result['rewards'][c]=dict(delta=delta,coins=coins,outcome=outcome)
+        if g.get('journey') and winner==c:
+            stage=g['journey']
+            first=s.sql(db,'INSERT INTO chess_journey VALUES(?,?,?) ON CONFLICT(player_id,stage) DO NOTHING',(pid,stage,time.time())).rowcount
+            result['journey']=dict(stage=stage,first=bool(first),title=JOURNEY[stage-1]['title'])
     g['result']=result;save(db,s.sql,g)
 def tick(s,db,g,b):
     if g['result'] or not g['minutes']:return
@@ -64,11 +82,12 @@ def after_move(s,db,g,b,m):
     o=b.outcome(claim_draw=False)
     if o:finish(s,db,g,None if o.winner is None else 'w' if o.winner else 'b',o.termination.name.lower())
     else:save(db,s.sql,g)
-def bot_move(b,level):
+def bot_move(b,level,stage=None):
     ms=list(b.legal_moves)
     if not ms:return None
     if level=='easy':return random.choice(ms)
-    deadline=time.monotonic()+(.15 if level=='medium' else .45);limit=3000 if level=='medium' else 14000;nodes=0
+    budget,limit,depth_cap={2:(.08,1000,1),3:(.18,4000,2),4:(.35,10000,3),5:(.65,22000,4)}.get(stage,(.15,3000,2) if level=='medium' else (.45,14000,4))
+    deadline=time.monotonic()+budget;nodes=0
     values={chess.PAWN:100,chess.KNIGHT:320,chess.BISHOP:330,chess.ROOK:500,chess.QUEEN:900,chess.KING:0}
     class Budget(Exception):pass
     def evaluate():
@@ -96,7 +115,7 @@ def bot_move(b,level):
             if a>=z:break
         return v
     ms=ordered(ms);best=ms[0]
-    for depth in range(1,3 if level=='medium' else 5):
+    for depth in range(1,depth_cap+1):
         candidate=best;v=-200000
         try:
             for m in ms:
@@ -107,10 +126,12 @@ def bot_move(b,level):
         except Budget:break
         best=candidate;ms=[best]+[m for m in ms if m!=best]
     return best
-def create(s,db,pid,other,mode,level,minutes,ranked,nonce):
-    side=secrets.choice(('w','b'));players={side:pid,opposite(side):other}
+def create(s,db,pid,other,mode,level,minutes,ranked,nonce,journey=None):
+    side='w' if journey else secrets.choice(('w','b'));players={side:pid,opposite(side):other}
     names={c:s.sql(db,'SELECT name FROM players WHERE id=?',(p,)).fetchone()[0] if p else 'Computador' for c,p in players.items()}
     g=dict(id=secrets.token_hex(16),players=players,names=names,mode=mode,level=level,ranked=ranked,minutes=minutes,remaining={'w':minutes*60,'b':minutes*60},clock_at=time.time(),moves=[],result=None,offer=None,nonce=nonce)
+    if journey:
+        g['journey']=journey;g['names']['b']=JOURNEY[journey-1]['name']
     s.sql(db,'INSERT INTO chess_matches(id,payload,finished) VALUES(?,?,0)',(g['id'],json.dumps(g)))
     for p in players.values():
         if p:
@@ -120,7 +141,7 @@ def create(s,db,pid,other,mode,level,minutes,ranked,nonce):
 def view(g,pid):
     if not g:return None
     c=color(g,pid)
-    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'])
+    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'],journey=g.get('journey'))
 def incoming(db,sql,pid):
     rows=sql(db,"SELECT i.id,p.name,i.minutes,i.ranked FROM chess_invites i JOIN players p ON p.id=i.sender WHERE i.receiver=? AND i.status='pending' AND i.expires>? ORDER BY i.expires",(pid,time.time())).fetchall()
     return [dict(id=r[0],name=r[1],game='chess',minutes=r[2],ranked=bool(r[3])) for r in rows]
@@ -132,7 +153,7 @@ def snapshot(s,db,pid,g):
     me['rank']=rank
     rows=s.sql(db,'SELECT p.name,c.points,c.wins,c.losses,c.draws,c.player_id FROM chess_profiles c JOIN players p ON p.id=c.player_id ORDER BY c.points DESC,c.wins DESC,c.player_id LIMIT 100').fetchall()
     ranking=[dict(name=x[0],points=x[1],wins=x[2],losses=x[3],draws=x[4],own=x[5]==pid) for x in rows]
-    return dict(profile=me,ranking=ranking,match=view(g,pid),queued=bool(s.sql(db,'SELECT 1 FROM chess_queue WHERE player_id=?',(pid,)).fetchone()),invites=incoming(db,s.sql,pid))
+    return dict(profile=me,ranking=ranking,match=view(g,pid),journey=journey_progress(db,s.sql,pid),queued=bool(s.sql(db,'SELECT 1 FROM chess_queue WHERE player_id=?',(pid,)).fetchone()),invites=incoming(db,s.sql,pid))
 def action(s,path,d,pid,now):
     op=path.rsplit('/',1)[-1]
     def err(msg,code=409):return code,{'error':msg}
@@ -143,7 +164,7 @@ def action(s,path,d,pid,now):
             result=[]
             for r in rows:
                 g=json.loads(r[5])
-                result.append(dict(opponent=r[0],outcome=r[1],delta=r[2],coins=r[3],played_at=r[4],ranked=g['ranked'],moves=g['moves'],mode=g['mode']))
+                result.append(dict(opponent=r[0],outcome=r[1],delta=r[2],coins=r[3],played_at=r[4],ranked=g['ranked'],moves=g['moves'],mode=g['mode'],journey=g.get('journey')))
             return 200,dict(history=result)
         sql(db,'UPDATE chess_guard SET id=id WHERE id=1')
         g=current(db,sql,pid)
@@ -162,6 +183,13 @@ def action(s,path,d,pid,now):
                     if not blocked(p) and now-s.PRESENCE.get(p,-1000)<=25:
                         g=create(s,db,pid,p,'online','',q[0],bool(q[1]),'queue');break
             return result()
+        if op=='journey-start':
+            stage=d.get('stage');nonce=d.get('nonce')
+            if type(stage) is not int or not 1<=stage<=len(JOURNEY) or not isinstance(nonce,str) or not 16<=len(nonce)<=80:return err('Etapa inválida.',400)
+            if g and g['nonce']==nonce and g.get('journey')==stage:return result()
+            if blocked(pid):return err('Conclua ou desista da partida atual.')
+            if stage>journey_progress(db,sql,pid)['unlocked']:return err('Vença a etapa anterior para desbloquear esta coroa.')
+            g=create(s,db,pid,None,'ai',JOURNEY[stage-1]['level'],0,False,nonce,journey=stage);return result()
         if op=='cancel':
             sql(db,'DELETE FROM chess_queue WHERE player_id=?',(pid,));return result()
         if op in ('start','queue','invite'):
@@ -213,7 +241,7 @@ def action(s,path,d,pid,now):
             if m not in b.legal_moves:return err('Lance ilegal.')
         elif op=='bot':
             if g['mode']!='ai' or turn==c:return err('Não é a vez do computador.')
-            t=time.monotonic();m=bot_move(b,g['level'])
+            t=time.monotonic();m=bot_move(b,g['level'],g.get('journey')) if g.get('journey') else bot_move(b,g['level'])
             if g['minutes']:
                 g['remaining'][turn]=max(0,g['remaining'][turn]-(time.monotonic()-t))
                 if g['remaining'][turn]<=0:finish(s,db,g,None if b.has_insufficient_material(c=='w') else c,'timeout');return result()
