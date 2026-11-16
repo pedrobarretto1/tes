@@ -13,19 +13,24 @@ const shape={
 };
 function installArt(){
  const svg=document.createElementNS(NS,'svg');svg.setAttribute('aria-hidden','true');svg.classList.add('chess-art-defs');
- const palettes={white:['#fff4d8','#ddba82','#94602f','#71491f','#fff1c5','#b37a3b'],black:['#b78a58','#67452f','#2b1b16','#d1a16c','#e4ba80','#3b251b']};
+ const palettes={white:['#fff4d8','#ddba82','#94602f','#71491f','#fff1c5','#b37a3b'],black:['#b78a58','#67452f','#2b1b16','#d1a16c','#e4ba80','#3b251b'],
+ 'imperial-white':['#fffbe5','#f3d894','#b68538','#805221','#fff9d9','#a87934'],'imperial-black':['#d5a344','#95601d','#382413','#f0cc75','#ffe5a0','#58350d'],
+ 'obsidian-white':['#f8f4eb','#c1b9b0','#746b6b','#554146','#fff1d9','#963846'],'obsidian-black':['#645667','#2c2834','#100f16','#aa5264','#f29a91','#d45153']};
  let defs='';
  for(const [color,c] of Object.entries(palettes)){
  defs+='<linearGradient id="chess-'+color+'-wood" x1="0" y1="0" x2="1" y2=".2"><stop stop-color="'+c[2]+'"/><stop offset=".28" stop-color="'+c[1]+'"/><stop offset=".46" stop-color="'+c[0]+'"/><stop offset=".73" stop-color="'+c[1]+'"/><stop offset="1" stop-color="'+c[2]+'"/></linearGradient><linearGradient id="chess-'+color+'-base" x1="0" y1="0" x2="0" y2="1"><stop stop-color="'+c[0]+'"/><stop offset=".38" stop-color="'+c[1]+'"/><stop offset="1" stop-color="'+c[2]+'"/></linearGradient>';
  for(const [type,body] of Object.entries(shape)){
  const stylized=body.replaceAll('class="chess-carved-band"','fill="url(#chess-'+color+'-base)" stroke="'+c[3]+'"').replaceAll('class="chess-carved-light"','fill="none" stroke="'+c[4]+'" stroke-width="1.8" opacity=".8"').replaceAll('class="chess-carved-detail"','fill="none" stroke="'+c[3]+'" stroke-width="1.8"').replaceAll('class="chess-carved-cut"','fill="none" stroke="'+c[5]+'" stroke-width="4"').replaceAll('class="chess-carved-eye"','fill="'+c[5]+'" stroke="'+c[4]+'" stroke-width=".7"');
- defs+='<symbol id="chess-art-'+color+'-'+type+'" viewBox="0 0 72 78"><ellipse cx="36" cy="70" rx="27" ry="5" fill="#21140c" opacity=".34"/><g transform="translate(0 3)" fill="url(#chess-'+color+'-wood)" stroke="'+c[3]+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">'+stylized+'<path d="M20 52 Q36 56 52 52 L56 58 L54 61 H18 L16 58Z" fill="url(#chess-'+color+'-base)"/><path d="M18 60 H54 Q60 62 60 67 L58 70 H14 L12 67 Q12 62 18 60Z" fill="url(#chess-'+color+'-base)"/><path d="M17 65 Q36 67 55 65 M22 55 Q36 58 50 55" fill="none" stroke="'+c[4]+'" opacity=".68" stroke-width="1.2"/></g></symbol>';
+ defs+='<symbol id="chess-art-'+color+'-'+type+'" viewBox="0 0 72 78"><ellipse cx="36" cy="70" rx="27" ry="5" fill="#21140c" opacity=".34"/><g transform="translate(0 3)" fill="url(#chess-'+color+'-wood)" stroke="'+c[3]+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">'+stylized+(color.startsWith('imperial-')?'<path d="M36 45l4 4-4 4-4-4Z" fill="#f6dc91" stroke="#95621e" stroke-width=".9"/>':color.startsWith('obsidian-')?'<path d="M36 45l4 4-4 4-4-4Z" fill="#d65867" stroke="#f5a6a5" stroke-width=".8"/>':'')+'<path d="M20 52 Q36 56 52 52 L56 58 L54 61 H18 L16 58Z" fill="url(#chess-'+color+'-base)"/><path d="M18 60 H54 Q60 62 60 67 L58 70 H14 L12 67 Q12 62 18 60Z" fill="url(#chess-'+color+'-base)"/><path d="M17 65 Q36 67 55 65 M22 55 Q36 58 50 55" fill="none" stroke="'+c[4]+'" opacity=".68" stroke-width="1.2"/></g></symbol>';
  }}
  svg.innerHTML='<defs>'+defs+'</defs>';document.body.prepend(svg);
 }
-function pieceArt(p){
+let shopEquipment={pieces:'pieces-classic',board:'board-classic',scene:'scene-classic',effect:'effect-classic'};
+const shopStyle=category=>shopEquipment[category]?.split('-')[1]||'classic';
+function artHref(p,style=shopStyle('pieces')){return '#chess-art-'+(style==='classic'?'':style+'-')+(C.side(p)===1?'white':'black')+'-'+p.toLowerCase()}
+function pieceArt(p,style){ 
  const color=C.side(p)===1?'white':'black',svg=document.createElementNS(NS,'svg'),use=document.createElementNS(NS,'use');
- svg.setAttribute('viewBox','0 0 72 78');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','chess-piece '+color);svg.dataset.piece=p;use.setAttribute('href','#chess-art-'+color+'-'+p.toLowerCase());svg.append(use);return svg;
+ svg.setAttribute('viewBox','0 0 72 78');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','chess-piece '+color);svg.dataset.piece=p;use.setAttribute('href',artHref(p,style));svg.append(use);return svg;
 }
 installArt();
 const pieceNames={k:'Rei',q:'Dama',r:'Torre',b:'Bispo',n:'Cavalo',p:'Peão'};
@@ -82,7 +87,7 @@ function animateMove(board,{before,move,viewFlip}){
  const hide=i=>{const el=cell(i).querySelector('.chess-piece');if(el){el.style.visibility='hidden';run.hidden.push(el)}};
  const duration=p.toLowerCase()==='n'?400:340;
  const captured=flag==='ep'?to+16*before.t:to;
- if(before.b[captured]!=='.'){const el=ghost(before.b[captured],captured);run.animations.push(el.animate([{opacity:1,transform:'scale(1)'},{opacity:1,offset:.45,transform:'scale(1)'},{opacity:0,transform:'scale(.7) translateY(6px)'}],{duration,fill:'forwards',easing:'ease-out'}))}
+ if(before.b[captured]!=='.'){shopBurst(layer,rect(captured),run);const el=ghost(before.b[captured],captured);run.animations.push(el.animate([{opacity:1,transform:'scale(1)'},{opacity:1,offset:.45,transform:'scale(1)'},{opacity:0,transform:'scale(.7) translateY(6px)'}],{duration,fill:'forwards',easing:'ease-out'}))}
  const slide=(piece,a,b,jump=false,promote=false)=>{
   const r=rect(a),d=rect(b),dx=d.x-r.x,dy=d.y-r.y,el=ghost(piece,a);hide(b);
   const dest='translate('+dx+'px,'+dy+'px)';
@@ -90,14 +95,14 @@ function animateMove(board,{before,move,viewFlip}){
   if(promote){frames=[{transform:'translate(0px,0px)'},{transform:dest,offset:.78,opacity:1},{transform:dest+' scale(.8)',opacity:0}];const crowned=ghost(game().b[b],b);run.animations.push(crowned.animate([{opacity:0,transform:'scale(.75)'},{opacity:0,transform:'scale(.75)',offset:.72},{opacity:1,transform:'scale(1.12)',offset:.9},{opacity:1,transform:'scale(1)'}],{duration:duration+120,fill:'forwards',easing:'ease-out'}))}
   run.animations.push(el.animate(frames,{duration:promote?duration+120:duration,easing:'cubic-bezier(.25,.7,.2,1)',fill:'forwards'}));
  };
- slide(p,from,to,p.toLowerCase()==='n',!!promo);
+ slide(p,from,to,p.toLowerCase()==='n',!!promo);if(promo)shopBurst(layer,rect(to),run);
  if(flag==='castle'){const a=to>from?from+3:from-4,b=to>from?from+1:from-1;slide(before.b[a],a,b)}
  Promise.allSettled(run.animations.map(a=>a.finished)).then(()=>{if(motionRun!==run)return;stopMotion();if(viewFlip!==flipped)render();else presentResult();});
  return true;
 }
 let shownLocalResult='',shownRemoteResults=new Set();
 function showChessResult(kind,title,detail,points,journey=false){
- const overlay=$('victory'),card=overlay.firstElementChild;overlay.dataset.result=kind;overlay.dataset.motion=prefs.motion?'on':'off';
+ const overlay=$('victory'),card=overlay.firstElementChild;overlay.dataset.result=kind;overlay.dataset.shopEffect=shopStyle('effect');overlay.dataset.motion=prefs.motion?'on':'off';
  $('resulticon').textContent={victory:'♛',defeat:'♟',resign:'⚑',draw:'◇'}[kind];$('resultlabel').textContent={victory:'Vitória',defeat:'Derrota',resign:'Desistência',draw:'Empate'}[kind];$('victorytitle').textContent=title;$('victorydetail').textContent=detail;$('resultpoints').textContent=points;$('journeyresultmap').hidden=!journey;
  card.querySelectorAll('.spark').forEach(e=>e.remove());if(prefs.motion&&!matchMedia('(prefers-reduced-motion: reduce)').matches){for(let i=0;i<(kind==='victory'?24:kind==='defeat'?12:10);i++){const e=element('i','spark');e.setAttribute('aria-hidden','true');e.style.setProperty('--x',((i*37+7)%97)+'%');e.style.setProperty('--y',kind==='victory'?'-5%':((i*23+10)%90)+'%');e.style.setProperty('--delay',(i%8*.18)+'s');e.style.setProperty('--dur',(2+(i%5)*.24)+'s');card.append(e)}}
  open('victory');$('closevictory').focus();
@@ -215,7 +220,7 @@ function drawSocial(data){chessClanState.registered=true;chessClanState.data={pl
  for(let x of data.invites||[]){let card=element('div','chess-invite');card.append(element('b','','Convite de Damas · '+x.name),element('p','','Abra Damas para escolher a modalidade e aceitar.'),button('Ver convite em Damas',()=>{returnDamas(true)}));invites.append(card)}
  $('chess-social-status').textContent='Conectado · lista compartilhada';
 }
-function applyData(data){idlePortal=data.idle_portal===true;if(data.journey)updateJourney(data.journey);if(motionRun&&remote&&data.match?.id===remote.id&&data.match.moves.length>moves.length){deferredData=data;return}drawRanking(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
+function applyData(data){idlePortal=data.idle_portal===true;if(data.journey)updateJourney(data.journey);if(motionRun&&remote&&data.match?.id===remote.id&&data.match.moves.length>moves.length){deferredData=data;return}drawRanking(data);if(data.shop)updateShop(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
  if(g&&(!g.result||mode!=='local'&&remote?.id===g.id)){
   const same=remote?.id===g.id, before=game(), viewFlip=flipped, nextMove=same&&g.moves.length===moves.length+1?C.legal(before).find(m=>C.key(m)===g.moves.at(-1)):null;
   const changed=!remote||remote.id!==g.id||remote.moves.length!==g.moves.length||JSON.stringify(remote.result)!==JSON.stringify(g.result)||remote.offer!==g.offer;
@@ -226,13 +231,42 @@ function applyData(data){idlePortal=data.idle_portal===true;if(data.journey)upda
  }else{if(mode==='local')$('white-name').textContent=profile?.name||'Brancas';updateControls();paintClock()}
  if(!leaving&&g&&g.mode==='ai'&&!g.paused&&!g.result&&sideKey()!==g.side){clearTimeout(botTimer);botTimer=setTimeout(()=>request('bot',{match:g.id,sequence:g.moves.length}),motionRun?520:120)}
 }
-async function request(op,body={},drain=false){if(leaving&&!drain)return;if(fetching){if(op==='state')return;if(fetchOp==='state'&&!pendingAction){pendingAction={op,body};return}msg('Aguarde a sincronização e tente novamente.');return}const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;fetchOp=op;let settle;requestDone=new Promise(r=>settle=r);if(op!=='state')idlePortal=false;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op==='journey-start'&&data.match?.journey){$('journey-dialog').close();window.scrollTo(0,0)}if(op!=='state')setTimeout(poll,80)}catch(e){msg(e.message);if(op==='journey-start')$('journey-error').textContent=e.message;$('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false;fetchOp='';const action=pendingAction;pendingAction=null;if(action)request(action.op,action.body,true);settle()}}
+async function request(op,body={},drain=false){if(leaving&&!drain)return;if(fetching){if(op==='state')return;if(fetchOp==='state'&&!pendingAction){pendingAction={op,body};return}msg('Aguarde a sincronização e tente novamente.');return}const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;fetchOp=op;let settle;requestDone=new Promise(r=>settle=r);if(op!=='state')idlePortal=false;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op.startsWith('shop-'))$('shop-status').textContent=op==='shop-buy'?'Relíquia adquirida! Equipe-a no inventário.':op==='shop-equip'?'Visual equipado.':'Escolha sua próxima relíquia.';if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op==='journey-start'&&data.match?.journey){$('journey-dialog').close();window.scrollTo(0,0)}if(op!=='state')setTimeout(poll,80)}catch(e){msg(e.message);if(op==='journey-start')$('journey-error').textContent=e.message;if(op.startsWith('shop-'))$('shop-status').textContent=e.message;else $('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false;fetchOp='';if(op.startsWith('shop-')){shopBusy=false;drawShop(true)}const action=pendingAction;pendingAction=null;if(action)request(action.op,action.body,true);settle()}}
 function poll(){if(!leaving&&!fetching&&!document.hidden)request('state')}
 window.addEventListener('focus',poll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();else if(mode==='local'){tickLocal();save()}});setInterval(poll,1800);
 $('white-icon').append(pieceArt('K'));$('black-icon').append(pieceArt('k'));
 $('chess-focus').onclick=()=>{let on=document.body.classList.toggle('chess-focus');$('chess-focus').textContent=on?'Mostrar painéis':'Modo concentração';$('chess-focus').setAttribute('aria-pressed',String(on));if(on)window.scrollTo(0,0);if(motionRun)render()};
 window.addEventListener('resize',()=>{if(motionRun)render()});
-// Campaign metadata and unlocks come only from the authenticated server.
+// Shop catalog and equipment are authoritative; only the preview is local.
+let shopCatalog=[],shopOwned=[],shopTab='pieces',shopSelected='',shopBusy=false,shopSignature='';
+const shopLabels={pieces:'Peças',board:'Tabuleiros',scene:'Cenários',effect:'Efeitos',inventory:'Inventário'};
+function updateShop(data){
+ const before=JSON.stringify(shopEquipment);shopEquipment=data.shop.equipped;shopOwned=data.shop.owned;if(data.catalog)shopCatalog=data.catalog;
+ if(before!==JSON.stringify(shopEquipment)){for(const c of ['board','scene','effect'])document.body.dataset['shop'+c[0].toUpperCase()+c.slice(1)]=shopStyle(c);for(const el of document.querySelectorAll('.chess-piece:not(#chess-shop .chess-piece)'))el.querySelector('use')?.setAttribute('href',artHref(el.dataset.piece))}
+ if($('chess-shop').open)drawShop();
+}
+function shopCall(op,item){if(shopBusy)return;if(!localStorage.getItem('damas-profile-token')){$('shop-status').textContent='Entre no Clube para acessar seu inventário.';return}if(fetching&&(fetchOp!=='state'||pendingAction)){$('shop-status').textContent='Sincronizando. Tente novamente.';return}shopBusy=true;$('shop-status').textContent='Sincronizando tesouro…';drawShop(true);request(op,item?{item}:{});}
+function openShop(){open('chess-shop');shopTab='pieces';shopSelected='';shopSignature='';$('shop-status').textContent='Carregando relíquias…';drawShop(true);shopCall('shop-state')}
+$('menu-shop').onclick=openShop;$('chess-shop').addEventListener('close',()=>{if(!$('chess-shop').open){$('shop-detail').replaceChildren();$('shop-items').replaceChildren();shopSignature=''}});
+function shopPreview(item){
+ const p=element('div','shop-preview');p.dataset.style=item.style;p.dataset.category=item.category;
+ if(item.category==='pieces'){const row=element('div','shop-piece-row');for(const c of ['K','Q','R','B','N','P','k','q','r','b','n','p'])row.append(pieceArt(c,item.style));p.append(row)}
+ else if(item.category==='board'){const frame=element('div','shop-mini-frame'),board=element('div','shop-mini-board');for(let n=0;n<64;n++){const cell=element('div','shop-mini-square '+(((n>>3)+(n&7))%2?'dark':''));if(n<16||n>=48)cell.append(pieceArt(n<8?'rnbqkbnr'[n%8]:n<16?'p':n<56?'P':'RNBQKBNR'[n%8],item.style));board.append(cell)}frame.append(board);p.append(frame)}
+ else if(item.category==='scene'){p.append(element('div','shop-mini-hall'),element('span','shop-preview-symbol','♛'))}
+ else{p.append(element('span','shop-preview-symbol',item.style==='obsidian'?'✷':'✦'),element('span','shop-preview-ring'))}
+ return p;
+}
+function drawShop(force=false){
+ if(!$('chess-shop').open)return;const coins=rankData?.coins??0,sig=JSON.stringify([shopTab,shopSelected,shopOwned,shopEquipment,coins,shopBusy,shopCatalog.length]);if(!force&&sig===shopSignature)return;shopSignature=sig;$('shop-coins').textContent=coins.toLocaleString('pt-BR');
+ const tabs=$('shop-tabs');tabs.replaceChildren();for(const [id,label] of Object.entries(shopLabels)){const b=button(label,()=>{shopTab=id;shopSelected='';drawShop(true)},id===shopTab?'gold':'');b.setAttribute('aria-pressed',String(id===shopTab));tabs.append(b)}
+ const items=shopCatalog.filter(i=>shopTab==='inventory'?shopOwned.includes(i.id):i.category===shopTab),grid=$('shop-items');grid.replaceChildren();const chosen=items.find(i=>i.id===shopSelected)||items[0];shopSelected=chosen?.id||'';
+ for(const item of items){const b=button('',()=>{shopSelected=item.id;drawShop(true)},'shop-item');b.classList.toggle('active',item.id===shopSelected);b.setAttribute('aria-pressed',String(item.id===shopSelected));b.dataset.item=item.id;const art=element('span','shop-item-emblem',{pieces:'♞',board:'▦',scene:'♜',effect:'✦'}[item.category]);art.dataset.style=item.style;b.append(art,element('strong','',item.name),element('small','',item.collection+' · '+(shopEquipment[item.category]===item.id?'Equipado':shopOwned.includes(item.id)?'Adquirido':item.price+' moedas')));grid.append(b)}
+ const detail=$('shop-detail');detail.replaceChildren();if(!chosen){detail.append(element('p','','Carregando catálogo…'));return}
+ const owned=shopOwned.includes(chosen.id),equipped=shopEquipment[chosen.category]===chosen.id;detail.append(shopPreview(chosen),element('small','eyebrow',chosen.collection+' · '+chosen.rarity),element('h3','',chosen.name),element('p','',chosen.description),element('p','shop-price',owned?'Na sua coleção':chosen.price+' moedas'));
+ const action=button(equipped?'Equipado':owned?'Equipar':'Comprar por '+chosen.price+' moedas',()=>shopCall(owned?'shop-equip':'shop-buy',chosen.id),'gold');action.id='shop-action';action.disabled=shopBusy||equipped||(!owned&&coins<chosen.price);detail.append(action);if(!owned&&coins<chosen.price)detail.append(element('small','chess-note','Faltam '+(chosen.price-coins)+' moedas.'));if(chosen.category==='board'&&chosen.style==='classic')detail.append(element('small','chess-note','Seu tema escolhido em Efeitos visuais será mantido.'));
+}
+function shopBurst(layer,r,run){const style=shopStyle('effect');if(style==='classic')return;const ring=element('div','chess-shop-burst '+style);ring.style.cssText='left:'+(r.x+r.w*.5)+'px;top:'+(r.y+r.h*.5)+'px;width:'+r.w+'px;height:'+r.h+'px';layer.append(ring);run.animations.push(ring.animate([{opacity:0,transform:'translate(-50%,-50%) scale(.25)'},{opacity:1,offset:.28,transform:'translate(-50%,-50%) scale(.72)'},{opacity:0,transform:'translate(-50%,-50%) scale(1.45)'}],{duration:340,fill:'forwards'}))}
+ // Campaign metadata and unlocks come only from the authenticated server.
 let profilePaintSignature='';function paintChessProfile(){const signature=JSON.stringify([profile,rankData,journeyData?.won]);if(signature===profilePaintSignature)return;profilePaintSignature=signature;if(profile){const glyph={crown:'♛',knight:'♞',shield:'⛨',oak:'♣',rook:'♜',star:'★'};$('chess-profile-avatar').textContent=glyph[profile.avatar]||'♞';$('chess-profile-clan').replaceChildren();if(profile.clan)$('chess-profile-clan').append(chessClans.clanNameplateRole(profile.clan));$('chess-profile-avatar').className='profile-avatar frame-'+(profile.frame||'wood');$('chess-profile-account').textContent=profile.account?'Conta: @'+profile.account+' · Perfil compartilhado.':'Você está como visitante. Vincule uma conta para acessar seu perfil em outros dispositivos.'}if(!rankData)return;const p=rankData,total=p.wins+p.losses+p.draws,tiles=$('chess-profile-tiles');tiles.replaceChildren();for(const [label,v] of [['Vitórias',p.wins],['Derrotas',p.losses],['Empates',p.draws],['Taxa de vitória',total?Math.round(100*p.wins/total)+'%':'—'],['Partidas competitivas',total],['Coroas',journeyData?.won.length||0]]){const box=element('div');box.append(element('strong','',String(v)),element('small','',label));tiles.append(box)}const defs=[['⚔','Primeira vitória','Vença uma partida competitiva.',p.wins>=1],['♜','Guardião do Tabuleiro','Vença dez partidas competitivas.',p.wins>=10],['✦','Veterano','Conclua vinte partidas competitivas.',total>=20],...(journeyData?.stages||[]).map(s=>['♛',s.title,'Vença '+s.name+'.',journeyData.won.includes(s.id)])];const grid=$('chess-achievements');grid.replaceChildren();$('chess-achievement-count').textContent=defs.filter(d=>d[3]).length+' / '+defs.length;for(const [icon,title,desc,won] of defs){const tile=element('div','achievement-tile '+(won?'unlocked':'locked'));tile.append(element('span','achievement-icon',won?icon:'◇'),element('strong','',title),element('small','',desc));grid.append(tile)}}
 $('chess-profile-edit').onclick=$('chess-profile-manage').onclick=()=>{$('profile-dialog').close();returnDamas(false,true)};
 $('chess-profile-history').onclick=()=>{open('history-dialog');$('replay-panel').hidden=true;loadHistory()};
