@@ -292,12 +292,12 @@ function drawShop(force=false){
  const coins=rankData?.coins??0,sig=JSON.stringify([shopTab,shopSelected,shopOnlyOwned,shopDraft,shopOwned,shopEquipment,coins,shopBusy,shopCatalog.length,document.body.dataset.chessTheme]);
  if(!force&&sig===shopSignature)return;
  $('shop-coins').textContent=coins.toLocaleString('pt-BR');
- const tabs=$('shop-tabs');tabs.replaceChildren();for(const [id,label] of Object.entries(shopLabels)){const b=button(label,()=>{shopTab=id;shopSelected='';drawShop(true)},id===shopTab?'primary':'secondary');b.setAttribute('aria-pressed',String(id===shopTab));tabs.append(b)}
+ const tabs=$('shop-tabs');tabs.replaceChildren();for(const [id,label] of Object.entries(shopLabels)){const b=button(label,()=>{shopTab=id;shopSelected='';drawShop(true)},id===shopTab?'gold':undefined);b.setAttribute('aria-pressed',String(id===shopTab));tabs.append(b)}
  $('shop-owned-filter').checked=shopOnlyOwned;
  const detail=$('shop-detail');detail.replaceChildren();
  const stage=element('div','chess-shop-combo-stage');shopSceneStyle(stage,shopId('scene'));shopEffectStyle(stage,shopId('effect'));if(stage.dataset.sceneStyle!=='classic')stage.append(element('div','shop-mini-hall'));stage.append(shopBoard(shopId('board'),shopId('pieces'),true));if(stage.dataset.effectStyle!=='classic')stage.append(element('span','shop-preview-ring'));
  const copy=element('div','shop-combo-copy');copy.append(element('small','','SUA MESA · PRÉVIA'),element('h3','','Combine seu estilo'),element('p','',shopName(shopId('board'))+' + '+shopName(shopId('pieces'))));
- const extra=element('p','chess-note',shopName(shopId('scene'))+' · '+shopName(shopId('effect')));copy.append(extra,button('Restaurar prévia',()=>{shopDraft={};shopSelected='';drawShop(true)},'secondary'));detail.append(stage,copy);
+ const extra=element('p','chess-note',shopName(shopId('scene'))+' · '+shopName(shopId('effect')));copy.append(extra,button('Restaurar prévia',()=>{shopDraft={};shopSelected='';drawShop(true)}));detail.append(stage,copy);
  const items=shopCatalog.filter(i=>(shopTab==='inventory'?shopOwned.includes(i.id):i.category===shopTab)&&(!shopOnlyOwned||shopOwned.includes(i.id)));
  const grid=$('shop-items');grid.replaceChildren();if(!items.some(i=>i.id===shopSelected))shopSelected=items[0]?.id||'';
  for(const item of items){
@@ -305,9 +305,9 @@ function drawShop(force=false){
   const card=element('article','school-item shop-item'+(equipped?' equipped':'')+(active?' previewing':''));card.dataset.item=item.id;
   const preview=shopCardPreview(item),label=element('div','shop-item-name');label.append(element('strong','',item.name),element('small','',item.description));
   const tag=element('span','shop-tag',equipped?'Equipado':owned?'Adquirido':item.price+' ◆');
-  const actions=element('div','shop-actions'),tryBtn=button('Ver combinação',()=>{shopDraft[item.category]=item.id;shopSelected=item.id;drawShop(true)},'secondary shop-try');
+  const actions=element('div','shop-actions'),tryBtn=button('Ver combinação',()=>{shopDraft[item.category]=item.id;shopSelected=item.id;drawShop(true)},'shop-try');
   tryBtn.setAttribute('aria-pressed',String(active));tryBtn.setAttribute('aria-label','Ver combinação: '+item.name);
-  const action=button(equipped?'Equipado':owned?'Equipar':'Comprar',()=>{shopSelected=item.id;shopCall(owned?'shop-equip':'shop-buy',item.id)},'primary shop-buy');
+  const action=button(equipped?'Equipado':owned?'Equipar':'Comprar',()=>{shopSelected=item.id;shopCall(owned?'shop-equip':'shop-buy',item.id)},'gold');action.classList.add('shop-buy');
   if(item.id===shopSelected)action.id='shop-action';action.disabled=shopBusy||equipped||(!owned&&coins<item.price);if(!owned&&coins<item.price)action.title='Faltam '+(item.price-coins)+' moedas de Xadrez';
   actions.append(tryBtn,action);card.append(preview,label,tag,actions);grid.append(card);
  }
