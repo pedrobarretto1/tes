@@ -54,3 +54,20 @@ body:has(#clubmenu:not(.hidden)) #clubmenu .club-card{max-height:calc(100dvh - 1
 
 /* Hall illustration: one static SVG, grounded architecture and floor, no animation. */
 .journey-scene{display:none;position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.49;color:#c1a779}.journey-scene svg{width:100%;height:100%;display:block}.chess-page[data-journey-stage] .journey-scene{display:block}.chess-page[data-journey-stage] .chess-shell{position:relative;z-index:1}.hall-art{display:none;visibility:hidden}.chess-page[data-journey-stage="1"] .hall-1,.chess-page[data-journey-stage="2"] .hall-2,.chess-page[data-journey-stage="3"] .hall-3,.chess-page[data-journey-stage="4"] .hall-4,.chess-page[data-journey-stage="5"] .hall-5{display:block;visibility:visible}.chess-page[data-journey-stage="2"] .journey-scene{color:#a0ae9d}.chess-page[data-journey-stage="3"] .journey-scene{color:#ad9bc1}.chess-page[data-journey-stage="4"] .journey-scene{color:#c7a287}.chess-page[data-journey-stage="5"] .journey-scene{color:#e5c078}.chess-page[data-chess-theme="crowns"] .chess-corners i{border-color:#fff1b6;background:linear-gradient(135deg,#f8df9c,#ad7836 55%,#583d65);box-shadow:0 0 0 2px #53354e}.chess-page[data-chess-theme="crowns"] .chess-frame{box-shadow:0 18px 40px #0008,inset 0 0 0 5px #5d3a6b,inset 0 0 0 8px #e8bc6d}@media(max-width:520px){.journey-scene{opacity:.27}}
+
+/* Portal/menu parity with the Damas clubhouse. The duplicate portal is inside the
+   native modal so it remains keyboard-accessible and never sits behind its backdrop. */
+.chess-page .chess-nav{padding:5px;background:#201711a8;border:1px solid #79573555;border-radius:12px;gap:3px;align-items:stretch}
+.chess-page .chess-nav button{border-color:transparent;background:transparent;box-shadow:none;color:#e8d2b0;font-size:11px;white-space:normal}
+.chess-page .chess-nav button#chess-friends{background:linear-gradient(140deg,#e7c38a,#b98447);color:#322015;border-color:#d4ac70}
+.chess-page .chess-nav button:not(#chess-friends):hover{background:#65432688}
+.chess-page .chess-nav #chess-profile{min-width:145px;font-size:12px;letter-spacing:.1px}
+.chess-page .chess-main-menu{border-color:#b38b57;border-radius:17px;background:repeating-linear-gradient(8deg,#ad783318 0 1px,transparent 1px 7px),linear-gradient(145deg,#65462e,#302218 70%);box-shadow:inset 0 0 0 4px #2a1b13,inset 0 0 0 5px #d4ad7040,0 24px 80px #000b;max-height:calc(100dvh - 30px);padding-top:0}
+.chess-main-menu .chess-menu-portal{position:sticky;top:0;z-index:3;margin:0 -12px 15px;padding:7px;border-radius:0 0 10px 10px;box-shadow:0 5px 14px #100b08aa,inset 0 0 0 2px #20160f}
+.chess-main-menu .dialog-head h2{color:#ffe3b0;letter-spacing:-.6px}
+.chess-main-menu .chess-menu-identity{padding:13px;border-color:#997044;background:linear-gradient(130deg,#4a3323,#2c2118)}
+.chess-main-menu .chess-menu-identity .chess-emblem{width:auto;height:auto;border:0;box-shadow:none;background:transparent;font-size:30px;flex:none}
+.chess-main-menu .chess-menu-identity b{color:#f9e4b9;font-size:18px;overflow-wrap:anywhere}.chess-main-menu .chess-menu-identity small{color:#d2b48c}
+.chess-main-menu .chess-menu-section h3{font:600 12px Arial,sans-serif;color:#e5bc82;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid #ad805447}
+.chess-main-menu .chess-menu-grid{margin-top:0;gap:8px}.chess-main-menu .chess-menu-grid button{min-height:72px;display:flex;flex-direction:column;justify-content:center;gap:7px;border-radius:11px;white-space:normal}.chess-main-menu .chess-menu-grid b{letter-spacing:-.2px}.chess-main-menu .chess-menu-grid small{margin-top:0;line-height:1.4}
+@media(max-width:520px){.chess-page .chess-nav button{min-width:0;flex:1 1 30%}.chess-page .chess-nav #chess-profile{flex:1 1 30%;min-width:0}.chess-main-menu .chess-menu-portal{margin:0 -7px 13px}.chess-main-menu .chess-menu-grid{grid-template-columns:1fr}.chess-main-menu .chess-menu-grid button{min-height:58px}.chess-main-menu .chess-menu-identity b{font-size:16px}}

@@ -5,6 +5,11 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Paridade visual do portal e menu do Xadrez
+- Pedido: aba do Xadrez diferente de Damas. Interpretação: seletor de universos, barra de navegação e menu principal, com identidade rústica e mesmas seções. Mantém mesa, jornada, funcionalidades e progressão.
+- xadrez.html/css/js: portal adicional dentro do diálogo modal (teclado acessível), fixo no topo durante rolagem; Damas usa fluxo seguro de saída/pausa; Xadrez fecha menu sem recarregar. Barra e cartões usam paleta, tipografia, espaçamento e responsividade do Clube de Damas. Jogadores mantém painel existente, não cria atalhos fictícios. aria-expanded acompanha abertura do diálogo. CSS/JS com cache atualizado.
+- Testes: test_chess_ui.js verifica seletor no menu e retorno durante Jornada. CI pendente; publicação não confirmada. Sem alterações de servidor/banco. Rollback: reverter commit.
+
 ## 15/11/2026 — Retorno do Xadrez às Damas
 - Pedido: portal bloqueava saída durante partida IA/Jornada ou busca. xadrez.js/html: saída assíncrona sincroniza o lance pendente, cancela busca, pausa IA/campanha sem desistir e abre Damas; convite de Damas usa o mesmo fluxo. Duelo online exige confirmação, continua ativo e relógio não pausa. Sem token, navega diretamente. Em falha de rede, avisa e permite tentar novamente. Menu permanece fechado.
 - chess_duels.py: leave autenticado e transacional; flag paused na partida existente, relógio congelado, bloqueio de lances enquanto pausado, state retoma com relógio reiniciado. servidor.py: chess_active ignora IA pausada apenas para conflito entre universos; jogo online continua protegido. Sem migração ou exclusão de dados.

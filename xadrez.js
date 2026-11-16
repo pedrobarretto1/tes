@@ -164,6 +164,9 @@ async function returnDamas(friends=false){
  }catch(e){leaving=false;msg(e.message);poll()}
 }
 $('return-damas').onclick=e=>{e.preventDefault();returnDamas()};
+$('menu-return-damas').onclick=e=>{e.preventDefault();$('menu-dialog').close();returnDamas()};
+$('menu-current-chess').onclick=e=>{e.preventDefault();$('menu-dialog').close()};
+for(const [trigger,dialog] of [['chess-menu','menu-dialog'],['chess-friends','friends-dialog']]){const el=$(dialog);new MutationObserver(()=>$(trigger).setAttribute('aria-expanded',String(el.open))).observe(el,{attributes:true,attributeFilter:['open']})}
 function label(p){return !p.online?'Offline':(p.game==='chess'?'Xadrez':'Damas')+' · '+(p.busy?'Em partida':'Disponível')}
 function rankRows(id,rows){let el=$(id);el.replaceChildren();if(!rows.length){el.append(element('p','chess-note','Nenhum jogador no ranking ainda.'));return}rows.forEach((p,i)=>{let row=element('div','chess-rank-row'+(p.own?' own':'')),info=element('div');info.append(element('b','',p.name),element('small','',p.wins+' V · '+p.losses+' D · '+p.draws+' E'+(p.own?' · SEU PERFIL':'')));row.append(element('span','rank-medal',i+1),info,element('strong','',p.points.toLocaleString('pt-BR')+' PH'));el.append(row)})}
 function drawRanking(data){if(!data.profile)return;rankData=data.profile;$('menu-honor').textContent=data.profile.points.toLocaleString('pt-BR')+' PH · '+data.profile.coins+' moedas';let p=data.profile,text='Sua posição: #'+p.rank+' · '+p.points.toLocaleString('pt-BR')+' PH';$('chess-rank-own').textContent=$('chess-rank-full-own').textContent=$('chess-personal-rank').textContent=text;$('chess-profile-stats').textContent=p.points+' PH · '+p.coins+' moedas · '+p.wins+' V / '+p.losses+' D / '+p.draws+' E';rankRows('chess-ranking-top',data.ranking.slice(0,3));rankRows('chess-ranking-full',data.ranking)}
