@@ -5,6 +5,14 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Xadrez: mesa competitiva e painel lateral
+- Pedido: replicar funcionalidade dos quatro painéis de Damas adaptados ao Xadrez (configuração, andamento, ranking e como jogar).
+- xadrez.html/css/js: controles de modo Local/Computador/Online, regras clássicas, sorteio de cores, relógios 0/1/3/5/10/15/30, três dificuldades, ranqueada/casual, busca/cancelamento, desafios, nova partida/desistência, empate, histórico, ranking top3/completo, perfil com PH/moedas, regras expansíveis. Nome da mesma conta, edição via Damas. Preserva peças SVG e giro Local; relógio Local salvo na aba; partidas online e IA restauradas pelo servidor.
+- chess_duels.py: motor python-chess (chess==1.11.2), partidas/assentos/convites/fila/perfil/histórico persistidos, relógio autoridade servidor, IA com limites de busca, validação de turnos/lances, fim por regras e tempo, resultado idempotente e transação com guard. Sorteio de cores. Ranking PH inicial 1000; +25/-15/+5/-20, Médio metade arredondada em magnitude, moedas 15/8 após 8 plies sem desistência, Fácil/casual/Local sem progresso competitivo. Recompensas, ranking e históricos independentes de Damas.
+- servidor.py/clube.js/index.html: rotas chess/* e schema aditivo, amigos e jogadores online compartilhados, convites Xadrez visíveis nas Damas (abrem Xadrez para aceite explícito), bloqueio de salas Damas enquanto duelo Xadrez ativo. Não migra nem remove dados. Motor Local original mantido.
+- Limites: IA própria leve, não Stockfish; ranking por PH (não Elo FIDE); fila por tempo/tipo, sem seleção de variante; sem clãs/loja/campanha Xadrez, sem chat/espectadores/replay visual online. Recompensa sem transferências entre jogos. Nome compartilhado gerenciado em Damas.
+- Testes: test_chess_duels.py, test_chess_ui.js, CI pendente. Branch xadrez-mesa-competitiva. Rollback: reverter rotas/interface preservando tabelas e resultados existentes; não apagar dados.
+
 ## 15/11/2026 — Xadrez: mesa rústica e peças entalhadas
 - Pedido: aproximar layout da Casa de Xadrez ao visual rústico aprovado das Damas e refinar peças.
 - xadrez.html/css: cabeçalho, navegação, mesa, cartas, moldura de madeira com cantos de latão, painéis e menu com a paleta e dimensões das Damas. Retira banner de apresentação para priorizar tabuleiro; painel de regras útil, expansões futuras informativas no menu. Modo concentração reversível, sem mudar estado da partida. Breakpoints 850/520 px, coordenadas separadas e contraste por casa. Portal compartilhado preservado.
