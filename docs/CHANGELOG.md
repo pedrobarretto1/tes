@@ -5,6 +5,10 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Transição entre universos
+- Pedido: transição nos dois sentidos Damas/Xadrez. CSS compartilhado com portal de madeira e dourado, emblema/nome do destino, entrada breve e saída de 460ms. Sem aguardar animação para navegar: marca de sessão consumida na página de destino, efeito visual não bloqueia cliques, fonte mostra portal enquanto salva/pausa. Cancelamento/erro e retorno pelo histórico limpam estado.
+- Respeita movimento reduzido, mantém fluxo de confirmação e persistência existente. Sem dados novos, sem delay artificial. UI valida os dois sentidos, desaparecimento e redução de movimento; CI pendente.
+ 
 ## 15/11/2026 — Atalho Amigos nas Damas
 - Pedido: menu das Damas deve oferecer Amigos como o Xadrez. index.html adiciona o mesmo cartão na seção Clube e comunidade; clube.js abre diretamente a aba Amigos do Clube de Honra. Fechar retorna à mesa. Sem mudanças de dados ou lista social. Teste UI verifica aba selecionada e menu fechado; CI pendente. Rollback: reverter commit.
 

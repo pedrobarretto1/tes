@@ -178,8 +178,8 @@ $('chess-ranking-open').onclick=$('menu-ranking').onclick=()=>open('ranking-dial
 function setPortalBusy(on){for(const id of ['return-damas','menu-return-damas']){const el=$(id);el.setAttribute('aria-busy',String(on));el.querySelector('small').textContent=on?'Entrando nas Damas…':'Entrar no reino'}if(on)msg('Salvando e entrando nas Damas…')}
 async function returnDamas(friends=false,profilePage=false){
  if(leaving)return;
- leaving=true;clearTimeout(botTimer);setPortalBusy(true);
- const token=localStorage.getItem('damas-profile-token'),go=()=>{tickLocal();save();if(friends)sessionStorage.setItem('damas-open-friends','1');if(profilePage)sessionStorage.setItem('damas-open-profile','1');location.href='/'};
+ leaving=true;clearTimeout(botTimer);setPortalBusy(true);window.realmTransition.begin('damas');
+ const token=localStorage.getItem('damas-profile-token'),go=()=>{tickLocal();save();if(friends)sessionStorage.setItem('damas-open-friends','1');if(profilePage)sessionStorage.setItem('damas-open-profile','1');window.realmTransition.navigate('damas')};
  try{
   if(!token){go();return}
   // An authoritative idle snapshot has no game, queue or outgoing invite to save.
@@ -189,13 +189,13 @@ async function returnDamas(friends=false,profilePage=false){
   while(fetching){const remaining=deadline-performance.now();if(remaining<=0)throw Error('A conexão ainda está sincronizando. Tente voltar novamente.');let timeout;try{await Promise.race([requestDone,new Promise((_,reject)=>timeout=setTimeout(()=>reject(Error('A conexão ainda está sincronizando. Tente voltar novamente.')),remaining))])}finally{clearTimeout(timeout)}}
   if(idlePortal&&!activeRemote()&&!queued){go();return}
   let allowOnline=false;
-  if(activeRemote()&&remote.mode==='online'){if(!confirm('O duelo online continuará ativo e o relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;setPortalBusy(false);poll();return}allowOnline=true}
+  if(activeRemote()&&remote.mode==='online'){if(!confirm('O duelo online continuará ativo e o relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;setPortalBusy(false);window.realmTransition.cancel();poll();return}allowOnline=true}
   const leave=async()=>{const r=await fetch('/api/social/chess/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,allowOnline})});return {r,data:await r.json()}};
   let result=await leave();
-  if(result.r.status===409&&!allowOnline){if(!confirm('Um duelo online está em andamento. O relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;setPortalBusy(false);poll();return}allowOnline=true;result=await leave()}
+  if(result.r.status===409&&!allowOnline){if(!confirm('Um duelo online está em andamento. O relógio continuará correndo. Voltar às Damas mesmo assim?')){leaving=false;setPortalBusy(false);window.realmTransition.cancel();poll();return}allowOnline=true;result=await leave()}
   if(!result.r.ok)throw Error(result.data.error||'Não foi possível salvar a partida.');
   go();
- }catch(e){leaving=false;setPortalBusy(false);msg(e.message);poll()}
+ }catch(e){leaving=false;setPortalBusy(false);window.realmTransition.cancel();msg(e.message);poll()}
 }
 $('return-damas').onclick=e=>{e.preventDefault();returnDamas()};
 $('menu-return-damas').onclick=e=>{e.preventDefault();$('menu-dialog').close();returnDamas()};
