@@ -5,6 +5,10 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 16/11/2026 — Loja visível no menu e acesso direto
+- Pedido: jogador não encontrou Loja de Honra após deploy #28. Botão movido para imediatamente abaixo do perfil no menu, antes de Jogar, e atalho Loja no cabeçalho. Ambos abrem a mesma janela. Versões JS/CSS atualizadas; teste de visibilidade sem rolar e abertura direta.
+- Diagnóstico de produção: Render declarou deploy anterior live, mas consulta explícita ao Neon produção/damas não encontrou as duas tabelas. Aplicada migração aditiva idempotente exatamente igual ao setup de chess_shop.py; confirmação de ambas as tabelas presentes, sem tocar dados anteriores. Causa do HTML ausente no navegador não confirmada. CI pendente.
+
 ## 16/11/2026 — Loja de Honra do Xadrez V1
 - Pedido: loja funcional com catálogo, inventário, compra/equipar, prévias e coleções Clássico, Império Dourado e Obsidiana. chess_shop.py: 12 itens em 4 categorias, preços 30–90 moedas, tabelas aditivas chess_shop_owned/equipped, catálogo/validação no servidor; compra idempotente sob chess_guard e saldo de chess_profiles, equipamento só de itens possuídos. Sem alteração em Damas ou recompensas competitivas.
 - chess_duels.py: operações shop-state/buy/equip autenticadas, snapshot pequeno de equipamentos e inventário; catálogo apenas nas operações de loja. xadrez.html/js/css: modal com visual clube, categorias, prévia única estática, moedas, inventário e aplicação das peças SVG, tabuleiros, salões e efeitos de captura/promoção/vitória. Clássico preserva temas livres e Cinco Coroas; cenário da Jornada tem prioridade; respeita movimento reduzido. Paletas originais e silhuetas preservadas, sem imagens pesadas. 
