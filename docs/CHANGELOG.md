@@ -5,6 +5,12 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Jornada do Mestre do Xadrez: As Cinco Coroas
+- Pedido: campanha própria, partidas tradicionais completas, mestres com personalidade/dificuldade crescente e recompensas exclusivas. Cinco estágios, brancas, sem relógio; vitória libera próxima coroa e título, derrota/empate permite repetir. Tabuleiro Cinco Coroas exclusivo após as cinco vitórias.
+- chess_duels.py: catálogo e progresso autenticados, tabela chess_journey aditiva, vitória registrada no finish da partida sob guard, start validado/idempotente; usa as partidas AI existentes, níveis de busca distintos e limitados, sem PH/moedas/ranking; histórico identifica campanha. Sem alterar Damas, contas, cosméticos existentes ou regras.
+- xadrez.html/css/js: mapa com cartões e bloqueios, paleta estática por salão, banner/painel na mesa tradicional, continuidade ao recarregar e recompensa visual autenticada. Tema escolhido localmente; desbloqueio da conta no servidor. Não é Torre nem Escola. Sem imagens/efeitos contínuos.
+- Testes: API cobre cinco vitórias legais com bot determinístico, isolamento, bloqueio, desistência, idempotência e histórico; UI cobre iniciar, jogar, recarregar, desistir, PH e bloqueio. CI pendente; publicação não confirmada. Rollback: reverter commit sem apagar tabela/progresso.
+
 ## 15/11/2026 — Menu expandido, Escola, replay e preferências do Xadrez
 - Pedido: adaptar as demais áreas do menu de Damas ao Xadrez. Primeira etapa: quatro seções, atalhos funcionais de busca, desafios, ranking, Escola, replay, amigos, perfil e configurações. Campanha, clãs, loja, Copa, Salão ao Vivo, sala privada e música ainda não disponíveis; nenhuma opção falsa.
 - xadrez.html/css/js: seis exercícios legais com dicas, validação e progresso local; tabuleiros isolados da mesa; replay do jogo atual e últimos 20 registros online, navegação por lance; três acabamentos gratuitos, animações opcionais e efeitos sonoros sintetizados opcionais com volume. Preferências locais do navegador, sem PH/recompensas. Sem alterações no motor ou Damas.
