@@ -59,3 +59,6 @@
 
 /* The shared result card lives inside a native modal in chess. */
 .chess-page dialog.victory{box-sizing:border-box;position:fixed;inset:0;margin:0;width:100%;height:100%;max-width:none;max-height:none;border:0;color:var(--ink);overflow:auto}.chess-page dialog.victory:not([open]){display:none}.chess-page dialog.victory::backdrop{background:transparent}.chess-page .victory>div{max-width:470px;max-height:calc(100dvh - 40px);overflow:auto}.chess-page .victory #journeyresultmap{margin-top:8px}.chess-page .victory[data-motion="off"]>div,.chess-page .victory[data-motion="off"] .crown,.chess-page .victory[data-motion="off"] .spark{animation:none!important}.chess-page .victory[data-motion="off"] .spark{display:none}@media(max-width:520px){.chess-page .victory>div{padding:22px 18px}.chess-page .victory h2{font-size:28px}.chess-page .victory .crown{width:76px;height:76px;font-size:44px}}
+
+/* Same clan shell and heraldry as Damas, inside a native modal. */
+.chess-page #clanoverlay{width:min(1000px,calc(100% - 16px));max-width:none;max-height:calc(100dvh - 16px);border:0;background:transparent;padding:0;color:var(--ink);overflow:visible}.chess-page #clanoverlay::backdrop{background:#130d09eb;backdrop-filter:blur(6px)}.chess-page #clanoverlay .clan-shell{margin:auto;width:100%;max-height:calc(100dvh - 16px)}
