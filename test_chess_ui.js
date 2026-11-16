@@ -11,7 +11,9 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
   await page.addInitScript(()=>{localStorage.setItem('damas-name','Teste Portal');localStorage.setItem('damas-profile-token','chess-ui-test-token-012345678901234567890123')});
   await page.goto(base,{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>!document.getElementById('clubmenu').classList.contains('hidden'));
+  await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));
+  assert(!(await page.locator('#clubmenu').isVisible()));assert(!(await page.locator('#clubwelcome').isVisible()));
+  await page.locator('#clubnavmenu').click();assert(await page.locator('#clubmenu').isVisible());await page.locator('#clubmenux').click();
   assert(await page.locator('#enter-xadrez').isVisible());await page.locator('#enter-xadrez').click();
   await page.waitForURL('**/xadrez.html');await page.waitForFunction(()=>document.getElementById('chess-profile').textContent==='Teste Portal');
   assert.equal(await page.locator('#chess-board button').count(),64);assert.equal(await page.locator('#chess-board button').first().getAttribute('data-square'),'a8');
@@ -45,7 +47,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   // Two isolated accounts play a real online game with a shared queue.
   const second=await browser.newPage({viewport:{width:1280,height:800}});second.on('pageerror',e=>errors.push(e.message));await second.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
   await second.addInitScript(()=>{localStorage.setItem('damas-name','Teste Rival');localStorage.setItem('damas-profile-token','chess-rival-test-token-012345678901234567890123')});
-  await second.goto(base,{waitUntil:'domcontentloaded'});await second.waitForFunction(()=>!document.getElementById('clubmenu').classList.contains('hidden'));await second.locator('#enter-xadrez').click();await second.waitForURL('**/xadrez.html');await second.waitForFunction(()=>document.getElementById('chess-profile').textContent==='Teste Rival');
+  await second.goto(base,{waitUntil:'domcontentloaded'});await second.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Rival ·'));assert(!(await second.locator('#clubmenu').isVisible()));await second.locator('#enter-xadrez').click();await second.waitForURL('**/xadrez.html');await second.waitForFunction(()=>document.getElementById('chess-profile').textContent==='Teste Rival');
   for(const p of [page,second]){await p.locator('[data-chess-mode=online]').click();await p.locator('#chess-time').selectOption('3');await p.locator('#chess-ranked').selectOption('casual');await p.locator('#chess-search').click()}
   await page.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);await second.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);
   const white=(await page.locator('#chess-side-hint').textContent()).includes('brancas')?page:second,black=white===page?second:page;
@@ -54,6 +56,10 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
   await second.close();await page.locator('[data-chess-mode=local]').click();
   await page.locator('#return-damas').click();await page.waitForURL(base+'/');assert.equal(await page.locator('h1').first().textContent(),'Casa de Damas');
+  await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));assert(!(await page.locator('#clubmenu').isVisible()));assert(!(await page.locator('#clubwelcome').isVisible()));
+  await page.reload();await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));assert(!(await page.locator('#clubmenu').isVisible()));
+  await page.goto(base+'/?friends=1');await page.waitForFunction(()=>!document.getElementById('cluboverlay').classList.contains('hidden'));assert(!(await page.locator('#clubmenu').isVisible()));assert.equal(new URL(page.url()).searchParams.has('friends'),false);
+  await page.locator('#clubclose').click();
   assert.deepEqual(errors,[]);console.log('CHESS UI OK: portal, SVG, local, AI rewards, two-account online and ranking');
  }finally{if(browser)await browser.close();server.kill()}
 })().catch(e=>{console.error(e);process.exitCode=1});
