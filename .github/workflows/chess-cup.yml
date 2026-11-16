@@ -1,0 +1,35 @@
+name: Copa de Honra do Xadrez — verificações
+on:
+  push:
+    branches: [main]
+    paths:
+      - chess_cup.py
+      - chess_duels.py
+      - chess_shop.py
+      - xadrez.js
+      - xadrez.html
+      - xadrez.css
+      - test_chess_cup.py
+      - test_chess_duels.py
+      - test_chess_ui.js
+      - .github/workflows/chess-cup.yml
+  workflow_dispatch:
+jobs:
+  chess-cup:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements.txt
+      - run: python -m py_compile servidor.py chess_cup.py chess_duels.py chess_shop.py test_chess_cup.py
+      - run: python -m unittest test_chess_cup.py test_chess_duels.py test_chess_social.py -v
+      - run: node --check xadrez.js && node --check test_chess_ui.js
+      - run: node test_chess_engine.js
+      - run: npm install --no-save --no-package-lock playwright@1.51.1
+      - run: npx playwright install chromium --with-deps
+      - run: node test_chess_ui.js

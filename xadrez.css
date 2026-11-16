@@ -115,3 +115,42 @@
 
 /* Profile uses the original Damas card, including desktop padding and mobile form. */
 .chess-page dialog.profile-card{width:min(720px,calc(100% - 36px));max-height:93vh;animation:resultRise .32s ease-out}.chess-page dialog.profile-card::backdrop{background:#120c08de;backdrop-filter:blur(7px)}.chess-page #chess-profile-clan.hidden,.chess-page #chess-profile-link.hidden,.chess-page #chess-profile-logout.hidden{display:none}@media(prefers-reduced-motion:reduce){.chess-page dialog.profile-card{animation:none}}
+
+
+/* Copa de Honra V1 — same timber, heraldry and championship cards as Damas. */
+.chess-page #chess-cup{width:min(700px,calc(100% - 20px));max-height:calc(100dvh - 22px);overflow:auto;overscroll-behavior:contain}
+.chess-cup-hero{display:flex;gap:14px;align-items:center;margin:12px 0 14px;padding:17px;border:1px solid #c6a06b;border-radius:13px;background:radial-gradient(ellipse at 15% 0,#765230,#39291d 70%)}
+.chess-cup-hero .chess-cup-trophy{width:92px;height:106px;flex:none;display:grid;place-items:center;font:76px Georgia;color:#ffe1a0;text-shadow:0 3px 0 #66451d,0 7px 15px #140a06;background:linear-gradient(130deg,#6a4b31,#261a15);border:2px solid #c89d62;border-radius:40% 40% 14px 14px;box-shadow:inset 0 0 0 4px #4b3522,0 6px 24px #0007}
+.chess-cup-hero small{font:700 10px Arial;letter-spacing:2px;color:#eacb98}
+.chess-cup-hero h3{font:normal 26px Georgia;margin:5px 0;color:#ffe3af}
+.chess-cup-hero p{font:13px/1.5 Arial;margin:0;color:#d9c2a1}
+.chess-cup-rewards{padding:13px 15px;background:linear-gradient(125deg,#584028,#261c16);border:1px solid #bb9254;border-radius:11px}
+.chess-cup-rewards strong{font:700 18px Georgia;color:#ffe4b1}
+.chess-cup-rewards p{margin:6px 0 0;font:13px/1.6 Arial;color:#e3cba7}
+.chess-cup-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 18px}
+.chess-cup-section-title{font:normal 22px Georgia;color:#f3d5a2;border-bottom:1px solid #947044;padding-bottom:9px;margin:17px 0 10px}
+.chess-cup-list{display:grid;gap:9px}
+.chess-cup-card{margin:0;gap:9px;min-width:0}
+.chess-cup-title{display:flex;align-items:center;justify-content:space-between;gap:7px;flex-wrap:wrap}
+.chess-cup-title strong{font:700 17px Georgia;color:#ffe0a3}
+.chess-cup-members{overflow-wrap:anywhere}
+.chess-cup-note{margin:0;color:#cdb58b;font:12px/1.5 Arial}
+.chess-cup-bracket{display:grid;gap:5px}
+.chess-cup-pair{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;border:1px solid #805e3c;background:#241a14}
+.chess-cup-pair.mine{border-color:#c9aa70;background:#463322}
+.chess-cup-pair span{font:600 13px Georgia;color:#edd1a5}
+.chess-cup-pair small{font:11px Arial;color:#d9bd8c}
+.chess-cup-pair button{min-width:125px}
+.chess-cup-winner{color:#ffe39d;font:700 18px Georgia}
+.chess-cup-actions{display:flex;flex-wrap:wrap;gap:8px}
+.chess-cup-actions button{flex:1 1 120px}
+.chess-cup-champion{padding:9px 12px;margin:6px 0;border:1px solid #916c43;border-radius:8px;background:#36281d;font:14px Georgia;color:#f4d89f}
+.chess-page[data-shop-board=champion] #chess-board .chess-square{background:linear-gradient(130deg,#fff1b8,#caa45e);color:#593d20}
+.chess-page[data-shop-board=champion] #chess-board .chess-square.dark{background:linear-gradient(135deg,#57877a,#254e52);color:#f7ecca}
+.chess-page[data-shop-board=champion] .chess-frame{background:linear-gradient(130deg,#eac97d,#4c6a64 27%,#d6ab59 54%,#21474b 84%,#eedb9c);border-color:#e6c27b}
+#chess-shop [data-board-style=champion]{background:linear-gradient(130deg,#eac97d,#4c6a64 27%,#d6ab59 54%,#21474b 84%,#eedb9c);border-color:#e6c27b}
+#chess-shop [data-board-style=champion] .shop-square.light{background:linear-gradient(130deg,#fff1b8,#caa45e)}
+#chess-shop [data-board-style=champion] .shop-square.dark{background:linear-gradient(135deg,#57877a,#254e52)}
+#chess-shop .shop-item:has([data-piece-style=champion]),#chess-shop .shop-item:has([data-board-style=champion]){border-color:#b89d65;background:linear-gradient(145deg,#524a33,#202c2b)}
+@media(max-width:550px){.chess-cup-hero{padding:12px;gap:10px}.chess-cup-hero .chess-cup-trophy{width:65px;height:86px;font-size:57px}.chess-cup-hero h3{font-size:21px}.chess-cup-pair{display:grid}.chess-cup-pair button{width:100%}}
+@media(prefers-reduced-motion:reduce){.chess-cup-hero .chess-cup-trophy{animation:none}}

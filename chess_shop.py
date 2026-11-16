@@ -2,10 +2,10 @@
 import time
 CATEGORIES=('pieces','board','scene','effect')
 CATALOG=[]
-def item(category,style,name,description,price):
-    CATALOG.append(dict(id=category+'-'+style,category=category,style=style,name=name,description=description,price=price,
-        collection={'classic':'Clássico','imperial':'Império Dourado','obsidian':'Ordem da Obsidiana'}[style],
-        rarity='Clássico' if style=='classic' else 'Lendário'))
+def item(category,style,name,description,price,exclusive=False):
+    CATALOG.append(dict(id=category+'-'+style,category=category,style=style,name=name,description=description,price=price,exclusive=exclusive,
+        collection={'classic':'Clássico','imperial':'Império Dourado','obsidian':'Ordem da Obsidiana','champion':'Copa de Honra'}[style],
+        rarity='Épico · Exclusivo' if exclusive else 'Clássico' if style=='classic' else 'Lendário'))
 for category,name,description in (
     ('pieces','Peças Clássicas','Madeira entalhada original.'),
     ('board','Tabuleiro Clássico','Seu tema gratuito ou conquistado na Jornada.'),
@@ -24,6 +24,8 @@ for category,name,description,price in (
     ('scene','Fortaleza de Rubi','Estandartes rubros, pilares e penumbra.',45),
     ('effect','Brasas da Ordem','Fragmentos rubros em capturas e promoções.',30),
 ):item(category,'obsidian',name,description,price)
+item('pieces','champion','Guardas das Oito Coroas','Reis e peças em ouro claro contra aço verde-real. Exclusivas dos campeões.',0,True)
+item('board','champion','Arena das Oito Coroas','Tabuleiro esmeralda e ouro conquistado na Copa de Honra.',0,True)
 BY_ID={i['id']:i for i in CATALOG}
 DEFAULTS={c:c+'-classic' for c in CATEGORIES}
 def setup(db,sql):
@@ -42,6 +44,7 @@ def action(db,sql,pid,op,d):
     item=BY_ID[iid];current=state(db,sql,pid)
     if op=='shop-buy':
         if iid in current['owned']:return 200,{}
+        if item.get('exclusive'):return 403,{'error':'Este item é conquistado ao vencer a Copa de Honra.'}
         # The guarded transaction atomically charges and grants ownership.
         row=sql(db,'UPDATE chess_profiles SET coins=coins-? WHERE player_id=? AND coins>=?',(item['price'],pid,item['price']))
         if not row.rowcount:return 409,{'error':'Moedas de Xadrez insuficientes.'}

@@ -3,6 +3,7 @@ import json,secrets,time,random
 import chess
 
 import chess_shop
+import chess_cup
 LEVELS=('easy','medium','hard')
 MINUTES=(0,1,3,5,10,15,30)
 JOURNEY=(
@@ -31,6 +32,7 @@ def setup(db,sql):
     ):sql(db,q)
     sql(db,"INSERT INTO chess_guard(id) VALUES(1) ON CONFLICT(id) DO NOTHING")
     chess_shop.setup(db,sql)
+    chess_cup.setup(db,sql)
 def ensure(db,sql,pid):
     sql(db,"INSERT INTO chess_profiles(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING",(pid,))
 def active(db,sql,pid,include_paused=True):
@@ -145,7 +147,7 @@ def create(s,db,pid,other,mode,level,minutes,ranked,nonce,journey=None):
 def view(g,pid):
     if not g:return None
     c=color(g,pid)
-    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'],journey=g.get('journey'),paused=bool(g.get('paused')),live_allowed=g.get('live',{}).get(pid) is True,live_public=all(g.get('live',{}).get(p) is True for p in g['players'].values() if p))
+    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'],journey=g.get('journey'),cup=g.get('cup'),cup_round=g.get('cup_round'),paused=bool(g.get('paused')),live_allowed=g.get('live',{}).get(pid) is True,live_public=all(g.get('live',{}).get(p) is True for p in g['players'].values() if p))
 def incoming(db,sql,pid):
     rows=sql(db,"SELECT i.id,p.name,i.minutes,i.ranked FROM chess_invites i JOIN players p ON p.id=i.sender WHERE i.receiver=? AND i.status='pending' AND i.expires>? ORDER BY i.expires",(pid,time.time())).fetchall()
     return [dict(id=r[0],name=r[1],game='chess',minutes=r[2],ranked=bool(r[3])) for r in rows]
@@ -159,7 +161,9 @@ def snapshot(s,db,pid,g):
     ranking=[dict(name=x[0],points=x[1],wins=x[2],losses=x[3],draws=x[4],own=x[5]==pid) for x in rows]
     queued=bool(s.sql(db,'SELECT 1 FROM chess_queue WHERE player_id=?',(pid,)).fetchone())
     outgoing=bool(s.sql(db,"SELECT 1 FROM chess_invites WHERE sender=? AND status='pending' AND expires>?",(pid,time.time())).fetchone())
-    return dict(profile=me,ranking=ranking,match=view(g,pid),journey=journey_progress(db,s.sql,pid),shop=chess_shop.state(db,s.sql,pid),queued=queued,invites=incoming(db,s.sql,pid),idle_portal=not queued and not outgoing and (not g or bool(g['result'])))
+    cups=chess_cup.snapshot(s,db,pid)
+    me['cup_wins']=cups['wins']
+    return dict(profile=me,ranking=ranking,match=view(g,pid),journey=journey_progress(db,s.sql,pid),shop=chess_shop.state(db,s.sql,pid),cup=cups,queued=queued,invites=incoming(db,s.sql,pid),idle_portal=not queued and not outgoing and (not g or bool(g['result'])))
 def action(s,path,d,pid,now):
     op=path.rsplit('/',1)[-1]
     def err(msg,code=409):return code,{'error':msg}
@@ -173,12 +177,17 @@ def action(s,path,d,pid,now):
                 result.append(dict(opponent=r[0],outcome=r[1],delta=r[2],coins=r[3],played_at=r[4],ranked=g['ranked'],moves=g['moves'],mode=g['mode'],journey=g.get('journey')))
             return 200,dict(history=result)
         sql(db,'UPDATE chess_guard SET id=id WHERE id=1')
+        chess_cup.tick(s,db)
         g=current(db,sql,pid)
         if g and not g['result']:
             b=board(g);tick(s,db,g,b);save(db,sql,g)
         def result():return 200,snapshot(s,db,pid,g)
         def blocked(p):
-            return active(db,sql,p) or s.active_room(p,now) or (p!=pid and s.PRESENCE_GAME.get(p)==('chess',True) and now-s.PRESENCE.get(p,-1000)<=25)
+            return active(db,sql,p) or chess_cup.occupied(db,sql,p) or s.active_room(p,now) or (p!=pid and s.PRESENCE_GAME.get(p)==('chess',True) and now-s.PRESENCE.get(p,-1000)<=25)
+        if op.startswith('cup-'):
+            code,data=chess_cup.action(s,db,op,d,pid,now)
+            if code!=200:return code,data
+            return 200,snapshot(s,db,pid,current(db,sql,pid))
         if op in ('shop-state','shop-buy','shop-equip'):
             ensure(db,sql,pid)
             code,data=chess_shop.action(db,sql,pid,op,d)

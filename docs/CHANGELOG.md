@@ -578,3 +578,14 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
 - Reutiliza o layout e as classes da loja de Damas (`escola.css`), com cards, carteira, abas, filtro de adquiridos e prévia de combinação.
 - Prévias SVG leves: tabuleiro completo, miniaturas e combinação independente de peças/tabuleiro/cenário/efeito; restaurar prévia não altera equipamento nem saldo.
 - Mantém as APIs e moedas próprias do Xadrez; amplia os testes de interface para combinação e filtro.
+
+
+### 2026-11-16 — Copa de Honra do Xadrez
+- Torneio de eliminação direta com 8 jogadores, quartas, semifinal e final, partidas de xadrez cronometradas (10 min para cada lado). A oitava inscrição inicia a chave automaticamente.
+- Conta e identidade compartilhadas com Damas, sem misturar PH e moedas. Partidas e avanço são registrados e apurados no banco de dados, dentro da trava do Xadrez.
+- Persistência dos eventos no banco; resultados e desempates por replay são apurados exclusivamente de chess_matches, nunca do cliente.
+- Primeira vitória de uma Copa libera 100 moedas de Xadrez e duas relíquias permanentes: Guardas das Oito Coroas e Arena das Oito Coroas (não compráveis na loja).
+- Impossível participar de partidas normais durante inscrição/eliminação ativa; organizador pode cancelar apenas antes de começar; inscrição pode ser abandonada antes das quartas.
+- Front-end: menu Copa de Honra, salão de inscrições, chaves, partidas e campeões. Arte de peças/tábua reais SVG, mantendo o estilo de madeira e ouro.
+- QA: novos testes da progressão de 8 jogadores, empate e replay, autorização, bônus idempotente e timeout, mais verificações existentes de Xadrez e interface no CI.
+- Escopo: não incorpora o modo Rei da Mesa, salas privadas ou torneios de IA nesta etapa.

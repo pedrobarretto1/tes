@@ -13,7 +13,7 @@ const shape={
 };
 function installArt(){
  const svg=document.createElementNS(NS,'svg');svg.setAttribute('aria-hidden','true');svg.classList.add('chess-art-defs');
- const palettes={white:['#fff4d8','#ddba82','#94602f','#71491f','#fff1c5','#b37a3b'],black:['#b78a58','#67452f','#2b1b16','#d1a16c','#e4ba80','#3b251b'],
+ const palettes={'champion-white':['#fffbe4','#f4d987','#a36d2b','#794f21','#fff5c4','#9d6127'],'champion-black':['#8aa7a0','#426c6c','#193039','#e0bc75','#ffebae','#18363f'],white:['#fff4d8','#ddba82','#94602f','#71491f','#fff1c5','#b37a3b'],black:['#b78a58','#67452f','#2b1b16','#d1a16c','#e4ba80','#3b251b'],
  'imperial-white':['#fffbe5','#f3d894','#b68538','#805221','#fff9d9','#a87934'],'imperial-black':['#d5a344','#95601d','#382413','#f0cc75','#ffe5a0','#58350d'],
  'obsidian-white':['#f8f4eb','#c1b9b0','#746b6b','#554146','#fff1d9','#963846'],'obsidian-black':['#645667','#2c2834','#100f16','#aa5264','#f29a91','#d45153']};
  let defs='';
@@ -57,7 +57,7 @@ function remoteText(r){if(!r)return '';let winner=r.winner==='w'?'Brancas':r.win
 function statusText(){if(claimed)return claimed;if(remote?.result&&mode!=='local')return remoteText(remote.result);if(mode!=='local'&&!remote)return queued?'Buscando adversário…':'Escolha uma partida';if(mode==='ai'&&remote&&sideKey()!==remote.side)return 'Vez do Computador';return C.status(history).text}
 function updateControls(){
  const playing=activeRemote(),locked=playing||queued;const live=$('chess-live-toggle');live.hidden=!playing;live.disabled=fetching;live.setAttribute('aria-pressed',String(!!remote?.live_allowed));live.textContent=remote?.live_public?'◉ Transmitindo':remote?.live_allowed?'◉ Aguardando consentimento':'◉ Transmitir';
- const chapter=remote?.journey; $('chess-mode-label').textContent=chapter?'JORNADA':mode==='ai'?'COMPUTADOR':mode==='online'?'ONLINE':'LOCAL';
+ const chapter=remote?.journey; $('chess-mode-label').textContent=remote?.cup&&mode==='online'?'COPA DE HONRA':chapter?'JORNADA':mode==='ai'?'COMPUTADOR':mode==='online'?'ONLINE':'LOCAL';
  document.querySelectorAll('[data-chess-mode]').forEach(b=>{let on=b.dataset.chessMode===mode;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));b.disabled=locked&&!on});
  document.querySelectorAll('[data-chess-level]').forEach(b=>{let on=b.dataset.chessLevel===level;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));b.disabled=locked});
  $('chess-difficulty').hidden=mode!=='ai'||!!chapter;$('chess-online-settings').hidden=mode!=='online';$('chess-auto-field').hidden=mode!=='local';
@@ -209,7 +209,7 @@ for(const [trigger,dialog] of [['chess-menu','menu-dialog'],['chess-friends','fr
 function label(p){return !p.online?'Offline':(p.game==='chess'?'Xadrez':'Damas')+' · '+(p.busy?'Em partida':'Disponível')}
 function rankRows(id,rows){let el=$(id);el.replaceChildren();if(!rows.length){el.append(element('p','chess-note','Nenhum jogador no ranking ainda.'));return}rows.forEach((p,i)=>{let row=element('div','chess-rank-row'+(p.own?' own':'')),info=element('div');info.append(element('b','',p.name),element('small','',p.wins+' V · '+p.losses+' D · '+p.draws+' E'+(p.own?' · SEU PERFIL':'')));row.append(element('span','rank-medal',i+1),info,element('strong','',p.points.toLocaleString('pt-BR')+' PH'));el.append(row)})}
 function chessTier(p){return p>=2200?'Lenda do Xadrez':p>=1800?'Mestre':p>=1500?'Ouro':p>=1250?'Prata':p>=1000?'Bronze':'Aprendiz'}
-function drawRanking(data){if(!data.profile)return;rankData=data.profile;$('menu-honor').textContent=data.profile.points.toLocaleString('pt-BR')+' PH · '+data.profile.coins+' moedas';let p=data.profile,text='Sua posição: #'+p.rank+' · '+p.points.toLocaleString('pt-BR')+' PH';$('chess-rank-own').textContent=$('chess-rank-full-own').textContent=$('chess-personal-rank').textContent=text;$('chess-profile-stats').textContent=chessTier(p.points)+' · '+p.points.toLocaleString('pt-BR')+' PH';$('chess-profile-wallet').textContent=p.coins+' moedas · #'+p.rank+' no ranking';paintChessProfile();rankRows('chess-ranking-top',data.ranking.slice(0,3));rankRows('chess-ranking-full',data.ranking)}
+function drawRanking(data){if(!data.profile)return;rankData=data.profile;$('menu-honor').textContent=data.profile.points.toLocaleString('pt-BR')+' PH · '+data.profile.coins+' moedas'+(data.profile.cup_wins?' · ♛ '+data.profile.cup_wins+' Copa(s)':'');let p=data.profile,text='Sua posição: #'+p.rank+' · '+p.points.toLocaleString('pt-BR')+' PH';$('chess-rank-own').textContent=$('chess-rank-full-own').textContent=$('chess-personal-rank').textContent=text;$('chess-profile-stats').textContent=chessTier(p.points)+' · '+p.points.toLocaleString('pt-BR')+' PH';$('chess-profile-wallet').textContent=p.coins+' moedas · #'+p.rank+' no ranking';paintChessProfile();rankRows('chess-ranking-top',data.ranking.slice(0,3));rankRows('chess-ranking-full',data.ranking)}
 function drawSocial(data){chessClanState.registered=true;chessClanState.data={players:[...data.friends,...data.players],clan_role:data.me.clan?.role??null};$('chess-clan-menu-note').textContent=data.me.clan?data.me.clan.tag+' · '+data.me.clan.name:'Crie uma ordem, encontre aliados e converse';if(data.clan_pending)$('chess-clan-menu-note').textContent+=' · '+data.clan_pending+' avisos';profile=data.me;paintChessProfile();if($('profile-dialog').open&&!$('chess-profile-editname').value)fillChessEditor();$('menu-identity').textContent=profile.name;$('chess-profile').textContent=profile.name+(rankData?' · '+chessTier(rankData.points)+' · '+rankData.points.toLocaleString('pt-BR')+' PH':'');$('chess-profile-name').textContent=profile.name;$('chess-player-name').value=profile.name;
  const list=$('chess-friend-list');list.replaceChildren();let accepted=data.friends.filter(p=>p.relation==='friend');$('friend-count').textContent=accepted.filter(p=>p.online).length?'('+accepted.filter(p=>p.online).length+' online)':'';
  const people=[...data.friends,...(data.players||[]).filter(p=>!data.friends.some(f=>f.id===p.id))];
@@ -220,7 +220,7 @@ function drawSocial(data){chessClanState.registered=true;chessClanState.data={pl
  for(let x of data.invites||[]){let card=element('div','chess-invite');card.append(element('b','','Convite de Damas · '+x.name),element('p','','Abra Damas para escolher a modalidade e aceitar.'),button('Ver convite em Damas',()=>{returnDamas(true)}));invites.append(card)}
  $('chess-social-status').textContent='Conectado · lista compartilhada';
 }
-function applyData(data){idlePortal=data.idle_portal===true;if(data.journey)updateJourney(data.journey);if(motionRun&&remote&&data.match?.id===remote.id&&data.match.moves.length>moves.length){deferredData=data;return}drawRanking(data);if(data.shop)updateShop(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
+function applyData(data){idlePortal=data.idle_portal===true;if(data.cup)updateCup(data.cup);if(data.journey)updateJourney(data.journey);if(motionRun&&remote&&data.match?.id===remote.id&&data.match.moves.length>moves.length){deferredData=data;return}drawRanking(data);if(data.shop)updateShop(data);if(data.me)drawSocial(data);queued=!!data.queued;const g=data.match;
  if(g&&(!g.result||mode!=='local'&&remote?.id===g.id)){
   const same=remote?.id===g.id, before=game(), viewFlip=flipped, nextMove=same&&g.moves.length===moves.length+1?C.legal(before).find(m=>C.key(m)===g.moves.at(-1)):null;
   const changed=!remote||remote.id!==g.id||remote.moves.length!==g.moves.length||JSON.stringify(remote.result)!==JSON.stringify(g.result)||remote.offer!==g.offer;
@@ -231,7 +231,7 @@ function applyData(data){idlePortal=data.idle_portal===true;if(data.journey)upda
  }else{if(mode==='local')$('white-name').textContent=profile?.name||'Brancas';updateControls();paintClock()}
  if(!leaving&&g&&g.mode==='ai'&&!g.paused&&!g.result&&sideKey()!==g.side){clearTimeout(botTimer);botTimer=setTimeout(()=>request('bot',{match:g.id,sequence:g.moves.length}),motionRun?520:120)}
 }
-async function request(op,body={},drain=false){if(leaving&&!drain)return;if(fetching){if(op==='state')return;if(op==='resign'){pendingAction={op,body};return}if(fetchOp==='state'&&!pendingAction){pendingAction={op,body};return}msg('Aguarde a sincronização e tente novamente.');return}const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;fetchOp=op;let settle;requestDone=new Promise(r=>settle=r);if(op!=='state')idlePortal=false;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op.startsWith('shop-'))$('shop-status').textContent=op==='shop-buy'?'Relíquia adquirida! Equipe-a no inventário.':op==='shop-equip'?'Visual equipado.':'Escolha sua próxima relíquia.';if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op==='journey-start'&&data.match?.journey){$('journey-dialog').close();window.scrollTo(0,0)}if(op!=='state')setTimeout(poll,80)}catch(e){msg(e.message);if(op==='journey-start')$('journey-error').textContent=e.message;if(op.startsWith('shop-'))$('shop-status').textContent=e.message;else $('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false;fetchOp='';if(op.startsWith('shop-')){shopBusy=false;drawShop(true)}const action=pendingAction;pendingAction=null;if(action)request(action.op,action.body,true);settle()}}
+async function request(op,body={},drain=false){if(leaving&&!drain)return;if(fetching){if(op==='state')return;if(op==='resign'){pendingAction={op,body};return}if(fetchOp==='state'&&!pendingAction){pendingAction={op,body};return}msg('Aguarde a sincronização e tente novamente.');return}const token=localStorage.getItem('damas-profile-token');if(!token){msg('Entre no Clube de Honra das Damas para conectar sua conta.');return}fetching=true;fetchOp=op;let settle;requestDone=new Promise(r=>settle=r);if(op!=='state')idlePortal=false;updateControls();try{let r=await fetch('/api/social/chess/'+op,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profileToken:token,busy:mode==='local'&&moves.length>0&&!ended(),...body})});let data=await r.json();if(!r.ok)throw Error(data.error||'Servidor indisponível.');fetching=false;applyData(data);if(op.startsWith('cup-'))$('chess-cup-status').textContent='Salão atualizado.';if(op.startsWith('shop-'))$('shop-status').textContent=op==='shop-buy'?'Relíquia adquirida! Equipe-a no inventário.':op==='shop-equip'?'Visual equipado.':'Escolha sua próxima relíquia.';if(op==='invite')msg('Convite enviado. Aguarde a resposta.');if(op==='respond'&&body.accept){$('friends-dialog').close();msg('Partida iniciada.')}if(op==='journey-start'&&data.match?.journey){$('journey-dialog').close();window.scrollTo(0,0)}if(op!=='state')setTimeout(poll,80)}catch(e){msg(e.message);if(op==='journey-start')$('journey-error').textContent=e.message;if(op.startsWith('cup-'))$('chess-cup-status').textContent=e.message;else if(op.startsWith('shop-'))$('shop-status').textContent=e.message;else $('chess-social-status').textContent='Não foi possível conectar ao clube. Local continua disponível.';fetching=false;updateControls()}finally{fetching=false;fetchOp='';if(op.startsWith('shop-')){shopBusy=false;drawShop(true)}const action=pendingAction;pendingAction=null;if(action)request(action.op,action.body,true);settle()}}
 function poll(){if(!leaving&&!fetching&&!document.hidden)request('state')}
 window.addEventListener('focus',poll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();else if(mode==='local'){tickLocal();save()}});setInterval(poll,1800);
 $('white-icon').append(pieceArt('K'));$('black-icon').append(pieceArt('k'));
@@ -301,14 +301,14 @@ function drawShop(force=false){
  const items=shopCatalog.filter(i=>(shopTab==='inventory'?shopOwned.includes(i.id):i.category===shopTab)&&(!shopOnlyOwned||shopOwned.includes(i.id)));
  const grid=$('shop-items');grid.replaceChildren();if(!items.some(i=>i.id===shopSelected))shopSelected=items[0]?.id||'';
  for(const item of items){
-  const owned=shopOwned.includes(item.id),equipped=shopEquipment[item.category]===item.id,active=shopId(item.category)===item.id;
+  const owned=shopOwned.includes(item.id),equipped=shopEquipment[item.category]===item.id,active=shopId(item.category)===item.id,locked=!!item.exclusive&&!owned;
   const card=element('article','school-item shop-item'+(equipped?' equipped':'')+(active?' previewing':''));card.dataset.item=item.id;
   const preview=shopCardPreview(item),label=element('div','shop-item-name');label.append(element('strong','',item.name),element('small','',item.description));
-  const tag=element('span','shop-tag',equipped?'Equipado':owned?'Adquirido':item.price+' ◆');
+  const tag=element('span','shop-tag',equipped?'Equipado':owned?'Adquirido':locked?'♛ Recompensa da Copa':item.price+' ◆');
   const actions=element('div','shop-actions'),tryBtn=button('Ver combinação',()=>{shopDraft[item.category]=item.id;shopSelected=item.id;drawShop(true)},'shop-try');
   tryBtn.setAttribute('aria-pressed',String(active));tryBtn.setAttribute('aria-label','Ver combinação: '+item.name);
-  const action=button(equipped?'Equipado':owned?'Equipar':'Comprar',()=>{shopSelected=item.id;shopCall(owned?'shop-equip':'shop-buy',item.id)},'gold');action.classList.add('shop-buy');
-  if(item.id===shopSelected)action.id='shop-action';action.disabled=shopBusy||equipped||(!owned&&coins<item.price);if(!owned&&coins<item.price)action.title='Faltam '+(item.price-coins)+' moedas de Xadrez';
+  const action=button(equipped?'Equipado':owned?'Equipar':locked?'Conquiste na Copa':'Comprar',()=>{shopSelected=item.id;shopCall(owned?'shop-equip':'shop-buy',item.id)},'gold');action.classList.add('shop-buy');
+  if(item.id===shopSelected)action.id='shop-action';action.disabled=shopBusy||equipped||locked||(!owned&&coins<item.price);if(!owned&&coins<item.price)action.title='Faltam '+(item.price-coins)+' moedas de Xadrez';
   actions.append(tryBtn,action);card.append(preview,label,tag,actions);grid.append(card);
  }
  if(!items.length)grid.append(element('p','chess-note',shopCatalog.length?'Nenhum item nesta categoria.':'Carregando catálogo…'));
@@ -335,6 +335,66 @@ function drawJourney(){const list=$('journey-cards');if(!journeyData){$('journey
 }
 function drawJourneyMatch(){const id=remote?.journey,stage=journeyData?.stages.find(s=>s.id===id);$('journey-banner').hidden=!stage;$('journey-side').hidden=!stage;if(!stage){delete document.body.dataset.journeyStage;if($('journey-dialog').open)drawJourney();return}document.body.dataset.journeyStage=String(id);$('journey-stage-label').textContent='JORNADA DO MESTRE · COROA '+id+' / 5';$('journey-hall').textContent=stage.hall;$('journey-match-detail').textContent='Contra '+stage.name+' · Partida clássica completa';$('journey-side-title').textContent=stage.name;$('journey-side-text').textContent=stage.description;const result=remote.result;$('journey-side-result').textContent=result?(result.winner===remote.side?'Coroa conquistada · '+stage.title:'O mestre aguarda sua revanche. Nenhum progresso perdido.'):'Vença para conquistar esta coroa e avançar.';$('journey-continue').textContent=result?'Ver próxima coroa':'Ver jornada';if($('journey-dialog').open)drawJourney()}
 $('menu-journey').onclick=$('journey-map-open').onclick=$('journey-continue').onclick=openJourney;
+
+// Copa de Honra uses the same profile and authoritative chess matches, with an independent tournament ledger.
+let cupState=null,cupSignature='';
+function updateCup(data){cupState=data;drawCup()}
+function cupOp(op,id){
+ if(fetching&&fetchOp!=='state'){$('chess-cup-status').textContent='Sincronizando. Tente novamente.';return}
+ if(mode==='local'&&moves.length&&!ended()&&op!=='cup-list'&&!confirm('Sua partida local será salva. Continuar para a Copa?'))return;
+ $('chess-cup-status').textContent='Sincronizando inscrições e chaves…';
+ request(op,id?{event:id}:{});
+}
+function openCup(){
+ open('chess-cup');drawCup(true);
+ if(!cupState)cupOp('cup-list');
+}
+function drawCup(force=false){
+ if(!$('chess-cup').open)return;
+ const data=cupState,sig=JSON.stringify([data,!!activeRemote(),!!queued]);
+ if(!force&&sig===cupSignature)return;cupSignature=sig;
+ const list=$('chess-cup-list'),champs=$('chess-cup-champions');list.replaceChildren();champs.replaceChildren();
+ const active=!!data?.events?.some(e=>e.contender&&['waiting','playing'].includes(e.status));
+ $('chess-cup-create').disabled=active||activeRemote()||queued||!localStorage.getItem('damas-profile-token');
+ $('chess-cup-status').textContent=data?'Você conquistou '+data.wins+' Copa(s). As inscrições são gratuitas.':'Conectando ao salão das Copas…';
+ if(!data){list.append(element('p','chess-note','Carregando…'));return}
+ for(const e of data.events){
+  const card=element('article','school-item chess-cup-card');card.dataset.cup=e.id;
+  const title=element('div','chess-cup-title');
+  title.append(element('strong','',(e.status==='finished'?'♛ ':'♜ ')+'Copa '+e.id.toUpperCase()),element('span','shop-tag',
+    e.status==='waiting'?'Inscrições abertas · '+e.count+'/8':e.status==='playing'?'Rodada '+e.round+'/3':e.status==='finished'?'Finalizada':'Encerrada'));
+  card.append(title,element('small','chess-cup-members',e.players.join(' · ')));
+  if(e.status==='waiting')card.append(element('p','chess-cup-note','Começa automaticamente quando oito jogadores se inscreverem.'));
+  if(e.pairs.length){
+   const bracket=element('div','chess-cup-bracket');
+   for(const pair of e.pairs){
+    const row=element('div','chess-cup-pair'+(pair.mine?' mine':''));
+    row.append(element('span','',pair.a+' × '+pair.b),element('small','',pair.winner?'♛ '+pair.winner+' avançou':pair.draws?'Revanche após '+pair.draws+' empate(s)':'Em andamento'));
+    if(pair.mine&&!pair.winner&&remote?.id===pair.match){
+     row.append(button('Ir para partida',()=>{$('chess-cup').close();$('chess-board').scrollIntoView({behavior:'smooth',block:'center'})},'gold'));
+    }
+    bracket.append(row);
+   }
+   card.append(bracket);
+  }
+  if(e.champion)card.append(element('strong','chess-cup-winner','♛ Campeão: '+e.champion));
+  const actions=element('div','chess-cup-actions');
+  if(e.status==='waiting'){
+   if(e.joined)actions.append(button('Sair da inscrição',()=>cupOp('cup-leave',e.id)));
+   else actions.append(button('Participar',()=>cupOp('cup-join',e.id),'gold'));
+   if(e.host)actions.append(button('Cancelar Copa',()=>{if(confirm('Cancelar esta Copa antes do início?'))cupOp('cup-cancel',e.id)}));
+  }
+  card.append(actions);list.append(card);
+ }
+ if(!data.events.length)list.append(element('p','chess-note','Nenhuma Copa criada. Inaugure a arena!'));
+ for(const ch of data.champions)champs.append(element('p','chess-cup-champion','♛ '+ch.name+' · '+new Date(ch.date*1000).toLocaleDateString('pt-BR')));
+ if(!data.champions.length)champs.append(element('p','chess-note','O primeiro campeão ainda será coroado.'));
+}
+$('menu-cup').onclick=openCup;
+$('chess-cup-create').onclick=()=>cupOp('cup-create');
+$('chess-cup-refresh').onclick=()=>cupOp('cup-list');
+$('chess-cup').addEventListener('close',()=>{cupSignature=''});
+
 // School and replay have their own positions; neither can modify the live game.
 const lessons=[
  ['centro','Controle do centro',C.START,'Avance o peão do rei duas casas para disputar o centro.','e2e4','O peão de e2 pode avançar para e4.','O centro fica controlado e você libera a dama e o bispo.'],

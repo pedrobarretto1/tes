@@ -66,7 +66,7 @@ class ChessDuelsTest(unittest.TestCase):
         self.assertEqual(self.call(self.a,'shop-equip',item='pieces-imperial')[0],403)
         self.assertEqual(self.call(self.a,'shop-buy',item={'id':'pieces-imperial'})[0],400)
         with s.database() as db:s.sql(db,'UPDATE chess_profiles SET coins=200 WHERE player_id=?',(self.pa,))
-        r=self.ok(self.a,'shop-buy',item='pieces-imperial');self.assertEqual(r['profile']['coins'],110);self.assertIn('pieces-imperial',r['shop']['owned']);self.assertEqual(len(r['catalog']),12)
+        r=self.ok(self.a,'shop-buy',item='pieces-imperial');self.assertEqual(r['profile']['coins'],110);self.assertIn('pieces-imperial',r['shop']['owned']);self.assertEqual(len(r['catalog']),14)
         self.assertEqual(self.ok(self.a,'shop-buy',item='pieces-imperial')['profile']['coins'],110)
         self.ok(self.a,'shop-equip',item='pieces-imperial')
         self.assertEqual(self.ok(self.a,'state')['shop']['equipped']['pieces'],'pieces-imperial')
