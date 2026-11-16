@@ -32,7 +32,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,sys; from pathlib i
   assert.equal(await page.locator('#chess-board button').count(),64);assert.equal(await page.locator('#chess-board button').first().getAttribute('data-square'),'a8');
   assert.equal(await page.locator('#chess-board [data-square=d1] .chess-piece').getAttribute('data-piece'),'Q');
   assert.equal(await page.locator('#chess-board .chess-piece').count(),32);
-  assert.equal(await page.locator('.chess-art-defs symbol').count(),12);
+  assert.equal(await page.locator('.chess-art-defs symbol').count(),36);for(const color of ['white','black'])for(const p of ['p','r','n','b','q','k'])for(const style of ['','imperial-','obsidian-'])assert.equal(await page.locator('#chess-art-'+style+color+'-'+p).count(),1);
   assert.equal(await page.locator('#chess-board .chess-piece use').count(),32);
   assert(await page.evaluate(()=>{const pieces=[...document.querySelectorAll('#chess-board .chess-piece')];return pieces.every(p=>{const u=p.querySelector('use'),r=p.getBoundingClientRect(),cell=p.parentElement.getBoundingClientRect();return document.getElementById(u.getAttribute('href').slice(1))&&r.width>20&&r.height>20&&r.width<=cell.width&&r.height<=cell.height})}));
   await page.locator('#chess-focus').click();assert(await page.locator('body').evaluate(el=>el.classList.contains('chess-focus')));assert(!(await page.locator('.chess-sidebar').isVisible()));await page.locator('#chess-focus').click();assert(await page.locator('.chess-sidebar').isVisible());

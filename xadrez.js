@@ -247,11 +247,11 @@ function updateShop(data){
 }
 function shopCall(op,item){if(shopBusy)return;if(!localStorage.getItem('damas-profile-token')){$('shop-status').textContent='Entre no Clube para acessar seu inventário.';return}if(fetching&&(fetchOp!=='state'||pendingAction)){$('shop-status').textContent='Sincronizando. Tente novamente.';return}shopBusy=true;$('shop-status').textContent='Sincronizando tesouro…';drawShop(true);request(op,item?{item}:{});}
 function openShop(){open('chess-shop');shopTab='pieces';shopSelected='';shopSignature='';$('shop-status').textContent='Carregando relíquias…';drawShop(true);shopCall('shop-state')}
-$('menu-shop').onclick=openShop;
+$('menu-shop').onclick=openShop;$('chess-shop').addEventListener('close',()=>{if(!$('chess-shop').open){$('shop-detail').replaceChildren();$('shop-items').replaceChildren();shopSignature=''}});
 function shopPreview(item){
  const p=element('div','shop-preview');p.dataset.style=item.style;p.dataset.category=item.category;
  if(item.category==='pieces'){const row=element('div','shop-piece-row');for(const c of ['K','Q','R','B','N','P','k','q','r','b','n','p'])row.append(pieceArt(c,item.style));p.append(row)}
- else if(item.category==='board'){const frame=element('div','shop-mini-frame'),board=element('div','shop-mini-board');for(let n=0;n<64;n++){const cell=element('div','shop-mini-square '+(((n>>3)+(n&7))%2?'dark':''));if(n<8||n>=56)cell.append(pieceArt((n<8?'rnbqkbnr':'RNBQKBNR')[n%8],item.style));board.append(cell)}frame.append(board);p.append(frame)}
+ else if(item.category==='board'){const frame=element('div','shop-mini-frame'),board=element('div','shop-mini-board');for(let n=0;n<64;n++){const cell=element('div','shop-mini-square '+(((n>>3)+(n&7))%2?'dark':''));if(n<16||n>=48)cell.append(pieceArt(n<8?'rnbqkbnr'[n%8]:n<16?'p':n<56?'P':'RNBQKBNR'[n%8],item.style));board.append(cell)}frame.append(board);p.append(frame)}
  else if(item.category==='scene'){p.append(element('div','shop-mini-hall'),element('span','shop-preview-symbol','♛'))}
  else{p.append(element('span','shop-preview-symbol',item.style==='obsidian'?'✷':'✦'),element('span','shop-preview-ring'))}
  return p;
