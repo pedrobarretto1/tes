@@ -92,9 +92,35 @@ function animateMove(board,{before,move,viewFlip}){
  };
  slide(p,from,to,p.toLowerCase()==='n',!!promo);
  if(flag==='castle'){const a=to>from?from+3:from-4,b=to>from?from+1:from-1;slide(before.b[a],a,b)}
- Promise.allSettled(run.animations.map(a=>a.finished)).then(()=>{if(motionRun!==run)return;stopMotion();if(viewFlip!==flipped)render();});
+ Promise.allSettled(run.animations.map(a=>a.finished)).then(()=>{if(motionRun!==run)return;stopMotion();if(viewFlip!==flipped)render();else presentResult();});
  return true;
 }
+let shownLocalResult='',shownRemoteResults=new Set();
+function showChessResult(kind,title,detail,points,journey=false){
+ const overlay=$('victory'),card=overlay.firstElementChild;overlay.dataset.result=kind;overlay.dataset.motion=prefs.motion?'on':'off';
+ $('resulticon').textContent={victory:'♛',defeat:'♟',resign:'⚑',draw:'◇'}[kind];$('resultlabel').textContent={victory:'Vitória',defeat:'Derrota',resign:'Desistência',draw:'Empate'}[kind];$('victorytitle').textContent=title;$('victorydetail').textContent=detail;$('resultpoints').textContent=points;$('journeyresultmap').hidden=!journey;
+ card.querySelectorAll('.spark').forEach(e=>e.remove());if(prefs.motion&&!matchMedia('(prefers-reduced-motion: reduce)').matches){for(let i=0;i<(kind==='victory'?24:kind==='defeat'?12:10);i++){const e=element('i','spark');e.setAttribute('aria-hidden','true');e.style.setProperty('--x',((i*37+7)%97)+'%');e.style.setProperty('--y',kind==='victory'?'-5%':((i*23+10)%90)+'%');e.style.setProperty('--delay',(i%8*.18)+'s');e.style.setProperty('--dur',(2+(i%5)*.24)+'s');card.append(e)}}
+ open('victory');$('closevictory').focus();
+}
+function presentResult(){
+ if(motionRun||leaving)return;
+ if(mode==='local'){
+  const st=C.status(history);if(!st.done&&!claimed){shownLocalResult='';return}
+  const key=moves.map(m=>m.key).join(' ')+':'+claimed+':'+st.text;if(key===shownLocalResult)return;shownLocalResult=key;
+  const winner=claimed?(claimed.startsWith('Pretas')?-1:claimed.startsWith('Brancas')?1:0):st.winner;
+  showChessResult(winner?'victory':'draw',winner?(winner===1?'Brancas':'Pretas')+' venceram!':'Empate!',claimed||st.text,'Partida local');return;
+ }
+ const g=remote,r=g?.result;if(!r||shownRemoteResults.has(g.id))return;shownRemoteResults.add(g.id);
+ const won=r.winner===g.side,kind=!r.winner?'draw':won?'victory':r.reason==='resign'?'resign':'defeat',reward=r.rewards?.[g.side];
+ const title=kind==='victory'?'Você venceu!':kind==='defeat'?'Você perdeu':kind==='resign'?'Você desistiu':'Empate!';
+ let detail=remoteText(r)+(kind==='resign'?'. O tabuleiro foi reiniciado.':kind==='victory'&&r.reason==='resign'?'. O adversário desistiu.':'.');
+ if(g.journey)detail+=won?' Coroa conquistada!':' Suas coroas conquistadas continuam salvas.';
+ const points=g.journey?(won?'Coroa conquistada':'Jornada do Mestre'):g.ranked&&reward?(reward.delta>=0?'+':'')+reward.delta+' PH · +'+reward.coins+' moedas':'Partida encerrada';
+ showChessResult(kind,title,detail,points,!!g.journey);
+}
+$('closevictory').onclick=()=>$('victory').close();
+$('journeyresultmap').onclick=()=>{$('victory').close();openJourney()};
+$('victory').addEventListener('close',()=>{$('victory').querySelectorAll('.spark').forEach(e=>e.remove())});
 function render(motion=null){
  stopMotion();
  const g=game(),st=C.status(history),done=ended(),legal=canPlay()?C.legal(g):[],targets=new Set(legal.filter(m=>m[0]===selected).map(m=>m[1])),last=moves.at(-1),board=$('chess-board'),playable=new Set(legal.map(m=>m[0]));
@@ -113,7 +139,7 @@ function render(motion=null){
  $('chess-promote').hidden=!promotion;$('promotion-choices').replaceChildren();
  if(promotion){for(let m of promotion){let choice=button('',()=>play(m),'chess-promotion-choice');choice.append(pieceArt(g.t===1?m[2].toUpperCase():m[2]),element('span','',pieceNames[m[2]]));$('promotion-choices').append(choice)}$('promotion-choices').append(button('Cancelar',()=>{promotion=null;render()}))}
  updateControls();paintClock();save();
- if(motion){const [f,t,,flag]=motion.move;playSound(flag==='ep'||motion.before.b[t]!=='.',flag==='castle');if(!animateMove(board,motion)&&viewFlip!==flipped)render();}
+ if(motion){const [f,t,,flag]=motion.move;playSound(flag==='ep'||motion.before.b[t]!=='.',flag==='castle');if(!animateMove(board,motion)&&viewFlip!==flipped)render();}presentResult();
 }
 function paintClock(){
  let minutes=mode==='local'?localMinutes:remote?.minutes||0,remaining=mode==='local'?localRemaining:remote?.remaining;
@@ -132,7 +158,7 @@ function newGame(){if(remote?.journey&&!activeRemote()){openJourney();return}if(
 function resign(){if(ended()||mode!=='local'&&!activeRemote()||mode==='local'&&!moves.length&&!clockStarted)return;resignIntent={mode,id:remote?.id};$('chess-resign-description').textContent=remote?.journey?'O mestre vencerá esta tentativa. As coroas conquistadas continuam salvas.':mode==='local'?'O outro jogador receberá a vitória. O tabuleiro será reiniciado.':'O adversário receberá a vitória e o tabuleiro voltará à posição inicial.';const points=$('chess-resign-points');points.hidden=!remote?.ranked;points.textContent='A desistência conta como derrota no Ranking de Honra.';open('chess-resign-dialog')}
 function resetResignedBoard(){clearTimeout(botTimer);deferredData=null;stopMotion();history=[start()];moves=[];selected=-1;promotion=null;claimed='';flipped=false;clockStarted=false;localRemaining={w:localMinutes*60,b:localMinutes*60};localClockAt=performance.now()}
 $('chess-resign-cancel').onclick=()=>$('chess-resign-dialog').close();
-$('chess-resign-confirm').onclick=()=>{const intent=resignIntent;$('chess-resign-dialog').close();if(!intent||intent.mode!==mode||intent.id!==remote?.id||ended())return;if(mode==='local'){tickLocal();if(ended())return;const result=(game().t===1?'Pretas':'Brancas')+' venceram por desistência.';lastLocalReplay=moves.map(m=>m.key);resetResignedBoard();render();msg(result+' Tabuleiro reiniciado.');poll()}else if(activeRemote())request('resign',{match:remote.id})};
+$('chess-resign-confirm').onclick=()=>{const intent=resignIntent;$('chess-resign-dialog').close();if(!intent||intent.mode!==mode||intent.id!==remote?.id||ended())return;if(mode==='local'){tickLocal();if(ended())return;const result=(game().t===1?'Pretas':'Brancas')+' venceram por desistência.';lastLocalReplay=moves.map(m=>m.key);resetResignedBoard();render();msg(result+' Tabuleiro reiniciado.');showChessResult('resign','Desistência',result+' O tabuleiro foi reiniciado.','Partida local');poll()}else if(activeRemote())request('resign',{match:remote.id})};
 $('chess-resign-dialog').addEventListener('close',()=>{resignIntent=null});
 $('chess-resign-dialog').addEventListener('click',e=>{if(e.target===$('chess-resign-dialog'))$('chess-resign-dialog').close()});
 $('chess-new').onclick=$('sidebar-new').onclick=newGame;
