@@ -1,6 +1,7 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata, re
+import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata, re, gzip
+from functools import lru_cache
 from contextlib import contextmanager
 from urllib.request import urlopen, Request
 
@@ -16,6 +17,10 @@ TOURNAMENTS = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
+@lru_cache(maxsize=64)
+def static_payload(filename,mtime):
+    raw=(BASE/filename).read_bytes()
+    return raw,gzip.compress(raw,compresslevel=5,mtime=0),hashlib.sha256(raw).hexdigest()
 # Fixed, licensed instrument recordings only. Cache per note; never proxy arbitrary URLs.
 PIANO_FILES=frozenset(('A1','C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6','Ds6','Fs6','A6','C7'))
 PIANO_CACHE={}
@@ -1376,6 +1381,164 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control', 'public, max-age=86400' if kind in ('audio/mpeg','audio/midi') and status==200 else 'no-store')
         self.end_headers()
         self.wfile.write(body)
+    def static_page(self,filename,kind):
+        # Public static files only; API responses and player data stay no-store.
+        raw,compressed,digest=static_payload(filename,(BASE/filename).stat().st_mtime_ns)
+        accepts=self.headers.get('Accept-Encoding','')
+        use_gzip=any(part.strip().split(';')[0].lower()=='gzip' and not re.search(r';\s*q\s*=\s*0(?:\.0*)?\s*
+    def do_GET(self):
+        if self.path.split('?')[0] in ('/', '/index.html'):
+            self.static_page('index.html','text/html; charset=utf-8')
+        elif self.path.split('?')[0]=='/xadrez.html':
+            self.static_page('xadrez.html','text/html; charset=utf-8')
+        elif self.path.split('?')[0]=='/torre.html':
+            self.reply(200,(BASE/'torre.html').read_bytes(),'text/html; charset=utf-8')
+        elif self.path.split('?')[0]=='/royal-demo.html':
+            self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
+        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js','/xadrez.js','/xadrez.css','/chess-engine.js'):
+            file=self.path.split('?')[0][1:]
+            self.static_page(file,'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
+        elif self.path.split('?')[0].startswith('/audio/classical/'):
+            path=self.path.split('?')[0];name=path.removeprefix('/audio/classical/').removesuffix('.mid')
+            if name not in CLASSICAL_SCORES or not path.endswith('.mid'):return self.reply(404,{'error':'Partitura inexistente.'})
+            data=classical_score(name)
+            return self.reply(200,data,'audio/midi') if data else self.reply(503,{'error':'Partitura indisponível temporariamente.'})
+        elif self.path.split('?')[0].startswith('/audio/piano/'):
+            path=self.path.split('?')[0]; name=path.removeprefix('/audio/piano/').removesuffix('.mp3')
+            if name not in PIANO_FILES or not path.endswith('.mp3'):return self.reply(404,{'error':'Amostra inexistente.'})
+            data=piano_sample(name)
+            return self.reply(200,data,'audio/mpeg') if data else self.reply(503,{'error':'Piano indisponível temporariamente.'})
+        elif self.path.split('?')[0] == '/api/health':
+            try:
+                with database() as db:sql(db,'SELECT 1').fetchone()
+                self.reply(200, {'ok':True,'persistentRanking':bool(DATABASE_URL),'database':database_provider()})
+            except Exception:
+                self.reply(503, {'ok':False,'persistentRanking':bool(DATABASE_URL),'database':database_provider(),'error':'Banco indisponível.'})
+        elif self.path == '/api/ranking':
+            try:
+                with database() as db:
+                    rows=sql(db,"SELECT p.name,p.points,p.wins,p.losses,p.draws,COALESCE(c.title,'visitor') FROM players p LEFT JOIN cosmetics c ON c.player_id=p.id ORDER BY p.points DESC,p.wins DESC,p.name,p.id LIMIT 100").fetchall()
+                self.reply(200,{'players':[dict(zip(('name','points','wins','losses','draws','title'),x)) for x in rows],'persistent':bool(DATABASE_URL)})
+            except Exception: self.reply(503,{'error':'Banco de dados indisponível.'})
+        else: self.reply(404, {'error':'Página inexistente.'})
+    def do_POST(self):
+        try:
+            n=int(self.headers.get('Content-Length','0'))
+            if not 0<n<=32768: raise ValueError()
+            d=json.loads(self.rfile.read(n)); assert isinstance(d,dict)
+        except Exception: return self.reply(400, {'error':'Pedido inválido.'})
+        path=self.path.split('?')[0]; now=time.monotonic()
+        if path=='/api/profile':
+            token=str(d.get('profileToken',''))
+            if not 32<=len(token)<=128: return self.reply(400,{'error':'Perfil inválido.'})
+            pid=identity(d)
+            if not pid:return self.reply(200,{'found':False})
+            with database() as db:
+                p=sql(db,'SELECT name,points,wins,losses,draws FROM players WHERE id=?',(pid,)).fetchone()
+                if not p: return self.reply(200,{'found':False})
+                rank=sql(db,'SELECT COUNT(*) FROM players WHERE points>? OR (points=? AND (wins>? OR (wins=? AND (name<? OR (name=? AND id<?)))))',(p[1],p[1],p[2],p[2],p[0],p[0],pid)).fetchone()[0]+1
+                title=cosmetics_for(db,pid)['title']
+            return self.reply(200,dict(zip(('name','points','wins','losses','draws'),p),found=True,rank=rank,title=title))
+        with LOCK:
+            if path.startswith('/api/social/'):
+                try: status,result=social_action(path,d,now);return self.reply(status,result)
+                except Exception as exc:
+                    print('Social error:',type(exc).__name__,str(exc),flush=True)
+                    return self.reply(503,{'error':'Clube indisponível. Tente novamente.'})
+            for k,r in list(ROOMS.items()):
+                if now-r['last']>TTL: del ROOMS[k]
+            if path=='/api/create':
+                if len(ROOMS)>=1000: return self.reply(503, {'error':'Servidor cheio.'})
+                code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+                while code in ROOMS: code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+                token=secrets.token_urlsafe(24); side=secrets.choice((1,-1))
+                pid=profile(d)
+                if pid and chess_active(pid):return self.reply(409,{'error':'Conclua a partida de Xadrez antes de entrar em Damas.'})
+                if d.get('ranked') is not False and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
+                rule=d.get('rule','free')
+                if not valid_rule(rule): return self.reply(400,{'error':'Regra inválida.'})
+                ROOMS[code]={'last':now,'host':side,'tokens':{side:token},'queues':{1:[],-1:[]},'seen':{side:now},'closed':False,'profiles':{side:pid},'rule':rule,'ranked':d.get('ranked') is not False and not rule.startswith('custom-') and rule not in ('kings','international','canadian'),'minutes':clock_value(d),'public':d.get('public') is True}
+                reset_match(ROOMS[code]);MATCH_QUEUE.pop(pid,None)
+                return self.reply(200,{'code':code,'token':token,'connected':False,'side':side,'ranked':ROOMS[code]['ranked'],'minutes':ROOMS[code]['minutes']})
+            code=str(d.get('code','')).upper(); r=ROOMS.get(code)
+            if not r: return self.reply(404,{'error':'Sala inexistente ou encerrada.'})
+            side=d.get('side'); r['last']=now
+            if path=='/api/join':
+                if r['closed']: return self.reply(404,{'error':'Sala encerrada.'})
+                side=-r['host']
+                if len(r['tokens'])==2: return self.reply(409,{'error':'Sala cheia.'})
+                pid=profile(d)
+                if pid and chess_active(pid):return self.reply(409,{'error':'Conclua a partida de Xadrez antes de entrar em Damas.'})
+                if r.get('ranked',True) and not pid: return self.reply(400,{'error':'Informe um perfil válido para jogar valendo PH.'})
+                if pid and pid==r['profiles'].get(r['host']): return self.reply(409,{'error':'Use outro perfil ou navegador para o adversário.'})
+                r['profiles'][side]=pid
+                token=secrets.token_urlsafe(24); r['tokens'][side]=token; r['seen'][side]=now;MATCH_QUEUE.pop(pid,None)
+                return self.reply(200,{'code':code,'token':token,'connected':True,'side':side,'ranked':r.get('ranked',True),'minutes':r.get('minutes',0)})
+            if side not in (1,-1) or not secrets.compare_digest(r['tokens'].get(side,'!'),str(d.get('token',''))): return self.reply(403,{'error':'Sessão inválida.'})
+            r['seen'][side]=now
+            if not r['closed']: tick_clock(r,now)
+            if path=='/api/resign':
+                if len(r['tokens'])!=2: return self.reply(409,{'error':'Aguarde o adversário.'})
+                if r['winner'] is None:
+                    if r['closed']: return self.reply(409,{'error':'Sala encerrada.'})
+                    finish(r,-game_side(r,side),True)
+                return self.reply(200,{'ok':True,'result':result_for(r,side),'closed':r['closed']})
+            if path=='/api/leave':
+                if len(r['tokens'])==2 and r['winner'] is None: finish(r,-game_side(r,side),True)
+                r['closed']=True
+                return self.reply(200,{'ok':True,'result':result_for(r,side),'closed':True})
+            if path=='/api/poll':
+                if not r['closed'] and -side in r['seen'] and now-r['seen'][-side]>90:
+                    if r['winner'] is None: finish(r,game_side(r,side),True)
+                    r['closed']=True
+                messages=r['queues'][side][:]; r['queues'][side].clear()
+                return self.reply(200,{'connected':len(r['tokens'])==2,'messages':messages,'result':result_for(r,side),'closed':r['closed'],'snapshot':room_snapshot(r,side,now)})
+            if r['closed']: return self.reply(409,{'error':'Sala encerrada.'})
+            if path=='/api/send':
+                if len(r['tokens'])!=2: return self.reply(409,{'error':'Aguarde o adversário.'})
+                m=d.get('message')
+                if not isinstance(m,str) or len(m)>12000: return self.reply(400,{'error':'Mensagem inválida.'})
+                if len(r['queues'][-side])>=200: return self.reply(429,{'error':'Fila cheia.'})
+                try:
+                    msg=json.loads(m)
+                    if not isinstance(msg,dict) or not process(r,side,msg): return self.reply(409,{'error':'Jogada ou ação inválida.'})
+                except (ValueError,TypeError,KeyError,IndexError): return self.reply(400,{'error':'Mensagem inválida.'})
+                if msg.get('type')=='rematch-ok':
+                    event=r.pop('rematch_event',None)
+                    if event:
+                        for q in r['queues'].values(): q.append(event)
+                elif msg.get('type')!='chat': r['queues'][-side].append(m)
+                return self.reply(200,{'ok':True})
+            return self.reply(404,{'error':'Rota inexistente.'})
+    def log_message(self, fmt, *args): pass
+
+if __name__=='__main__':
+    from selftest import run
+    run(sys.modules[__name__])
+    # Run Tower integration tests on a temporary SQLite database, never Neon.
+    import unittest
+    sys.modules.setdefault('servidor',sys.modules[__name__])
+    suite=unittest.defaultTestLoader.loadTestsFromNames(['test_torre','test_torre_api'])
+    if not unittest.TextTestRunner(verbosity=1).run(suite).wasSuccessful():
+        raise RuntimeError('Tower beta checks failed')
+    setup()
+    print('DATABASE READY: '+database_provider(),flush=True)
+    port=int(os.environ.get('PORT','8765'))
+    print(f'Casa de Damas: http://localhost:{port} (Ctrl+C para encerrar)',flush=True)
+    ThreadingHTTPServer(('0.0.0.0',port),Handler).serve_forever()
+,part) for part in accepts.split(','))
+        etag='"'+digest+('-gzip' if use_gzip else '')+'"'
+        body=compressed if use_gzip else raw
+        unchanged=self.headers.get('If-None-Match')==etag
+        self.send_response(304 if unchanged else 200)
+        self.send_header('Content-Type',kind)
+        self.send_header('Cache-Control','no-cache')
+        self.send_header('ETag',etag)
+        self.send_header('Vary','Accept-Encoding')
+        if use_gzip:self.send_header('Content-Encoding','gzip')
+        if not unchanged:self.send_header('Content-Length',str(len(body)))
+        self.end_headers()
+        if not unchanged:self.wfile.write(body)
     def do_OPTIONS(self): self.reply(204, b'')
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):

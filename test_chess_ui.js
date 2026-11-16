@@ -10,6 +10,9 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:800}}),base='http://127.0.0.1:'+port;
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
   await page.addInitScript(()=>{localStorage.setItem('damas-name','Teste Portal');localStorage.setItem('damas-profile-token','chess-ui-test-token-012345678901234567890123')});
+  // Static files are compressed and conditionally revalidated; API is not cached.
+  const raw=await page.request.get(base+'/xadrez.html',{headers:{'Accept-Encoding':'identity'}}),zip=await page.request.get(base+'/xadrez.html',{headers:{'Accept-Encoding':'gzip'}});
+  assert.equal(zip.headers()['content-encoding'],'gzip');assert.equal(await raw.text(),await zip.text());assert(Number(zip.headers()['content-length'])<Number(raw.headers()['content-length']));assert.equal((await page.request.get(base+'/xadrez.html',{headers:{'Accept-Encoding':'gzip','If-None-Match':zip.headers().etag}})).status(),304);
   await page.goto(base,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));
   assert(!(await page.locator('#clubmenu').isVisible()));assert(!(await page.locator('#clubwelcome').isVisible()));
