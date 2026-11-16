@@ -5,6 +5,11 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 16/11/2026 — Salão ao Vivo do Xadrez V1
+- Pedido: assistir duelos online, IA e Jornada com filtros amigos, privacidade e cosméticos. chess_live.py: leitura exclusiva do payload oficial, sem escrever partidas/relógios; consentimento por partida (todos os participantes humanos), privado por padrão, revogação imediata, pausa/ausência e encerramento expiram transmissão. Lista limitada, sem tokens/IDs de jogadores, relógio projetado sem finalizar partida, cosméticos por cor e tabuleiro/cenário da mesa. Local offline não transmitido nesta V1.
+- chess_duels.py: live-permission valida participante e partida corrente; view expõe consentimento próprio e público; resultado registra finished_at. Sem novas tabelas ou mudanças em Damas. servidor.py roteia list/watch independentemente de matchmaking. xadrez.html/js/css: acesso direto e menu, toggle na partida, lista e filtros, tabuleiro 64 casas somente leitura, giro, lances/capturas/relógio; polling 2s apenas salão aberto, sem reconstruir posição idêntica.
+- Testes API consentimento de ambos, revogação, terceiro não joga, IA/Jornada e pausa; UI abertura e vazio; teste de terceiro navegador móvel observa consentimento duplo, movimentos e giro, revogação limpa o tabuleiro e mantém aviso de privacidade mesmo quando a lista atualiza. CI pendente. Rollback: reverter código, dados extras no payload compatíveis.
+ 
 ## 16/11/2026 — Loja visível no menu e acesso direto
 - Pedido: jogador não encontrou Loja de Honra após deploy #28. Botão movido para imediatamente abaixo do perfil no menu, antes de Jogar, e atalho Loja no cabeçalho. Ambos abrem a mesma janela. Versões JS/CSS atualizadas; teste de visibilidade sem rolar e abertura direta.
 - Diagnóstico de produção: Render declarou deploy anterior live, mas consulta explícita ao Neon produção/damas não encontrou as duas tabelas. Aplicada migração aditiva idempotente exatamente igual ao setup de chess_shop.py; confirmação de ambas as tabelas presentes, sem tocar dados anteriores. Causa do HTML ausente no navegador não confirmada. CI pendente.

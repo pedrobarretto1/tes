@@ -39,6 +39,28 @@ class ChessDuelsTest(unittest.TestCase):
         with s.database() as db:
             self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM chess_history').fetchone()[0],2)
             self.assertEqual(s.sql(db,'SELECT points,wins FROM players WHERE id=?',(self.pa,)).fetchone(),(1000,0))
+    def test_live_privacy_and_read_only(self):
+        g=self.duel();mid=g['id'];w,b=self.tokens(g)
+        self.assertEqual(self.ok(self.z,'live/list')['matches'],[])
+        self.assertEqual(self.call(self.z,'live/watch',match=mid)[0],404)
+        self.assertEqual(self.call(self.z,'live-permission',match=mid,allowed=True)[0],409)
+        self.ok(w,'live-permission',match=mid,allowed=True)
+        self.assertEqual(self.ok(self.z,'live/list')['matches'],[])
+        self.ok(b,'live-permission',match=mid,allowed=True)
+        self.assertEqual(self.ok(self.z,'live/list')['matches'][0]['id'],mid)
+        self.ok(w,'move',match=mid,sequence=0,move='e2e4')
+        view=self.ok(self.z,'live/watch',match=mid)['match'];self.assertEqual(view['moves'],['e2e4']);self.assertEqual(view['turn'],'b');self.assertNotIn('players',view);self.assertNotIn('nonce',view)
+        self.assertEqual(self.call(self.z,'move',match=mid,sequence=1,move='e7e5')[0],409)
+        self.ok(b,'live-permission',match=mid,allowed=False)
+        self.assertEqual(self.call(self.z,'live/watch',match=mid)[0],404)
+        self.assertEqual(self.ok(self.z,'live/list')['matches'],[])
+    def test_live_ai_and_journey(self):
+        g=self.ok(self.a,'journey-start',stage=1,nonce='j'*16)['match'];mid=g['id']
+        self.ok(self.a,'live-permission',match=mid,allowed=True)
+        self.assertEqual(self.ok(self.b,'live/list')['matches'][0]['journey'],1)
+        self.assertEqual(self.ok(self.b,'live/watch',match=mid)['match']['names']['b'],'O Escudeiro')
+        self.ok(self.a,'leave')
+        self.assertEqual(self.call(self.b,'live/watch',match=mid)[0],404)
     def test_shop_purchase_equip_isolated(self):
         self.assertEqual(self.call(self.a,'shop-buy',item='pieces-imperial')[0],409)
         self.assertEqual(self.call(self.a,'shop-equip',item='pieces-imperial')[0],403)

@@ -1266,6 +1266,9 @@ def social_action(path,d,now):
     PRESENCE[pid]=now
     if path in ('/api/social/register','/api/social/state'):
         PRESENCE_GAME[pid]=('damas',False)
+    if path.startswith('/api/social/chess/live/'):
+        import chess_live
+        return chess_live.action(sys.modules[__name__],path,d,pid,now)
     if path.startswith('/api/social/chess/clans/'):
         import chess_clans
         return chess_clans.action(sys.modules[__name__],path,d,pid)
