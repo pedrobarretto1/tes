@@ -572,3 +572,9 @@ correção/alteração futura, mesmo pequena. Mais recente primeiro.
 - Testes reais e resultados:
 - Commit / PR / deploy:
 - Pendências / rollback:
+
+
+### 2026-11-16 — Loja de Honra do Xadrez: mesa personalizável
+- Reutiliza o layout e as classes da loja de Damas (`escola.css`), com cards, carteira, abas, filtro de adquiridos e prévia de combinação.
+- Prévias SVG leves: tabuleiro completo, miniaturas e combinação independente de peças/tabuleiro/cenário/efeito; restaurar prévia não altera equipamento nem saldo.
+- Mantém as APIs e moedas próprias do Xadrez; amplia os testes de interface para combinação e filtro.
