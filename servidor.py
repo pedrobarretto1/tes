@@ -510,7 +510,7 @@ def presence_busy(pid,now,db=None):
 def chess_state(pid,now):
     # Shared social graph; deliberately no Damas competitive data.
     with database() as db:
-        me=sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()
+        me=sql(db,"SELECT p.name,COALESCE(c.avatar,'crown'),COALESCE(c.frame,'wood'),a.username FROM players p LEFT JOIN cosmetics c ON c.player_id=p.id LEFT JOIN accounts a ON a.player_id=p.id WHERE p.id=?",(pid,)).fetchone()
         if not me:return None
         rows=sql(db,"SELECT p.id,p.name,f.sender,f.state FROM friendships f JOIN players p ON p.id=CASE WHEN f.sender=? THEN f.receiver ELSE f.sender END WHERE f.sender=? OR f.receiver=?",(pid,pid,pid)).fetchall()
         friends=[]
@@ -528,7 +528,7 @@ def chess_state(pid,now):
                 p=sql(db,'SELECT name FROM players WHERE id=?',(v['sender'],)).fetchone()
                 if p:invites.append(dict(id=key,name=p[0],game='damas'))
     friends.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold()))
-    return dict(me=dict(name=me[0]),friends=friends,players=players[:100],invites=invites)
+    return dict(me=dict(name=me[0],avatar=me[1],frame=me[2],account=me[3]),friends=friends,players=players[:100],invites=invites)
 def social_state(pid,now):
     for event in list(TOURNAMENTS.values()):event_tick(event,now)
     for k,v in list(PRESENCE.items()):

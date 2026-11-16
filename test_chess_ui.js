@@ -17,7 +17,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));
   assert(!(await page.locator('#clubmenu').isVisible()));assert(!(await page.locator('#clubwelcome').isVisible()));
   assert.equal(await page.locator('.side .panel').filter({hasText:'Em andamento'}).count(),0);
-  await page.locator('#clubnavmenu').click();assert(await page.locator('#clubmenu').isVisible());await page.locator('#clubmenux').click();
+  await page.locator('#clubnavmenu').click();assert(await page.locator('#clubmenu').isVisible());await page.locator('#menuprofileopen').click();await page.locator('#myprofileclose').click();assert(!(await page.locator('#clubmenu').isVisible()));await page.locator('#clubnavmenu').click();await page.locator('#menuthemefx').click();await page.locator('#themefxclose').click();assert(!(await page.locator('#clubmenu').isVisible()));await page.locator('#clubnavmenu').click();await page.locator('#clubsound').click();await page.locator('#audioclose').click();assert(!(await page.locator('#clubmenu').isVisible()));
   assert(await page.locator('#enter-xadrez').isVisible());await page.locator('#enter-xadrez').click();
   await page.waitForURL('**/xadrez.html');await page.waitForFunction(()=>document.getElementById('chess-profile').textContent==='Teste Portal');
   assert.equal(await page.locator('.chess-sidebar .chess-panel').filter({hasText:'EM ANDAMENTO'}).count(),0);
@@ -31,6 +31,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.locator('.chess-roadmap summary').click();await page.locator('#sidebar-rules').click();assert(await page.locator('#rules-dialog').isVisible());await page.locator('[data-close=rules-dialog]').click();
   assert.equal(await page.locator('#chess-board [data-square=h1]').evaluate(el=>el.classList.contains('light')),true);
   await page.locator('#chess-menu').click();assert(await page.locator('#menu-return-damas').isVisible());assert.equal(await page.locator('#menu-current-chess').getAttribute('aria-current'),'page');assert(await page.getByRole('button',{name:'♞ Partida Local Dois jogadores'}).isVisible());assert.equal(await page.locator('#menu-dialog').getByText('Torre dos Reis').count(),0);await page.locator('[data-close=menu-dialog]').click();
+  await page.locator('#chess-profile').click();assert(await page.locator('#profile-dialog').isVisible());assert.equal(await page.locator('#chess-profile-tiles>div').count(),6);assert.equal(await page.locator('#chess-achievements>div').count(),8);await page.locator('[data-close=profile-dialog]').click();assert(!(await page.locator('#menu-dialog').isVisible()));
   // Menu modules work independently of the live game.
   await page.locator('#chess-menu').click();await page.locator('#menu-school').click();assert(await page.locator('#school-dialog').isVisible());
   await page.locator('#school-board [data-square=e2]').click();await page.locator('#school-board [data-square=e3]').click();assert((await page.locator('#school-feedback').textContent()).includes('não resolve'));
