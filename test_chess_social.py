@@ -36,6 +36,16 @@ class ChessSocialTest(unittest.TestCase):
         self.assertEqual(d['invites'][0]['game'],'damas')
         d=self.call(self.a,'state')[1];self.assertEqual(d['me']['points'],2345);self.assertEqual(d['me']['wins'],13)
         self.assertEqual(s.PRESENCE_GAME[self.pa][0],'damas')
+    def test_profile_details_and_shared_edit(self):
+        code,d=self.call(self.a,'chess/profile-details');self.assertEqual(code,200)
+        self.assertEqual(d['completed'],0);self.assertEqual(d['bestStreak'],0)
+        self.assertEqual(d['level'],1)
+        self.assertFalse(next(f for f in d['frames'] if f['id']=='gold')['locked'])
+        self.assertTrue(next(f for f in d['frames'] if f['id']=='halloween')['locked'])
+        self.assertEqual(self.call(self.a,'customize',name='Alice Real',avatar='knight',frame='gold')[0],200)
+        d=self.call(self.a,'chess/state')[1];self.assertEqual(d['me']['name'],'Alice Real');self.assertEqual(d['me']['avatar'],'knight');self.assertEqual(d['me']['frame'],'gold');self.assertEqual(d['profile']['points'],1000)
+        self.assertEqual(self.call(self.a,'state')[1]['me']['points'],2345)
+        self.assertEqual(self.call('x'*64,'chess/profile-details')[0],403)
     def test_unauthenticated(self):
         self.assertEqual(self.call('x'*64,'chess/state')[0],403)
 if __name__=='__main__':unittest.main()
