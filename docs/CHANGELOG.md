@@ -5,6 +5,9 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Atalho Amigos nas Damas
+- Pedido: menu das Damas deve oferecer Amigos como o Xadrez. index.html adiciona o mesmo cartão na seção Clube e comunidade; clube.js abre diretamente a aba Amigos do Clube de Honra. Fechar retorna à mesa. Sem mudanças de dados ou lista social. Teste UI verifica aba selecionada e menu fechado; CI pendente. Rollback: reverter commit.
+
 ## 15/11/2026 — Clãs da Casa de Xadrez
 - Pedido: ordens independentes com criação, brasões, recrutamento, cargos, chat, ranking. Reutiliza a autoridade de clas.py e a interface original via clans-ui.js, extraída de clube.js; Damas mantém transportes e dados existentes. Xadrez usa /api/social/chess/clans/* com autenticação existente, tabelas e índices chess_clan* separados, estatísticas de chess_profiles/history/journey, notificações próprias; identidade compartilhada, sem transferir PH.
 - Ranking por média exata de nível (mesma fórmula, vitórias/empates/partidas competitivas/conquistas/coroas do Xadrez). Ordens com 5+ membros e 7+ dias classificadas, demais provisórias. Recrutamento por busca de contas inclusive offline; Conselho Real, cargos, brasões e chat reutilizados. Pedidos e avisos no salão, insígnia no perfil. Torneios internos e cofre ainda não ativos, sem economia/prêmios.
