@@ -5,6 +5,12 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Interface compartilhada dos dois reinos
+- Pedido: usar praticamente o mesmo CSS/HTML de Damas no Xadrez, em vez de duplicar aparência. clube.css torna-se fonte visual comum, com primitivas de botões, eyebrow, sub e ações extraídas de index.html. Damas mantém sua estrutura e todas as regras.
+- xadrez.html: reutiliza classes reais shell/top/brand/emblem/layout/player/panel, clubnav, club-card/club-head, club-personal, menu-section/club-menu-grid, profile-hero/avatar/club-profile-stats/achievement-grid/account-box. Mantém IDs, diálogos nativos acessíveis, portal no menu e funcionalidades específicas. Xadrez exibe PH próprio na barra; sem inventar botões de funções ainda não implementadas.
+- xadrez.css: remove estilos duplicados de menu/perfil e mantém estilos de peças, tabuleiro, animações, salões, preferências e comportamento modal. xadrez.js: cards dinâmicos usam classes compartilhadas. Sem alteração de API/banco. Versões CSS/JS atualizadas nos dois HTML.
+- Teste UI: confirma mesma URL CSS e estilo computado de botão na barra, componentes de perfil, regressões de tabuleiro, menu, jornada, desistência. CI pendente. Rollback: reverter commit.
+ 
 ## 15/11/2026 — Mesa limpa e desistência
 - Pedido: retirar painel lateral Em andamento de ambos, reiniciar Xadrez após desistência, confirmação nativa do jogo e reduzir atraso residual. index.html: remove painel, mantém nós internos de status/histórico para compatibilidade, move replay para baixo da mesa. Xadrez remove painel e renderização redundante; turno e replay continuam disponíveis.
 - xadrez.js/html/css: diálogo próprio, cancelar mantém partida, confirma resultado no servidor antes do reset em IA/online/Jornada, local reinicia imediatamente; último replay local em memória e remoto preservado no histórico. Resultado/PH e coroa mantidos; mesa inicial para próxima partida, sem auto iniciar partida remota. Não modifica regras nem banco.
