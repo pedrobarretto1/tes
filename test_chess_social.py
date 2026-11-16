@@ -20,7 +20,7 @@ class ChessSocialTest(unittest.TestCase):
     def test_shared_friends_and_separate_context(self):
         self.call(self.b,'state')
         code,data=self.call(self.a,'chess/state',busy=True)
-        self.assertEqual(code,200);self.assertEqual(data['me'],{'name':'Alice'})
+        self.assertEqual(code,200);self.assertEqual(data['me'],{'name':'Alice','avatar':'crown','frame':'wood','account':None})
         self.assertEqual(data['friends'][0]['game'],'damas')
         self.assertEqual(data['friends'][0]['relation'],'friend')
         self.assertNotIn('points',data['me']);self.assertNotIn('clan',data)

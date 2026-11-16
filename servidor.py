@@ -1,6 +1,7 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata, re
+import json, secrets, threading, time, os, hashlib, sqlite3, subprocess, sys, unicodedata, re, gzip
+from functools import lru_cache
 from contextlib import contextmanager
 from urllib.request import urlopen, Request
 
@@ -16,6 +17,10 @@ TOURNAMENTS = {}
 LOCK = threading.Lock()
 TTL = 60 * 60 * 4
 BASE = Path(__file__).resolve().parent
+@lru_cache(maxsize=64)
+def static_payload(filename,mtime):
+    raw=(BASE/filename).read_bytes()
+    return raw,gzip.compress(raw,compresslevel=5,mtime=0),hashlib.sha256(raw).hexdigest()
 # Fixed, licensed instrument recordings only. Cache per note; never proxy arbitrary URLs.
 PIANO_FILES=frozenset(('A1','C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6','Ds6','Fs6','A6','C7'))
 PIANO_CACHE={}
@@ -505,7 +510,7 @@ def presence_busy(pid,now,db=None):
 def chess_state(pid,now):
     # Shared social graph; deliberately no Damas competitive data.
     with database() as db:
-        me=sql(db,'SELECT name FROM players WHERE id=?',(pid,)).fetchone()
+        me=sql(db,"SELECT p.name,COALESCE(c.avatar,'crown'),COALESCE(c.frame,'wood'),a.username FROM players p LEFT JOIN cosmetics c ON c.player_id=p.id LEFT JOIN accounts a ON a.player_id=p.id WHERE p.id=?",(pid,)).fetchone()
         if not me:return None
         rows=sql(db,"SELECT p.id,p.name,f.sender,f.state FROM friendships f JOIN players p ON p.id=CASE WHEN f.sender=? THEN f.receiver ELSE f.sender END WHERE f.sender=? OR f.receiver=?",(pid,pid,pid)).fetchall()
         friends=[]
@@ -523,7 +528,7 @@ def chess_state(pid,now):
                 p=sql(db,'SELECT name FROM players WHERE id=?',(v['sender'],)).fetchone()
                 if p:invites.append(dict(id=key,name=p[0],game='damas'))
     friends.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold()))
-    return dict(me=dict(name=me[0]),friends=friends,players=players[:100],invites=invites)
+    return dict(me=dict(name=me[0],avatar=me[1],frame=me[2],account=me[3]),friends=friends,players=players[:100],invites=invites)
 def social_state(pid,now):
     for event in list(TOURNAMENTS.values()):event_tick(event,now)
     for k,v in list(PRESENCE.items()):
@@ -1376,19 +1381,41 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control', 'public, max-age=86400' if kind in ('audio/mpeg','audio/midi') and status==200 else 'no-store')
         self.end_headers()
         self.wfile.write(body)
+    def static_page(self,filename,kind):
+        raw,compressed,digest=static_payload(filename,(BASE/filename).stat().st_mtime_ns)
+        accepts=self.headers.get('Accept-Encoding','')
+        use_gzip=False
+        for part in accepts.split(','):
+            fields=part.strip().lower().split(';')
+            if fields[0].strip()!='gzip':continue
+            try:q=next((float(x.split('=',1)[1]) for x in fields[1:] if x.strip().startswith('q=')),1.0)
+            except ValueError:q=0
+            if q>0:use_gzip=True
+        etag='"'+digest+('-gzip' if use_gzip else '')+'"'
+        body=compressed if use_gzip else raw
+        unchanged=self.headers.get('If-None-Match')==etag
+        self.send_response(304 if unchanged else 200)
+        self.send_header('Content-Type',kind)
+        self.send_header('Cache-Control','no-cache')
+        self.send_header('ETag',etag)
+        self.send_header('Vary','Accept-Encoding')
+        if use_gzip:self.send_header('Content-Encoding','gzip')
+        if not unchanged:self.send_header('Content-Length',str(len(body)))
+        self.end_headers()
+        if not unchanged:self.wfile.write(body)
     def do_OPTIONS(self): self.reply(204, b'')
     def do_GET(self):
         if self.path.split('?')[0] in ('/', '/index.html'):
-            self.reply(200, (BASE/'index.html').read_bytes(), 'text/html; charset=utf-8')
+            self.static_page('index.html','text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/xadrez.html':
-            self.reply(200,(BASE/'xadrez.html').read_bytes(),'text/html; charset=utf-8')
+            self.static_page('xadrez.html','text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/torre.html':
             self.reply(200,(BASE/'torre.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/royal-demo.html':
             self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js','/xadrez.js','/xadrez.css','/chess-engine.js'):
             file=self.path.split('?')[0][1:]
-            self.reply(200,(BASE/file).read_bytes(),'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
+            self.static_page(file,'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
             path=self.path.split('?')[0];name=path.removeprefix('/audio/classical/').removesuffix('.mid')
             if name not in CLASSICAL_SCORES or not path.endswith('.mid'):return self.reply(404,{'error':'Partitura inexistente.'})

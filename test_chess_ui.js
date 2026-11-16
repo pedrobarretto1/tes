@@ -10,12 +10,17 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:800}}),base='http://127.0.0.1:'+port;
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
   await page.addInitScript(()=>{localStorage.setItem('damas-name','Teste Portal');localStorage.setItem('damas-profile-token','chess-ui-test-token-012345678901234567890123')});
+  // Static files are compressed and conditionally revalidated; API is not cached.
+  const raw=await page.request.get(base+'/xadrez.html',{headers:{'Accept-Encoding':'identity'}}),zip=await page.request.get(base+'/xadrez.html',{headers:{'Accept-Encoding':'gzip'}});
+  assert.equal(zip.headers()['content-encoding'],'gzip');assert.equal(await raw.text(),await zip.text());assert(Number(zip.headers()['content-length'])<Number(raw.headers()['content-length']));assert.equal((await page.request.get(base+'/xadrez.html',{headers:{'Accept-Encoding':'gzip','If-None-Match':zip.headers().etag}})).status(),304);
   await page.goto(base,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));
   assert(!(await page.locator('#clubmenu').isVisible()));assert(!(await page.locator('#clubwelcome').isVisible()));
-  await page.locator('#clubnavmenu').click();assert(await page.locator('#clubmenu').isVisible());await page.locator('#clubmenux').click();
+  assert.equal(await page.locator('.side .panel').filter({hasText:'Em andamento'}).count(),0);
+  await page.locator('#clubnavmenu').click();assert(await page.locator('#clubmenu').isVisible());await page.locator('#menuprofileopen').click();await page.locator('#myprofileclose').click();assert(!(await page.locator('#clubmenu').isVisible()));await page.locator('#clubnavmenu').click();await page.locator('#menuthemefx').click();await page.locator('#themefxclose').click();assert(!(await page.locator('#clubmenu').isVisible()));await page.locator('#clubnavmenu').click();await page.locator('#clubsound').click();await page.locator('#audioclose').click();assert(!(await page.locator('#clubmenu').isVisible()));for(const [open,close] of [['menuescola','schoolclose'],['menujourney','journeyclose'],['menuclans','clanclose'],['menumatch','matchclose']]){await page.locator('#clubnavmenu').click();await page.locator('#'+open).click();await page.locator('#'+close).click();assert(!(await page.locator('#clubmenu').isVisible()))}
   assert(await page.locator('#enter-xadrez').isVisible());await page.locator('#enter-xadrez').click();
   await page.waitForURL('**/xadrez.html');await page.waitForFunction(()=>document.getElementById('chess-profile').textContent==='Teste Portal');
+  assert.equal(await page.locator('.chess-sidebar .chess-panel').filter({hasText:'EM ANDAMENTO'}).count(),0);
   assert.equal(await page.locator('#chess-board button').count(),64);assert.equal(await page.locator('#chess-board button').first().getAttribute('data-square'),'a8');
   assert.equal(await page.locator('#chess-board [data-square=d1] .chess-piece').getAttribute('data-piece'),'Q');
   assert.equal(await page.locator('#chess-board .chess-piece').count(),32);
@@ -26,6 +31,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.locator('.chess-roadmap summary').click();await page.locator('#sidebar-rules').click();assert(await page.locator('#rules-dialog').isVisible());await page.locator('[data-close=rules-dialog]').click();
   assert.equal(await page.locator('#chess-board [data-square=h1]').evaluate(el=>el.classList.contains('light')),true);
   await page.locator('#chess-menu').click();assert(await page.locator('#menu-return-damas').isVisible());assert.equal(await page.locator('#menu-current-chess').getAttribute('aria-current'),'page');assert(await page.getByRole('button',{name:'♞ Partida Local Dois jogadores'}).isVisible());assert.equal(await page.locator('#menu-dialog').getByText('Torre dos Reis').count(),0);await page.locator('[data-close=menu-dialog]').click();
+  await page.locator('#chess-profile').click();assert(await page.locator('#profile-dialog').isVisible());assert.equal(await page.locator('#chess-profile-tiles>div').count(),6);assert.equal(await page.locator('#chess-achievements>div').count(),8);await page.locator('[data-close=profile-dialog]').click();assert(!(await page.locator('#menu-dialog').isVisible()));
   // Menu modules work independently of the live game.
   await page.locator('#chess-menu').click();await page.locator('#menu-school').click();assert(await page.locator('#school-dialog').isVisible());
   await page.locator('#school-board [data-square=e2]').click();await page.locator('#school-board [data-square=e3]').click();assert((await page.locator('#school-feedback').textContent()).includes('não resolve'));
@@ -46,6 +52,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await seed(['e2e4','a7a6','e4e5','d7d5']);await move('e5','d6',2);assert.equal(await page.locator('#chess-board [data-square=d5] .chess-piece').count(),0);
   await seed(['a2a4','h7h5','a4a5','h5h4','a5a6','h4h3','a6b7','h3g2']);await page.locator('#chess-board [data-square=b7]').click();await page.locator('#chess-board [data-square=a8]').click();await page.locator('.chess-promotion-choice').first().click();assert.equal(await page.locator('.chess-motion-ghost').count(),3);await page.waitForFunction(()=>!document.querySelector('.chess-motion-layer'));assert.equal(await page.locator('#chess-board [data-square=a8] .chess-piece').getAttribute('data-piece'),'Q');
   await seed([]);await page.emulateMedia({reducedMotion:'reduce'});await page.locator('#chess-board [data-square=g1]').click();await page.locator('#chess-board [data-square=f3]').click();assert.equal(await page.locator('.chess-motion-layer').count(),0);await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.locator('#chess-resign').click();assert(await page.locator('#chess-resign-dialog').isVisible());await page.locator('#chess-resign-confirm').click();assert.equal(await page.locator('#chess-board [data-square=g1] .chess-piece').getAttribute('data-piece'),'N');assert.equal(await page.locator('#chess-status').textContent(),'Brancas jogam');
   await page.locator('#chess-friends').click();assert(await page.locator('#friends-dialog').isVisible());await page.locator('[data-close=friends-dialog]').click();
   await page.setViewportSize({width:375,height:780});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.equal(await page.locator('#chess-board button').count(),64);assert(await page.evaluate(()=>{const board=document.getElementById('chess-board').getBoundingClientRect();return Math.abs(board.width-board.height)<2&&board.width<=innerWidth&&[...document.querySelectorAll('#chess-board .chess-piece')].every(p=>p.getBoundingClientRect().width>20)}));
   await page.locator('#chess-menu').click();assert(await page.locator('#menu-dialog').isVisible());await page.locator('[data-close=menu-dialog]').click();
@@ -53,11 +60,13 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.locator('[data-chess-mode=ai]').click();assert(await page.locator('#chess-difficulty').isVisible());await page.locator('[data-chess-level=medium]').click();
   await page.locator('#sidebar-new').click();await page.waitForFunction(()=>document.getElementById('chess-side-hint').textContent.startsWith('Suas peças:'));
   await page.waitForFunction(()=>document.getElementById('chess-status').textContent!=='Vez do Computador');
-  page.on('dialog',d=>d.accept());await page.locator('#sidebar-resign').click();
+  let nativeResign=0;page.on('dialog',d=>{nativeResign++;d.accept()});
+  const resign=async(p)=>{await p.locator('#sidebar-resign').click();assert(await p.locator('#chess-resign-dialog').isVisible());await p.locator('#chess-resign-confirm').click();await p.waitForFunction(()=>document.querySelector('#chess-board [data-square=e2] .chess-piece')?.dataset.piece==='P'&&document.querySelectorAll('#chess-board .chess-piece').length===32&&document.getElementById('sidebar-resign').disabled)};
+  await page.locator('#sidebar-resign').click();assert(await page.locator('#chess-resign-dialog').isVisible());await page.locator('#chess-resign-cancel').click();assert(!(await page.locator('#chess-resign-dialog').isVisible()));await resign(page);assert.equal(nativeResign,0);
   await page.waitForFunction(()=>document.getElementById('chess-personal-rank').textContent.includes('990 PH'));
   assert((await page.locator('#chess-message').textContent()).includes('-10 PH'));
   await page.locator('[data-chess-level=easy]').click();await page.waitForResponse(r=>r.url().endsWith('/api/social/chess/state')&&r.ok());assert.equal(await page.locator('[data-chess-level=easy]').getAttribute('aria-pressed'),'true');await page.locator('#sidebar-new').click();await page.waitForFunction(()=>!document.getElementById('sidebar-resign').disabled);
-  await page.waitForFunction(()=>document.getElementById('chess-status').textContent!=='Vez do Computador');await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);
+  await page.waitForFunction(()=>document.getElementById('chess-status').textContent!=='Vez do Computador');await resign(page);
   assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
   // Two isolated accounts play a real online game with a shared queue.
   const second=await browser.newPage({viewport:{width:1280,height:800}});second.on('pageerror',e=>errors.push(e.message));await second.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
@@ -68,7 +77,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   const white=(await page.locator('#chess-side-hint').textContent()).includes('brancas')?page:second,black=white===page?second:page;
   await white.locator('#chess-board [data-square=e2]').click();await white.locator('#chess-board [data-square=e4]').click();await black.waitForFunction(()=>document.querySelector('#chess-board [data-square=e4] .chess-piece')?.dataset.piece==='P');
   await black.waitForFunction(()=>!document.querySelector('.chess-motion-layer'));await black.locator('#chess-board [data-square=e7]').click();await black.locator('#chess-board [data-square=e5]').click();await white.waitForFunction(()=>document.querySelector('#chess-board [data-square=e5] .chess-piece')?.dataset.piece==='p');
-  await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
+  await resign(page);assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
   await second.close();await page.locator('#chess-menu').click();await page.locator('#menu-replay').click();await page.waitForFunction(()=>document.querySelectorAll('#history-list .chess-history-entry').length>=1);await page.locator('#history-list .chess-history-entry').first().getByRole('button',{name:'Rever'}).click();await page.locator('#replay-next').click();assert((await page.locator('#replay-info').textContent()).includes('e4'));await page.locator('[data-close=history-dialog]').click();await page.locator('[data-chess-mode=local]').click();
   // Campaign uses the ordinary full board, persists on reload and never changes PH.
   await page.locator('#chess-menu').click();await page.locator('#menu-journey').click();await page.waitForFunction(()=>document.querySelectorAll('#journey-cards .journey-card').length===5);
@@ -83,7 +92,7 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   await page.reload();await page.waitForFunction(()=>!document.getElementById('journey-banner').hidden);assert.equal(await page.locator('#chess-board [data-square=e4] .chess-piece').getAttribute('data-piece'),'P');
   await page.locator('#chess-menu').click();await page.locator('#menu-return-damas').click();await page.waitForURL(base+'/');await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste Portal ·'));assert(!(await page.locator('#clubmenu').isVisible()));
   await page.locator('#enter-xadrez').click();await page.waitForURL('**/xadrez.html');await page.waitForFunction(()=>!document.getElementById('journey-banner').hidden);assert.equal(await page.locator('#chess-board [data-square=e4] .chess-piece').getAttribute('data-piece'),'P');
-  await page.locator('#sidebar-resign').click();await page.waitForFunction(()=>document.getElementById('sidebar-resign').disabled);assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
+  await resign(page);assert((await page.locator('#chess-personal-rank').textContent()).includes('990 PH'));
   await page.locator('#journey-continue').click();assert(await page.locator('.journey-card.stage-2 button').isDisabled());await page.locator('[data-close=journey-dialog]').click();
   await page.locator('[data-chess-mode=local]').click();
   // An idle switch must not wait for a new leave round-trip.

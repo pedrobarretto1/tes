@@ -4,7 +4,7 @@ const B=(label,fn,primary=false)=>{let e=N('button',primary?'primary':'secondary
 const tabs=['clubwelcome','clubmenu','cluboverlay','clubnotificationoverlay','matchoverlay','replayoverlay','accountoverlay','myprofileoverlay','schooloverlay','chatoverlay'];
 let school=null,puzzle=null,selection=null,path=[],watchCode='',watchTimer=0,schoolEpoch=0,chatKey='',lastChat='',analysisData=null,watchAbort=null;
 function show(id){for(let x of tabs)E(x).classList.toggle('hidden',x!==id)}
-function close(){schoolEpoch++;leaveWatch();E('schooloverlay').classList.add('hidden');if(!focusEnabled)show('clubmenu')}
+function close(){schoolEpoch++;leaveWatch();E('schooloverlay').classList.add('hidden');E('clubmenu').classList.add('hidden')}
 function status(t){E('schoolstatus').textContent=t}
 async function api(route,data={}){let token=profileToken(),r=await fetch('/api/social/'+route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,profileToken:token})});let d=await r.json();if(token!==profileToken())throw Error('Perfil alterado. Abra novamente.');if(!r.ok)throw Error(d.error||'Não foi possível acessar o clube.');if(route.startsWith('school/')||route==='journey/equip'){if(Array.isArray(d.owned))window.savePatch?.({wallet:d});if(route!=='school/state')window.saveRefresh?.(true)}return d}
 function withRule(rule,fn){let old=ruleMode;try{ruleMode=validRule(rule)?rule:'free';return fn()}finally{ruleMode=old}}
