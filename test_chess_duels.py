@@ -64,6 +64,35 @@ class ChessDuelsTest(unittest.TestCase):
         self.assertEqual(self.ok(self.b,'state')['match']['id'],g['id'])
         self.ok(self.a,'resign',match=g['id']);self.assertEqual(self.ok(self.b,'state')['profile']['points'],1000)
         hist=self.ok(self.a,'history')['history'];self.assertEqual(len(hist),1);self.assertFalse(hist[0]['ranked']);self.assertEqual(hist[0]['delta'],0);self.assertEqual(self.ok(self.z,'history')['history'],[])
+    def test_journey_progress_and_isolation(self):
+        import chess
+        from unittest.mock import patch
+        self.assertEqual(self.call(self.a,'journey-start',stage=2,nonce='x'*16)[0],409)
+        self.assertEqual(self.call(self.a,'journey-start',stage=True,nonce='x'*16)[0],400)
+        g=self.ok(self.a,'journey-start',stage=1,nonce='x'*16)['match']
+        self.assertEqual((g['journey'],g['side'],g['ranked'],g['moves']),(1,'w',False,[]))
+        self.assertEqual(self.ok(self.a,'journey-start',stage=1,nonce='x'*16)['match']['id'],g['id'])
+        self.assertEqual(self.ok(self.a,'resign',match=g['id'])['journey']['won'],[])
+        for stage in range(1,6):
+            g=self.ok(self.a,'journey-start',stage=stage,nonce=('stage-%02d'%stage)*3)['match']
+            mid=g['id'];self.assertEqual(self.ok(self.a,'state')['match']['id'],mid)
+            self.assertEqual(self.call(self.z,'move',match=mid,sequence=0,move='e2e4')[0],409)
+            for i,(white,black) in enumerate([('e2e4','e7e5'),('f1c4','b8c6'),('d1h5','g8f6')]):
+                self.ok(self.a,'move',match=mid,sequence=2*i,move=white)
+                with patch.object(c,'bot_move',return_value=chess.Move.from_uci(black)):
+                    self.ok(self.a,'bot',match=mid,sequence=2*i+1)
+            r=self.ok(self.a,'move',match=mid,sequence=6,move='h5f7')
+            self.assertEqual(r['match']['result']['reason'],'checkmate')
+            self.assertEqual(r['journey']['won'],list(range(1,stage+1)))
+            self.assertEqual(r['profile']['points'],1000)
+            self.assertEqual(r['profile']['coins'],0)
+            self.assertEqual(self.ok(self.a,'move',match=mid,sequence=6,move='h5f7')['journey']['won'],list(range(1,stage+1)))
+        self.assertTrue(self.ok(self.a,'state')['journey']['complete'])
+        self.assertEqual(self.ok(self.b,'state')['journey']['won'],[])
+        self.assertEqual(self.ok(self.a,'history')['history'][0]['journey'],5)
+        with s.database() as db:
+            self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM chess_journey WHERE player_id=?',(self.pa,)).fetchone()[0],5)
+            self.assertEqual(s.sql(db,'SELECT points,wins FROM players WHERE id=?',(self.pa,)).fetchone(),(1000,0))
     def test_timeout(self):
         g=self.start('hard',minutes=1)
         with s.database() as db:
