@@ -11,8 +11,8 @@ const server=spawn('python',['-u','-c',"import servidor as s,tempfile; from path
   let errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith('http://127.0.0.1:')?r.continue():r.abort());
   await page.addInitScript(()=>{localStorage.setItem('damas-name','Teste IA');localStorage.setItem('damas-profile-token','bot-ui-test-token-012345678901234567890123')});
   await page.goto('http://127.0.0.1:'+port,{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>!document.getElementById('clubmenu').classList.contains('hidden'),{},{timeout:15000});
-  await page.locator('#clubmenux').click();
+  await page.waitForFunction(()=>document.getElementById('clubnavprofile').textContent.startsWith('Teste IA ·'),{},{timeout:15000});
+  assert(!(await page.locator('#clubmenu').isVisible()));
   await page.locator('#start').click();
   await page.waitForFunction(()=>botGame&&turn===mySide&&!animating&&!movePending,{},{timeout:15000});
   assert.equal(await page.evaluate(()=>botGame.level),'medium');

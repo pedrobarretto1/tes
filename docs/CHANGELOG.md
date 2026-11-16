@@ -5,6 +5,13 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Menu fechado ao iniciar e trocar de reino
+- Pedido: impedir abertura automática do menu ao carregar Damas ou retornar do Xadrez.
+- clube.js: cadastro silencioso para nome salvo; primeiro acesso ou sessão inválida ainda mostra identificação. Após cadastro/login, fecha identificação sem abrir menu; abertura manual durante conexão é atendida após sucesso. Atalhos explícitos de amigos continuam abrindo o painel correto e o parâmetro é consumido. Navegação manual existente preservada.
+- index.html: versão do clube.js atualizada para 79, evitando cache antigo. Nenhuma alteração de motor, partidas ou banco.
+- test_chess_ui.js/test_bot_ui.js: esperam registro pelo perfil, verificam menu fechado, abertura manual, retorno do Xadrez, reload e link de amigos. Testes de navegador pendentes de CI; publicação não confirmada.
+- Rollback: reverter este commit; nenhuma migração necessária.
+
 ## 15/11/2026 — Xadrez: mesa competitiva e painel lateral
 - Pedido: replicar funcionalidade dos quatro painéis de Damas adaptados ao Xadrez (configuração, andamento, ranking e como jogar).
 - xadrez.html/css/js: controles de modo Local/Computador/Online, regras clássicas, sorteio de cores, relógios 0/1/3/5/10/15/30, três dificuldades, ranqueada/casual, busca/cancelamento, desafios, nova partida/desistência, empate, histórico, ranking top3/completo, perfil com PH/moedas, regras expansíveis. Nome da mesma conta, edição via Damas. Preserva peças SVG e giro Local; relógio Local salvo na aba; partidas online e IA restauradas pelo servidor.
