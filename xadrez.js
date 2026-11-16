@@ -165,7 +165,7 @@ function applyData(data){if(motionRun&&remote&&data.match?.id===remote.id&&data.
   const changed=!remote||remote.id!==g.id||remote.moves.length!==g.moves.length||JSON.stringify(remote.result)!==JSON.stringify(g.result)||remote.offer!==g.offer;
   if(mode==='local'){tickLocal();save()}
   if(!remote||remote.id!==g.id){flipped=g.side==='b';selected=-1;promotion=null}
-  remote=g;mode=g.mode;level=g.level||level;clockAt=performance.now();$('chess-time').value=String(g.minutes);$('chess-ranked').value=g.ranked?'ranked':'casual';
+  remote=g;mode=g.mode;clockAt=performance.now();if(!same||!g.result){level=g.level||level;$('chess-time').value=String(g.minutes);$('chess-ranked').value=g.ranked?'ranked':'casual'}
   if(changed){rebuild(g.moves);selected=-1;promotion=null;claimed='';if(g.result){let r=g.result.rewards[g.side];msg(remoteText(g.result)+(g.ranked&&r?' · '+(r.delta>=0?'+':'')+r.delta+' PH · +'+r.coins+' moedas':''))}else msg('');render(nextMove?{before,move:nextMove,viewFlip}:null)}else{updateControls();paintClock()}
  }else{if(mode==='local')$('white-name').textContent=profile?.name||'Brancas';updateControls();paintClock()}
  if(g&&g.mode==='ai'&&!g.result&&sideKey()!==g.side){clearTimeout(botTimer);botTimer=setTimeout(()=>request('bot',{match:g.id,sequence:g.moves.length}),motionRun?520:120)}
