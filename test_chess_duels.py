@@ -93,6 +93,27 @@ class ChessDuelsTest(unittest.TestCase):
         with s.database() as db:
             self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM chess_journey WHERE player_id=?',(self.pa,)).fetchone()[0],5)
             self.assertEqual(s.sql(db,'SELECT points,wins FROM players WHERE id=?',(self.pa,)).fetchone(),(1000,0))
+    def test_leave_and_resume_ai(self):
+        g=self.start('medium',minutes=5);mid=g['id']
+        self.ok(self.a,'leave')
+        with s.database() as db:
+            raw=c.current(db,s.sql,self.pa)
+            self.assertTrue(raw['paused'])
+            self.assertTrue(c.active(db,s.sql,self.pa))
+            self.assertFalse(s.chess_active(self.pa,db))
+            remaining=raw['remaining'].copy();raw['clock_at']=time.time()-600;c.save(db,s.sql,raw)
+        self.assertEqual(self.call(self.a,'move',match=mid,sequence=0,move='e2e4')[0],409)
+        r=self.ok(self.a,'state')['match'];self.assertFalse(r['paused']);self.assertEqual(r['id'],mid);self.assertEqual(r['remaining'],remaining)
+        self.ok(self.a,'resign',match=mid)
+        g=self.duel();self.assertEqual(self.call(self.a,'leave')[0],409)
+        self.ok(self.a,'leave',allowOnline=True)
+        self.assertTrue(s.chess_active(self.pa))
+        self.assertEqual(self.ok(self.a,'state')['match']['id'],g['id'])
+    def test_leave_queue_and_journey(self):
+        self.ok(self.a,'queue',minutes=3,ranked=False);self.ok(self.a,'leave')
+        self.assertFalse(self.ok(self.a,'state')['queued'])
+        g=self.ok(self.a,'journey-start',stage=1,nonce='q'*16)['match'];self.ok(self.a,'move',match=g['id'],sequence=0,move='e2e4');self.ok(self.a,'leave')
+        r=self.ok(self.a,'state');self.assertEqual(r['match']['moves'],['e2e4']);self.assertEqual(r['match']['journey'],1);self.assertFalse(r['match']['paused'])
     def test_timeout(self):
         g=self.start('hard',minutes=1)
         with s.database() as db:

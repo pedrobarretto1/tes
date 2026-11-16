@@ -498,8 +498,8 @@ def live_for(pid,now):
 
 def chess_active(pid,db=None):
     import chess_duels
-    if db is not None:return chess_duels.active(db,sql,pid)
-    with database() as conn:return chess_duels.active(conn,sql,pid)
+    if db is not None:return chess_duels.active(db,sql,pid,include_paused=False)
+    with database() as conn:return chess_duels.active(conn,sql,pid,include_paused=False)
 def presence_busy(pid,now,db=None):
     return active_room(pid,now) or bool(live_for(pid,now)) or (now-PRESENCE.get(pid,-1000)<=25 and PRESENCE_GAME.get(pid,('damas',False))==('chess',True)) or chess_active(pid,db)
 def chess_state(pid,now):
@@ -1263,7 +1263,8 @@ def social_action(path,d,now):
         MATCH_QUEUE.pop(pid,None)
         code,data=chess_duels.action(sys.modules[__name__],path,d,pid,now)
         if code==200:
-            if data.get('match') and not data['match']['result']:PRESENCE_GAME[pid]=('chess',True)
+            if data.get('match') and not data['match']['result'] and not data['match'].get('paused'):PRESENCE_GAME[pid]=('chess',True)
+            if path=='/api/social/chess/leave':PRESENCE_GAME[pid]=('damas',False)
             if path=='/api/social/chess/state':
                 social=chess_state(pid,now);data['chess_invites']=data.pop('invites');data.update(social)
         return code,data

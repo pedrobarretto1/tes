@@ -31,8 +31,10 @@ def setup(db,sql):
     sql(db,"INSERT INTO chess_guard(id) VALUES(1) ON CONFLICT(id) DO NOTHING")
 def ensure(db,sql,pid):
     sql(db,"INSERT INTO chess_profiles(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING",(pid,))
-def active(db,sql,pid):
-    return bool(sql(db,"SELECT 1 FROM chess_seats s JOIN chess_matches m ON m.id=s.match_id WHERE s.player_id=? AND m.finished=0",(pid,)).fetchone())
+def active(db,sql,pid,include_paused=True):
+    r=sql(db,"SELECT m.payload FROM chess_seats s JOIN chess_matches m ON m.id=s.match_id WHERE s.player_id=? AND m.finished=0",(pid,)).fetchone()
+    if not r:return False
+    return include_paused or not json.loads(r[0]).get('paused',False)
 def current(db,sql,pid):
     r=sql(db,"SELECT m.payload FROM chess_seats s JOIN chess_matches m ON m.id=s.match_id WHERE s.player_id=?",(pid,)).fetchone()
     return json.loads(r[0]) if r else None
@@ -69,7 +71,7 @@ def finish(s,db,g,winner,reason):
             result['journey']=dict(stage=stage,first=bool(first),title=JOURNEY[stage-1]['title'])
     g['result']=result;save(db,s.sql,g)
 def tick(s,db,g,b):
-    if g['result'] or not g['minutes']:return
+    if g['result'] or g.get('paused') or not g['minutes']:return
     now=time.time();c='w' if b.turn else 'b'
     # CPU search is charged explicitly; waiting for a bot poll does not cost its clock.
     if g['mode']=='ai' and g['players'][c] is None:return
@@ -141,7 +143,7 @@ def create(s,db,pid,other,mode,level,minutes,ranked,nonce,journey=None):
 def view(g,pid):
     if not g:return None
     c=color(g,pid)
-    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'],journey=g.get('journey'))
+    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'],journey=g.get('journey'),paused=bool(g.get('paused')))
 def incoming(db,sql,pid):
     rows=sql(db,"SELECT i.id,p.name,i.minutes,i.ranked FROM chess_invites i JOIN players p ON p.id=i.sender WHERE i.receiver=? AND i.status='pending' AND i.expires>? ORDER BY i.expires",(pid,time.time())).fetchall()
     return [dict(id=r[0],name=r[1],game='chess',minutes=r[2],ranked=bool(r[3])) for r in rows]
@@ -173,7 +175,15 @@ def action(s,path,d,pid,now):
         def result():return 200,snapshot(s,db,pid,g)
         def blocked(p):
             return active(db,sql,p) or s.active_room(p,now) or (p!=pid and s.PRESENCE_GAME.get(p)==('chess',True) and now-s.PRESENCE.get(p,-1000)<=25)
+        if op=='leave':
+            if g and not g['result'] and g['mode']=='online' and d.get('allowOnline') is not True:return err('Existe um duelo online em andamento.',409)
+            sql(db,'DELETE FROM chess_queue WHERE player_id=?',(pid,))
+            if g and not g['result'] and g['mode']=='ai':
+                g['paused']=True;save(db,sql,g)
+            return 200,{'left':True}
         if op in ('state','poll'):
+            if g and not g['result'] and g.get('paused') and not s.active_room(pid,now):
+                g['paused']=False;g['clock_at']=time.time();save(db,sql,g)
             sql(db,'DELETE FROM chess_queue WHERE seen<?',(time.time()-25,))
             q=sql(db,'SELECT minutes,ranked FROM chess_queue WHERE player_id=?',(pid,)).fetchone()
             if q and not blocked(pid):
@@ -221,6 +231,7 @@ def action(s,path,d,pid,now):
             sql(db,"UPDATE chess_invites SET status='accepted' WHERE id=?",(d['invite'],));return result()
         if not g or d.get('match')!=g['id']:return err('Partida indisponível.')
         if g['result']:return result()
+        if g.get('paused'):return err('Retome a partida antes de jogar.')
         c=color(g,pid);b=board(g);turn='w' if b.turn else 'b'
         if op=='resign':finish(s,db,g,opposite(c),'resign');return result()
         if op=='draw':
