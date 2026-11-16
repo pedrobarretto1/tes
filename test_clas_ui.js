@@ -3,8 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
 const html=fs.readFileSync('index.html','utf8');
-const source=fs.readFileSync('clube.js','utf8');
-const ui=source.slice(source.indexOf('/* Clan social beta:'),source.indexOf("let saved=localStorage.getItem('damas-name');"));
+const ui=fs.readFileSync('clans-ui.js','utf8');
 const staticHtml=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<link\b[^>]*href="([^"]+)"[^>]*>/gi,(tag,url)=>{
   if(!url.startsWith('/')||!url.split('?')[0].endsWith('.css'))return '';
   const path=url.split('?')[0].slice(1);return fs.existsSync(path)?'<style>'+fs.readFileSync(path,'utf8')+'</style>':'';
@@ -22,7 +21,7 @@ const data={me:{id:'me',name:'Fundador',level:5,xp:800},account:true,mine:null,c
         function node(t,c,txt){let e=document.createElement(t);if(c)e.className=c;if(txt!==undefined)e.textContent=txt;return e}
         function button(l,fn,primary){let b=node('button',primary?'primary':'secondary',l);b.type='button';b.onclick=fn;return b}
         const show=id=>{document.querySelectorAll('.club-overlay').forEach(el=>el.classList.add('hidden'));E(id).classList.remove('hidden')};
-        const api=new Function('E','S','node','button','profileToken','request','poll','show','status','confirm',ui+';return {renderClan,set:(d,t)=>{clanData=d;clanTab=t}}')(E,S,node,button,()=>'token',async()=>data,()=>{},show,()=>{},()=>true);
+        new Function(ui)();const api=window.createClanUI({E,S,node,button,profileToken:()=>'token',request:async()=>data,poll:()=>{},show,status:()=>{},close:id=>E(id).classList.add('hidden')});
         window.clanTest={api,data};show('clanoverlay');api.set(data,'browse');api.renderClan();
       },{ui,data});
       const search=page.locator('.clan-directory-search input'),label=page.locator('.clan-directory-search .clan-field-label'),btn=page.locator('.clan-directory-search button');

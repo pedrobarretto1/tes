@@ -110,6 +110,8 @@ def setup():
         bot_duels.setup(db,sql)
         import chess_duels
         chess_duels.setup(db,sql)
+        import chess_clans
+        chess_clans.setup(db,sql)
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 def identity(d):
@@ -510,6 +512,8 @@ def presence_busy(pid,now,db=None):
 def chess_state(pid,now):
     # Shared social graph; deliberately no Damas competitive data.
     with database() as db:
+        import chess_clans
+        clan_identity=chess_clans.identity(db,sql,pid);clan_pending=chess_clans.pending(db,sql,pid)
         me=sql(db,"SELECT p.name,COALESCE(c.avatar,'crown'),COALESCE(c.frame,'wood'),a.username FROM players p LEFT JOIN cosmetics c ON c.player_id=p.id LEFT JOIN accounts a ON a.player_id=p.id WHERE p.id=?",(pid,)).fetchone()
         if not me:return None
         rows=sql(db,"SELECT p.id,p.name,f.sender,f.state FROM friendships f JOIN players p ON p.id=CASE WHEN f.sender=? THEN f.receiver ELSE f.sender END WHERE f.sender=? OR f.receiver=?",(pid,pid,pid)).fetchall()
@@ -528,7 +532,7 @@ def chess_state(pid,now):
                 p=sql(db,'SELECT name FROM players WHERE id=?',(v['sender'],)).fetchone()
                 if p:invites.append(dict(id=key,name=p[0],game='damas'))
     friends.sort(key=lambda p:(not p['online'],p['relation']!='friend',p['name'].casefold()))
-    return dict(me=dict(name=me[0],avatar=me[1],frame=me[2],account=me[3]),friends=friends,players=players[:100],invites=invites)
+    return dict(me=dict(name=me[0],avatar=me[1],frame=me[2],account=me[3],clan=clan_identity),clan_pending=clan_pending,friends=friends,players=players[:100],invites=invites)
 def social_state(pid,now):
     for event in list(TOURNAMENTS.values()):event_tick(event,now)
     for k,v in list(PRESENCE.items()):
@@ -1262,6 +1266,9 @@ def social_action(path,d,now):
     PRESENCE[pid]=now
     if path in ('/api/social/register','/api/social/state'):
         PRESENCE_GAME[pid]=('damas',False)
+    if path.startswith('/api/social/chess/clans/'):
+        import chess_clans
+        return chess_clans.action(sys.modules[__name__],path,d,pid)
     if path.startswith('/api/social/chess/'):
         import chess_duels
         PRESENCE_GAME[pid]=('chess',d.get('busy') is True)
@@ -1413,7 +1420,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200,(BASE/'torre.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/royal-demo.html':
             self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js','/xadrez.js','/xadrez.css','/chess-engine.js'):
+        elif self.path.split('?')[0] in ('/clans-ui.js','/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js','/xadrez.js','/xadrez.css','/chess-engine.js'):
             file=self.path.split('?')[0][1:]
             self.static_page(file,'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):

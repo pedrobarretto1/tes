@@ -5,6 +5,18 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Transição entre universos
+- Pedido: transição nos dois sentidos Damas/Xadrez. CSS compartilhado com portal de madeira e dourado, emblema/nome do destino, entrada breve e saída de 460ms. Sem aguardar animação para navegar: marca de sessão consumida na página de destino, efeito visual não bloqueia cliques, fonte mostra portal enquanto salva/pausa. Cancelamento/erro e retorno pelo histórico limpam estado.
+- Respeita movimento reduzido, mantém fluxo de confirmação e persistência existente. Sem dados novos, sem delay artificial. UI valida os dois sentidos, desaparecimento e redução de movimento; CI pendente.
+ 
+## 15/11/2026 — Atalho Amigos nas Damas
+- Pedido: menu das Damas deve oferecer Amigos como o Xadrez. index.html adiciona o mesmo cartão na seção Clube e comunidade; clube.js abre diretamente a aba Amigos do Clube de Honra. Fechar retorna à mesa. Sem mudanças de dados ou lista social. Teste UI verifica aba selecionada e menu fechado; CI pendente. Rollback: reverter commit.
+
+## 15/11/2026 — Clãs da Casa de Xadrez
+- Pedido: ordens independentes com criação, brasões, recrutamento, cargos, chat, ranking. Reutiliza a autoridade de clas.py e a interface original via clans-ui.js, extraída de clube.js; Damas mantém transportes e dados existentes. Xadrez usa /api/social/chess/clans/* com autenticação existente, tabelas e índices chess_clan* separados, estatísticas de chess_profiles/history/journey, notificações próprias; identidade compartilhada, sem transferir PH.
+- Ranking por média exata de nível (mesma fórmula, vitórias/empates/partidas competitivas/conquistas/coroas do Xadrez). Ordens com 5+ membros e 7+ dias classificadas, demais provisórias. Recrutamento por busca de contas inclusive offline; Conselho Real, cargos, brasões e chat reutilizados. Pedidos e avisos no salão, insígnia no perfil. Torneios internos e cofre ainda não ativos, sem economia/prêmios.
+- Testes: isolamento de dados, requisitos, permissões, chat, ranking e endpoint; UI compartilhada e abertura/fechamento do salão de Xadrez, duas contas registradas com fundação, convite, ingresso, chat, ranking e isolamento. API e testes Python aprovados; primeiro Chromium detectou sintaxe strict no factory com parâmetros desestruturados, corrigida movendo diretiva ao escopo do script. Segunda rodada aprovou UI Damas/IA; teste Xadrez falhou ao vincular conta por usar token visitante revogado. Teste troca para sessão autenticada e preserva token no reload; ranking exibe posição oficial. CI final pendente. Rollback: reverter código, preservar tabelas chess_clan*; não apagar dados Damas.
+ 
 ## 15/11/2026 — Emblema do Xadrez centralizado
 - Pedido: cavalo do cabeçalho aparece pequeno no canto da moldura dourada. Após compartilhamento do CSS, display grid, centralização e fonte estavam apenas no estilo inline de Damas.
 - clube.css: emblema compartilhado recebe grid, place-items center, fonte 29px, line-height 1 e flex sem encolhimento; regra mobile existente mantém 42px/25px. xadrez.html: mesma estrutura div das Damas com span do símbolo. Versão de clube.css atualizada em ambas as páginas. Sem alterações em regras, contas, banco ou partidas.
