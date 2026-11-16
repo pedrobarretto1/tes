@@ -1,12 +1,3 @@
-/* Shared portal: visually distinct from the menu. */
-.universe-switch{display:flex;gap:8px;margin:0 0 16px;padding:7px;border:1px solid #91764e;background:linear-gradient(120deg,#33261d,#201a17);border-radius:10px;box-shadow:inset 0 0 0 2px #20160f;max-width:100%;box-sizing:border-box}
-.universe-switch .universe-link{display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:8px 13px;border:1px solid #68543d;border-radius:6px;background:#2b231e;color:#e7cba0;text-decoration:none;font-family:Georgia,serif;line-height:1.1}
-.universe-switch .universe-link.current{background:linear-gradient(120deg,#65492e,#382a1f);border-color:#d0a66b;box-shadow:inset 0 0 0 1px #bc8e4c55}
-.universe-link>span:first-child{font-size:27px;line-height:1;color:#e6bd7c}.universe-link b{display:block;font-size:17px}.universe-link small{display:block;color:#bda991;font:10px Arial;margin-top:3px}
-.universe-link:focus-visible{outline:2px solid #f2cb8a;outline-offset:2px}
-body:has(#clubmenu:not(.hidden)) #universeportal{position:fixed;top:10px;left:50%;transform:translateX(-50%);width:min(670px,calc(100% - 30px));z-index:41;margin:0}
-body:has(#clubmenu:not(.hidden)) #clubmenu{top:84px}
-body:has(#clubmenu:not(.hidden)) #clubmenu .club-card{max-height:calc(100dvh - 116px)}
 /* Same timber-and-brass language as the Damas table, scoped to Chess. */
 .chess-page{margin:0;min-height:100vh;background:radial-gradient(ellipse at 45% 0,#56402d 0,#231a13 53%,#17110e 100%);color:#f3e4c9;font:16px Georgia,'Times New Roman',serif;--gold:#d8ae70;--muted:#bcaa90;--line:#5c4632;--ink:#f3e4c9}
 .chess-page *{box-sizing:border-box}.chess-page [hidden]{display:none!important}

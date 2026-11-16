@@ -212,3 +212,13 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 
 /* Insígnia do clã: abaixo do nome, sem substituir títulos do perfil. */
 .clan-nameplate{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}.clan-person-name{display:block;overflow-wrap:anywhere}.clan-role-badge{display:inline-flex;align-items:center;align-self:flex-start;gap:4px;padding:3px 8px;border:1px solid #827359;border-radius:4px;background:#252a2a;color:#d2c5ae;font:700 11px/1.4 Arial;max-width:100%;overflow-wrap:anywhere}.clan-role-badge[data-role=king]{border-color:#d8b875;background:#463622;color:#ffe1a1}.clan-role-badge[data-role=vice]{border-color:#a69abf;color:#e0d3fb;background:#30283d}.clan-role-badge[data-role=captain]{border-color:#a1b2bd;color:#d6e1e8;background:#293943}.clan-role-tag{font-weight:400}.clan-profile-role{margin:4px 0}.clan-chat-author{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.clan-chat-author>small{flex:none}.clan-nameplate .clan-role-badge,#clanoverlay .clan-nameplate .clan-role-badge{font-size:11px;padding:3px 8px}
+
+/* Shared portal: visually distinct from the menu. */
+.universe-switch{display:flex;gap:8px;margin:0 0 16px;padding:7px;border:1px solid #91764e;background:linear-gradient(120deg,#33261d,#201a17);border-radius:10px;box-shadow:inset 0 0 0 2px #20160f;max-width:100%;box-sizing:border-box}
+.universe-switch .universe-link{display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:8px 13px;border:1px solid #68543d;border-radius:6px;background:#2b231e;color:#e7cba0;text-decoration:none;font-family:Georgia,serif;line-height:1.1}
+.universe-switch .universe-link.current{background:linear-gradient(120deg,#65492e,#382a1f);border-color:#d0a66b;box-shadow:inset 0 0 0 1px #bc8e4c55}
+.universe-link>span:first-child{font-size:27px;line-height:1;color:#e6bd7c}.universe-link b{display:block;font-size:17px}.universe-link small{display:block;color:#bda991;font:10px Arial;margin-top:3px}
+.universe-link:focus-visible{outline:2px solid #f2cb8a;outline-offset:2px}
+body:has(#clubmenu:not(.hidden)) #universeportal{position:fixed;top:10px;left:50%;transform:translateX(-50%);width:min(670px,calc(100% - 30px));z-index:41;margin:0}
+body:has(#clubmenu:not(.hidden)) #clubmenu{top:84px}
+body:has(#clubmenu:not(.hidden)) #clubmenu .club-card{max-height:calc(100dvh - 116px)}
