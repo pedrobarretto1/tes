@@ -1,6 +1,6 @@
 /* Shared clan UI: injected realm-specific transport and navigation. */
-window.createClanUI=function({E,S,node,button,profileToken,request,poll,show,close,status,realm='damas'}){
 'use strict';
+window.createClanUI=function({E,S,node,button,profileToken,request,poll,show,close,status,realm='damas'}){
 /* Clan social beta: persistent server state, no client-side membership authority. */
 let clanData=null,clanTab='browse',clanBusy=false,clanQuery='',clanOffset=0,clanEpoch=0,clanChatBusy=false,clanChatKey='',clanChatSerial=0;
 const clanFields=[['points','PH mínimo'],['wins','Vitórias mínimas'],['losses','Derrotas mínimas'],['rate','Taxa de vitória (%)'],['level','Nível mínimo'],['max_losses','Derrotas máximas'],['games','Partidas mínimas']];
