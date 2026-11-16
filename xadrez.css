@@ -56,3 +56,6 @@
 
 /* Keep shared button width rules from stretching compact chess controls. */
 .chess-page .chess-turn button,.chess-page .chess-friend-row button,.chess-page .chess-history-entry button,.chess-page .journey-banner button{width:auto}.chess-page .journey-card button{width:auto}.chess-page .chess-profile-card button{width:100%}@media(max-width:520px){.chess-page .journey-card button{width:100%}}
+
+/* The shared result card lives inside a native modal in chess. */
+.chess-page dialog.victory{box-sizing:border-box;position:fixed;inset:0;margin:0;width:100%;height:100%;max-width:none;max-height:none;border:0;color:var(--ink);overflow:auto}.chess-page dialog.victory:not([open]){display:none}.chess-page dialog.victory::backdrop{background:transparent}.chess-page .victory>div{max-width:470px;max-height:calc(100dvh - 40px);overflow:auto}.chess-page .victory #journeyresultmap{margin-top:8px}.chess-page .victory[data-motion="off"]>div,.chess-page .victory[data-motion="off"] .crown,.chess-page .victory[data-motion="off"] .spark{animation:none!important}.chess-page .victory[data-motion="off"] .spark{display:none}@media(max-width:520px){.chess-page .victory>div{padding:22px 18px}.chess-page .victory h2{font-size:28px}.chess-page .victory .crown{width:76px;height:76px;font-size:44px}}
