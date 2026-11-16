@@ -1266,6 +1266,21 @@ def social_action(path,d,now):
     PRESENCE[pid]=now
     if path in ('/api/social/register','/api/social/state'):
         PRESENCE_GAME[pid]=('damas',False)
+    if path=='/api/social/chess/profile-details':
+        import clas,chess_clans
+        with database() as db:
+            c=cosmetics_for(db,pid,True)
+            points=sql(db,'SELECT points FROM players WHERE id=?',(pid,)).fetchone()[0]
+            frames=[dict(id=k,label=v,locked=points<minimum and c['frame']!=k) for k,v,minimum in [('wood','Madeira',0),('bronze','Bronze',1000),('silver','Prata',1250),('gold','Ouro',1500)]]
+            frames.extend(dict(id=k,label=v,locked=k not in c['thematicFrames']) for k,v in [('halloween','Lua Sombria'),('christmas','Guirlanda de Natal'),('horror','Cripta Sombria'),('romance','Rosas Encantadas'),('last-king','Trono do Último Rei')])
+            history=sql(db,'SELECT h.outcome,m.payload FROM chess_history h JOIN chess_matches m ON m.id=h.match_id WHERE h.player_id=? ORDER BY h.played_at,h.match_id',(pid,)).fetchall()
+            streak=best=completed=0
+            for outcome,payload in history:
+                if not json.loads(payload).get('ranked'):continue
+                streak=streak+1 if outcome=='win' else 0
+                best=max(best,streak);completed+=int(outcome!='resign')
+            stats=clas.stats(db,chess_clans.scoped(sql),pid)
+            return 200,dict(frames=frames,bestStreak=best,completed=completed,level=stats['level'],persistent=bool(DATABASE_URL),savedAt=int(time.time()*1000))
     if path.startswith('/api/social/chess/live/'):
         import chess_live
         return chess_live.action(sys.modules[__name__],path,d,pid,now)
