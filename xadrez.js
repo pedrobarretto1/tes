@@ -247,7 +247,7 @@ function updateShop(data){
 }
 function shopCall(op,item){if(shopBusy)return;if(!localStorage.getItem('damas-profile-token')){$('shop-status').textContent='Entre no Clube para acessar seu inventário.';return}if(fetching&&(fetchOp!=='state'||pendingAction)){$('shop-status').textContent='Sincronizando. Tente novamente.';return}shopBusy=true;$('shop-status').textContent='Sincronizando tesouro…';drawShop(true);request(op,item?{item}:{});}
 function openShop(){open('chess-shop');shopTab='pieces';shopSelected='';shopSignature='';$('shop-status').textContent='Carregando relíquias…';drawShop(true);shopCall('shop-state')}
-$('menu-shop').onclick=openShop;$('chess-shop').addEventListener('close',()=>{if(!$('chess-shop').open){$('shop-detail').replaceChildren();$('shop-items').replaceChildren();shopSignature=''}});
+$('menu-shop').onclick=openShop;$('chess-shop-open').onclick=openShop;$('chess-shop').addEventListener('close',()=>{if(!$('chess-shop').open){$('shop-detail').replaceChildren();$('shop-items').replaceChildren();shopSignature=''}});
 function shopPreview(item){
  const p=element('div','shop-preview');p.dataset.style=item.style;p.dataset.category=item.category;
  if(item.category==='pieces'){const row=element('div','shop-piece-row');for(const c of ['K','Q','R','B','N','P','k','q','r','b','n','p'])row.append(pieceArt(c,item.style));p.append(row)}
