@@ -5,6 +5,11 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 15/11/2026 — Mesa limpa e desistência
+- Pedido: retirar painel lateral Em andamento de ambos, reiniciar Xadrez após desistência, confirmação nativa do jogo e reduzir atraso residual. index.html: remove painel, mantém nós internos de status/histórico para compatibilidade, move replay para baixo da mesa. Xadrez remove painel e renderização redundante; turno e replay continuam disponíveis.
+- xadrez.js/html/css: diálogo próprio, cancelar mantém partida, confirma resultado no servidor antes do reset em IA/online/Jornada, local reinicia imediatamente; último replay local em memória e remoto preservado no histórico. Resultado/PH e coroa mantidos; mesa inicial para próxima partida, sem auto iniciar partida remota. Não modifica regras nem banco.
+- Testes: UI cobre painel ausente, cancelar/confirmar, reinício Local/IA/online/Jornada e regressões. CI pendente. Rollback: reverter commit; sem migrações.
+
 ## 15/11/2026 — Paridade visual do portal e menu do Xadrez
 - Pedido: aba do Xadrez diferente de Damas. Interpretação: seletor de universos, barra de navegação e menu principal, com identidade rústica e mesmas seções. Mantém mesa, jornada, funcionalidades e progressão.
 - xadrez.html/css/js: portal adicional dentro do diálogo modal (teclado acessível), fixo no topo durante rolagem; Damas usa fluxo seguro de saída/pausa; Xadrez fecha menu sem recarregar. Barra e cartões usam paleta, tipografia, espaçamento e responsividade do Clube de Damas. Jogadores mantém painel existente, não cria atalhos fictícios. aria-expanded acompanha abertura do diálogo. CSS/JS com cache atualizado.
