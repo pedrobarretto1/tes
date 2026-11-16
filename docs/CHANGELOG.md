@@ -5,6 +5,11 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 16/11/2026 — Loja de Honra do Xadrez V1
+- Pedido: loja funcional com catálogo, inventário, compra/equipar, prévias e coleções Clássico, Império Dourado e Obsidiana. chess_shop.py: 12 itens em 4 categorias, preços 30–90 moedas, tabelas aditivas chess_shop_owned/equipped, catálogo/validação no servidor; compra idempotente sob chess_guard e saldo de chess_profiles, equipamento só de itens possuídos. Sem alteração em Damas ou recompensas competitivas.
+- chess_duels.py: operações shop-state/buy/equip autenticadas, snapshot pequeno de equipamentos e inventário; catálogo apenas nas operações de loja. xadrez.html/js/css: modal com visual clube, categorias, prévia única estática, moedas, inventário e aplicação das peças SVG, tabuleiros, salões e efeitos de captura/promoção/vitória. Clássico preserva temas livres e Cinco Coroas; cenário da Jornada tem prioridade; respeita movimento reduzido. Paletas originais e silhuetas preservadas, sem imagens pesadas. 
+- Testes: API de saldo, idempotência, equipamento, isolamento; UI de abertura, prévia, bloqueio por saldo e inventário. CI pendente. Rollback: reverter código, manter tabelas.
+ 
 ## 15/11/2026 — Transição entre universos
 - Pedido: transição nos dois sentidos Damas/Xadrez. CSS compartilhado com portal de madeira e dourado, emblema/nome do destino, entrada breve e saída de 460ms. Sem aguardar animação para navegar: marca de sessão consumida na página de destino, efeito visual não bloqueia cliques, fonte mostra portal enquanto salva/pausa. Cancelamento/erro e retorno pelo histórico limpam estado.
 - Respeita movimento reduzido, mantém fluxo de confirmação e persistência existente. Sem dados novos, sem delay artificial. UI valida os dois sentidos, desaparecimento e redução de movimento; CI pendente.

@@ -39,6 +39,21 @@ class ChessDuelsTest(unittest.TestCase):
         with s.database() as db:
             self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM chess_history').fetchone()[0],2)
             self.assertEqual(s.sql(db,'SELECT points,wins FROM players WHERE id=?',(self.pa,)).fetchone(),(1000,0))
+    def test_shop_purchase_equip_isolated(self):
+        self.assertEqual(self.call(self.a,'shop-buy',item='pieces-imperial')[0],409)
+        self.assertEqual(self.call(self.a,'shop-equip',item='pieces-imperial')[0],403)
+        self.assertEqual(self.call(self.a,'shop-buy',item={'id':'pieces-imperial'})[0],400)
+        with s.database() as db:s.sql(db,'UPDATE chess_profiles SET coins=200 WHERE player_id=?',(self.pa,))
+        r=self.ok(self.a,'shop-buy',item='pieces-imperial');self.assertEqual(r['profile']['coins'],110);self.assertIn('pieces-imperial',r['shop']['owned']);self.assertEqual(len(r['catalog']),12)
+        self.assertEqual(self.ok(self.a,'shop-buy',item='pieces-imperial')['profile']['coins'],110)
+        self.ok(self.a,'shop-equip',item='pieces-imperial')
+        self.assertEqual(self.ok(self.a,'state')['shop']['equipped']['pieces'],'pieces-imperial')
+        self.assertEqual(self.ok(self.b,'state')['shop']['equipped']['pieces'],'pieces-classic')
+        self.assertNotIn('pieces-imperial',self.ok(self.b,'state')['shop']['owned'])
+        self.ok(self.a,'shop-buy',item='board-obsidian');self.ok(self.a,'shop-equip',item='board-obsidian')
+        self.assertEqual(self.ok(self.a,'state')['profile']['coins'],50)
+        self.assertEqual(self.ok(self.a,'shop-equip',item='pieces-classic')['shop']['equipped']['pieces'],'pieces-classic')
+        with s.database() as db:self.assertEqual(s.sql(db,'SELECT points,coins FROM players WHERE id=?',(self.pa,)).fetchone(),(1000,0))
     def test_ai_levels_and_retries(self):
         g=self.start('medium');mid=g['id'];side=g['side']
         self.assertEqual(self.ok(self.a,'start',level='hard',minutes=0,nonce='a'*16)['match']['id'],mid)

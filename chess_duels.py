@@ -2,6 +2,7 @@
 import json,secrets,time,random
 import chess
 
+import chess_shop
 LEVELS=('easy','medium','hard')
 MINUTES=(0,1,3,5,10,15,30)
 JOURNEY=(
@@ -29,6 +30,7 @@ def setup(db,sql):
         "CREATE TABLE IF NOT EXISTS chess_history (match_id TEXT NOT NULL, player_id TEXT NOT NULL, opponent TEXT NOT NULL, outcome TEXT NOT NULL, delta INTEGER NOT NULL, coins INTEGER NOT NULL, played_at DOUBLE PRECISION NOT NULL, PRIMARY KEY(match_id,player_id))",
     ):sql(db,q)
     sql(db,"INSERT INTO chess_guard(id) VALUES(1) ON CONFLICT(id) DO NOTHING")
+    chess_shop.setup(db,sql)
 def ensure(db,sql,pid):
     sql(db,"INSERT INTO chess_profiles(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING",(pid,))
 def active(db,sql,pid,include_paused=True):
@@ -157,7 +159,7 @@ def snapshot(s,db,pid,g):
     ranking=[dict(name=x[0],points=x[1],wins=x[2],losses=x[3],draws=x[4],own=x[5]==pid) for x in rows]
     queued=bool(s.sql(db,'SELECT 1 FROM chess_queue WHERE player_id=?',(pid,)).fetchone())
     outgoing=bool(s.sql(db,"SELECT 1 FROM chess_invites WHERE sender=? AND status='pending' AND expires>?",(pid,time.time())).fetchone())
-    return dict(profile=me,ranking=ranking,match=view(g,pid),journey=journey_progress(db,s.sql,pid),queued=queued,invites=incoming(db,s.sql,pid),idle_portal=not queued and not outgoing and (not g or bool(g['result'])))
+    return dict(profile=me,ranking=ranking,match=view(g,pid),journey=journey_progress(db,s.sql,pid),shop=chess_shop.state(db,s.sql,pid),queued=queued,invites=incoming(db,s.sql,pid),idle_portal=not queued and not outgoing and (not g or bool(g['result'])))
 def action(s,path,d,pid,now):
     op=path.rsplit('/',1)[-1]
     def err(msg,code=409):return code,{'error':msg}
@@ -177,6 +179,11 @@ def action(s,path,d,pid,now):
         def result():return 200,snapshot(s,db,pid,g)
         def blocked(p):
             return active(db,sql,p) or s.active_room(p,now) or (p!=pid and s.PRESENCE_GAME.get(p)==('chess',True) and now-s.PRESENCE.get(p,-1000)<=25)
+        if op in ('shop-state','shop-buy','shop-equip'):
+            ensure(db,sql,pid)
+            code,data=chess_shop.action(db,sql,pid,op,d)
+            if code!=200:return code,data
+            response=snapshot(s,db,pid,g);response['catalog']=chess_shop.CATALOG;return 200,response
         if op=='leave':
             if g and not g['result'] and g['mode']=='online' and d.get('allowOnline') is not True:return err('Existe um duelo online em andamento.',409)
             sql(db,'DELETE FROM chess_queue WHERE player_id=?',(pid,))
