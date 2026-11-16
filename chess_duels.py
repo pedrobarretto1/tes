@@ -71,7 +71,7 @@ def finish(s,db,g,winner,reason):
             stage=g['journey']
             first=s.sql(db,'INSERT INTO chess_journey VALUES(?,?,?) ON CONFLICT(player_id,stage) DO NOTHING',(pid,stage,time.time())).rowcount
             result['journey']=dict(stage=stage,first=bool(first),title=JOURNEY[stage-1]['title'])
-    g['result']=result;save(db,s.sql,g)
+    g['result']=result;g['finished_at']=time.time();save(db,s.sql,g)
 def tick(s,db,g,b):
     if g['result'] or g.get('paused') or not g['minutes']:return
     now=time.time();c='w' if b.turn else 'b'
@@ -145,7 +145,7 @@ def create(s,db,pid,other,mode,level,minutes,ranked,nonce,journey=None):
 def view(g,pid):
     if not g:return None
     c=color(g,pid)
-    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'],journey=g.get('journey'),paused=bool(g.get('paused')))
+    return dict(id=g['id'],side=c,names=g['names'],mode=g['mode'],level=g['level'],ranked=g['ranked'],minutes=g['minutes'],remaining=g['remaining'],moves=g['moves'],result=g['result'],offer=g['offer'],journey=g.get('journey'),paused=bool(g.get('paused')),live_allowed=g.get('live',{}).get(pid) is True,live_public=all(g.get('live',{}).get(p) is True for p in g['players'].values() if p))
 def incoming(db,sql,pid):
     rows=sql(db,"SELECT i.id,p.name,i.minutes,i.ranked FROM chess_invites i JOIN players p ON p.id=i.sender WHERE i.receiver=? AND i.status='pending' AND i.expires>? ORDER BY i.expires",(pid,time.time())).fetchall()
     return [dict(id=r[0],name=r[1],game='chess',minutes=r[2],ranked=bool(r[3])) for r in rows]
@@ -184,6 +184,9 @@ def action(s,path,d,pid,now):
             code,data=chess_shop.action(db,sql,pid,op,d)
             if code!=200:return code,data
             response=snapshot(s,db,pid,g);response['catalog']=chess_shop.CATALOG;return 200,response
+        if op=='live-permission':
+            if not g or g['result'] or d.get('match')!=g['id'] or type(d.get('allowed')) is not bool:return err('Partida indisponível para transmissão.')
+            g.setdefault('live',{})[pid]=d['allowed'];save(db,sql,g);return result()
         if op=='leave':
             if g and not g['result'] and g['mode']=='online' and d.get('allowOnline') is not True:return err('Existe um duelo online em andamento.',409)
             sql(db,'DELETE FROM chess_queue WHERE player_id=?',(pid,))
