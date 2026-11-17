@@ -69,10 +69,10 @@
  async function equip(game,item){
   if(!view||busy)return;const t=view.token,before=view;busy=true;view.notice='Equipando item…';render();
   try{
-   const response=await api(game==='damas'?'school/equip':'chess/shop-equip',{item},t);
+   const response=await api('profile/inventory/equip',{game,item},t);
    if(view!==before)return;
-   if(game==='damas'){view.damas={...view.damas,...response};window.schoolRefreshStyle?.()}
-   else view.chess=response;
+   view.damas=response.damas;view.chess=response.chess;
+   if(game==='damas')window.schoolRefreshStyle?.();
    view.notice='✓ Skin equipada! A alteração foi salva no servidor.';
    window.dispatchEvent(new CustomEvent('profile-inventory-equipped',{detail:{game,item}}));
   }catch(e){if(view===before)view.notice=e.message}
@@ -83,11 +83,11 @@
   const current=++serial;view={id,token:t,notice:'',damas:null,chess:null,damasError:'',chessError:''};busy=false;
   host.replaceChildren(node('p','sub',t?'Carregando skins do servidor…':'Entre na sua conta para consultar o inventário.'));
   if(!t)return;
-  const results=await Promise.allSettled([api('school/state',{},t),api('chess/shop-state',{},t)]);
-  if(serial!==current||t!==token()||view?.id!==id)return;
-  if(results[0].status==='fulfilled')view.damas=results[0].value;else view.damasError=results[0].reason.message;
-  if(results[1].status==='fulfilled')view.chess=results[1].value;else view.chessError=results[1].reason.message;
-  render();
+  try{
+   const result=await api('profile/inventory/state',{},t);
+   if(serial!==current||t!==token()||view?.id!==id)return;
+   view.damas=result.damas;view.chess=result.chess;render();
+  }catch(e){if(serial===current&&t===token()&&view?.id===id){view.damasError=e.message;view.chessError=e.message;render()}}
  }
  window.perfilInventario={open};
 })();

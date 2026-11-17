@@ -1255,6 +1255,12 @@ def progress_snapshot(pid):
         journey=journey_public(j[0],json.loads(j[1]) if j[1] else None,j[2],db,pid) if j else journey_public(0,None,'',db,pid)
         return dict(version=1,savedAt=int(time.time()*1000),persistent=bool(DATABASE_URL),me=me,wallet=wallet,journey=journey)
 
+def profile_inventory_state(db,pid):
+    """Inventários de ambos os jogos: somente itens da conta autenticada."""
+    import chess_shop
+    return dict(damas=wallet_state(db,pid),
+                chess=dict(shop=chess_shop.state(db,sql,pid),catalog=chess_shop.CATALOG))
+
 def social_action(path,d,now):
     if path.startswith('/api/social/account/'):return account_action(path,d,now)
     if path=='/api/social/register':
@@ -1266,6 +1272,22 @@ def social_action(path,d,now):
     PRESENCE[pid]=now
     if path in ('/api/social/register','/api/social/state'):
         PRESENCE_GAME[pid]=('damas',False)
+    if path=='/api/social/profile/inventory/state':
+        with database() as db:return 200,profile_inventory_state(db,pid)
+    if path=='/api/social/profile/inventory/equip':
+        game,item=d.get('game'),d.get('item')
+        if not isinstance(item,str) or game not in ('damas','chess'):
+            return 400,{'error':'Item de inventário inválido.'}
+        if game=='damas':
+            code,data=school_action('/api/social/school/equip',{'item':item},pid,now)
+            if code!=200:return code,data
+            with database() as db:return 200,profile_inventory_state(db,pid)
+        import chess_shop
+        with database() as db:
+            sql(db,'INSERT INTO chess_profiles(player_id) VALUES(?) ON CONFLICT(player_id) DO NOTHING',(pid,))
+            code,data=chess_shop.action(db,sql,pid,'shop-equip',{'item':item})
+            if code!=200:return code,data
+            return 200,profile_inventory_state(db,pid)
     if path=='/api/social/chess/profile-details':
         import clas,chess_clans
         with database() as db:
