@@ -1,0 +1,114 @@
+/* Texturas de mesa compartilhadas: Damas e Xadrez.
+   Madeira clássica vem da mesa original de Damas; temas da loja vêm de escola.css.
+   Os overrides abaixo são apenas para geometria e elementos exclusivos do Xadrez. */
+:root {
+  --mesa-wood-light: repeating-linear-gradient(4deg,#93652a15 0 1px,transparent 1px 6px),linear-gradient(125deg,#e4c493,#c8a06b);
+  --mesa-wood-dark: repeating-linear-gradient(4deg,#210e0b25 0 1px,transparent 1px 5px),linear-gradient(125deg,#8e5735,#714225);
+  --mesa-wood-frame: repeating-linear-gradient(6deg,#56321b55 0 1px,transparent 1px 7px),linear-gradient(120deg,#b17a42,#68401e 28%,#9c6938 60%,#4f2a15);
+  --mesa-wood-edge: #c39862;
+}
+/* A mesa das Damas é a referência: os temas especiais continuam controlados
+   por escola.css/temas.css com maior especificidade. */
+.boardframe { background:var(--mesa-wood-frame); border-color:var(--mesa-wood-edge); }
+#board .sq.light { background:var(--mesa-wood-light); }
+#board .sq.dark { background:var(--mesa-wood-dark); }
+
+/* O tabuleiro principal e as prévias partem sempre da mesma madeira. */
+body.chess-page {
+  --mesa-light:var(--mesa-wood-light);
+  --mesa-dark:var(--mesa-wood-dark);
+  --mesa-frame:var(--mesa-wood-frame);
+  --mesa-edge:var(--mesa-wood-edge);
+}
+body.chess-page[data-chess-theme="walnut"] {
+  --mesa-light:repeating-linear-gradient(4deg,#93652a15 0 1px,transparent 1px 6px),linear-gradient(125deg,#cfb28e,#a38360);
+  --mesa-dark:repeating-linear-gradient(4deg,#210e0b25 0 1px,transparent 1px 5px),linear-gradient(125deg,#65412c,#422a20);
+  --mesa-frame:linear-gradient(125deg,#9a704a,#4b2b1f);
+  --mesa-edge:#bd976c;
+}
+body.chess-page[data-chess-theme="stone"] {
+  --mesa-light:repeating-linear-gradient(116deg,transparent 0 34px,#757c8530 35px 37px,transparent 38px 60px),linear-gradient(125deg,#e0d8c4,#bfb7a3);
+  --mesa-dark:repeating-linear-gradient(116deg,transparent 0 36px,#bfc3c622 37px 39px,transparent 40px 65px),linear-gradient(125deg,#85877d,#61665e);
+  --mesa-frame:linear-gradient(125deg,#998b74,#544d40);
+  --mesa-edge:#c0af91;
+}
+body.chess-page[data-chess-theme="crowns"] {
+  --mesa-light:repeating-linear-gradient(4deg,#93652a15 0 1px,transparent 1px 6px),linear-gradient(135deg,#f5dda1,#bd8d48);
+  --mesa-dark:repeating-linear-gradient(4deg,#210e0b25 0 1px,transparent 1px 5px),linear-gradient(135deg,#684a7c,#382243);
+  --mesa-frame:repeating-linear-gradient(6deg,#f8d99c22 0 1px,transparent 1px 7px),linear-gradient(120deg,#e5b65e,#7b4a24 38%,#d1a356 65%,#593b67);
+  --mesa-edge:#f8db98;
+}
+/* Estes dois temas já pertencem à loja das Damas. As variáveis --shop-*
+   são herdadas diretamente de escola.css, sem copiar os gradientes. */
+body.chess-page:is([data-shop-board="imperial"],[data-shop-board="obsidian"]),
+body.chess-page #chess-shop :is([data-board-style="imperial"],[data-board-style="obsidian"]),
+body.chess-page .live-frame:is([data-style="imperial"],[data-style="obsidian"]) {
+  --mesa-light:var(--shop-light);
+  --mesa-dark:var(--shop-dark);
+  --mesa-frame:var(--shop-frame);
+  --mesa-edge:var(--shop-edge);
+}
+/* Copa de Honra: paleta exclusiva mantida, grão/acabamento da mesma família. */
+body.chess-page[data-shop-board="champion"],
+body.chess-page #chess-shop [data-board-style="champion"],
+body.chess-page .live-frame[data-style="champion"] {
+  --mesa-light:repeating-linear-gradient(4deg,#93652a15 0 1px,transparent 1px 6px),linear-gradient(130deg,#fff1b8,#caa45e);
+  --mesa-dark:repeating-linear-gradient(4deg,#210e0b25 0 1px,transparent 1px 5px),linear-gradient(135deg,#57877a,#254e52);
+  --mesa-frame:repeating-linear-gradient(6deg,#56321b55 0 1px,transparent 1px 7px),linear-gradient(130deg,#eac97d,#4c6a64 27%,#d6ab59 54%,#21474b 84%,#eedb9c);
+  --mesa-edge:#e6c27b;
+}
+/* A prévia clássica nunca herda uma skin comprada da mesa ao fundo. */
+body.chess-page #chess-shop .chess-shop-board {
+  --mesa-light:var(--mesa-wood-light);
+  --mesa-dark:var(--mesa-wood-dark);
+  --mesa-frame:var(--mesa-wood-frame);
+  --mesa-edge:var(--mesa-wood-edge);
+  display:grid;
+  padding:0;
+  border:5px solid transparent;
+  border-radius:7px;
+  background:var(--mesa-frame) border-box;
+  box-shadow:0 4px 12px #0006,0 0 0 1px var(--mesa-edge);
+  overflow:hidden;
+}
+body.chess-page #chess-shop [data-board-style="classic"][data-base-theme="walnut"] {
+  --mesa-light:repeating-linear-gradient(4deg,#93652a15 0 1px,transparent 1px 6px),linear-gradient(125deg,#cfb28e,#a38360);
+  --mesa-dark:repeating-linear-gradient(4deg,#210e0b25 0 1px,transparent 1px 5px),linear-gradient(125deg,#65412c,#422a20);
+  --mesa-frame:linear-gradient(125deg,#9a704a,#4b2b1f);
+  --mesa-edge:#bd976c;
+}
+body.chess-page #chess-shop [data-board-style="classic"][data-base-theme="stone"] {
+  --mesa-light:repeating-linear-gradient(116deg,transparent 0 34px,#757c8530 35px 37px,transparent 38px 60px),linear-gradient(125deg,#e0d8c4,#bfb7a3);
+  --mesa-dark:repeating-linear-gradient(116deg,transparent 0 36px,#bfc3c622 37px 39px,transparent 40px 65px),linear-gradient(125deg,#85877d,#61665e);
+  --mesa-frame:linear-gradient(125deg,#998b74,#544d40);
+  --mesa-edge:#c0af91;
+}
+body.chess-page #chess-shop [data-board-style="classic"][data-base-theme="crowns"] {
+  --mesa-light:repeating-linear-gradient(4deg,#93652a15 0 1px,transparent 1px 6px),linear-gradient(135deg,#f5dda1,#bd8d48);
+  --mesa-dark:repeating-linear-gradient(4deg,#210e0b25 0 1px,transparent 1px 5px),linear-gradient(135deg,#684a7c,#382243);
+  --mesa-frame:linear-gradient(120deg,#e5b65e,#7b4a24 38%,#d1a356 65%,#593b67);
+  --mesa-edge:#f8db98;
+}
+/* Tamanho de cada casa e interações continuam próprios de cada jogo. */
+body.chess-page .chess-frame {background:var(--mesa-frame);border-color:var(--mesa-edge)}
+body.chess-page[data-shop-board] .chess-frame,
+body.chess-page[data-chess-theme] .chess-frame {background:var(--mesa-frame);border-color:var(--mesa-edge)}
+body.chess-page .chess-board .chess-square.light,
+body.chess-page #chess-board .chess-square.light,
+body.chess-page #live-board .chess-square.light,
+body.chess-page #chess-shop [data-board-style] .shop-square.light {
+  background:var(--mesa-light);
+  color:#45311e;
+}
+body.chess-page .chess-board .chess-square.dark,
+body.chess-page #chess-board .chess-square.dark,
+body.chess-page #live-board .chess-square.dark,
+body.chess-page #chess-shop [data-board-style] .shop-square.dark {
+  background:var(--mesa-dark);
+  color:#fff0ce;
+}
+body.chess-page #chess-shop .shop-mini-square {display:grid;place-items:center}
+body.chess-page .live-frame.chess-frame {background:var(--mesa-frame);border-color:var(--mesa-edge)}
+/* Contraste de coordenadas nas skins de pedra e de campeão. */
+body.chess-page[data-shop-board="obsidian"] #chess-board .chess-square.light {color:#47333b}
+body.chess-page[data-shop-board="champion"] #chess-board .chess-square.light {color:#593d20}
