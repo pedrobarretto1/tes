@@ -259,7 +259,7 @@ let shopCatalog=[],shopOwned=[],shopTab='pieces',shopSelected='',shopBusy=false,
 const shopLabels={pieces:'Peças',board:'Tabuleiros',scene:'Cenários',effect:'Efeitos',inventory:'Inventário'};
 function updateShop(data){
  const before=JSON.stringify(shopEquipment);shopEquipment=data.shop.equipped;shopOwned=data.shop.owned;if(data.catalog)shopCatalog=data.catalog;
- if(before!==JSON.stringify(shopEquipment)){for(const c of ['board','scene','effect'])document.body.dataset['shop'+c[0].toUpperCase()+c.slice(1)]=shopStyle(c);document.body.dataset.theme=shopStyle('board')==='champion'?'champion-hall':shopStyle('board');for(const el of document.querySelectorAll('.chess-piece:not(#chess-shop .chess-piece):not(#chess-live .chess-piece)'))el.querySelector('use')?.setAttribute('href',artHref(el.dataset.piece))}
+ if(before!==JSON.stringify(shopEquipment)){for(const c of ['board','scene','effect'])document.body.dataset['shop'+c[0].toUpperCase()+c.slice(1)]=shopStyle(c);document.body.dataset.theme=shopStyle('board')==='champion'?'champion-hall':shopStyle('board');document.documentElement.dataset.theme=document.body.dataset.theme;for(const el of document.querySelectorAll('.chess-piece:not(#chess-shop .chess-piece):not(#chess-live .chess-piece)'))el.querySelector('use')?.setAttribute('href',artHref(el.dataset.piece))}
  if($('chess-shop').open)drawShop();
 }
 function shopCall(op,item){if(shopBusy)return;if(!localStorage.getItem('damas-profile-token')){$('shop-status').textContent='Entre no Clube para acessar seu inventário.';return}if(fetching&&(fetchOp!=='state'||pendingAction)){$('shop-status').textContent='Sincronizando. Tente novamente.';return}shopBusy=true;$('shop-status').textContent='Sincronizando tesouro…';drawShop(true);request(op,item?{item}:{});}

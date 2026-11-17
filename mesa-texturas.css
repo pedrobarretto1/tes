@@ -51,3 +51,21 @@ body.chess-page #chess-shop .shop-preview[data-board-style=classic][data-base-th
  --shop-dark:linear-gradient(135deg,#684a7c,#382243);
 }
 @media(max-width:520px){body.chess-page .chess-frame{padding:9px}}
+
+
+/* Opções locais preservam os veios SVG da Reforja, variando só a paleta. */
+body.chess-page[data-shop-board=classic][data-chess-theme=walnut]{
+ --shop-light:linear-gradient(125deg,#cfb28e,#a38360);
+ --shop-dark:linear-gradient(125deg,#65412c,#422a20);
+ --shop-frame:linear-gradient(125deg,#9a704a,#4b2b1f);
+}
+body.chess-page[data-shop-board=classic][data-chess-theme=stone]{
+ --shop-light:linear-gradient(125deg,#e0d8c4,#bfb7a3);
+ --shop-dark:linear-gradient(125deg,#85877d,#61665e);
+ --shop-frame:linear-gradient(125deg,#998b74,#544d40);
+}
+body.chess-page[data-shop-board=classic][data-chess-theme=crowns]{
+ --shop-light:linear-gradient(135deg,#f5dda1,#bd8d48);
+ --shop-dark:linear-gradient(135deg,#684a7c,#382243);
+ --shop-frame:linear-gradient(120deg,#e5b65e,#7b4a24 38%,#d1a356 65%,#593b67);
+}
