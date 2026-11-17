@@ -678,6 +678,16 @@ def school_action(path,d,pid,now):
             sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(spec['board'],pid))
             sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(spec['skin'],pid))
             return 200,wallet_state(db,pid)
+        if path.endswith('/equip-set'):
+            key=d.get('path')
+            if not isinstance(key,str) or key not in ROYAL_PATHS:return 400,{'error':'Coleção real inválida.'}
+            board,skin=ROYAL_PATHS[key]
+            w=wallet_state(db,pid)
+            if board not in w['owned'] or skin not in w['owned']:
+                return 403,{'error':'Você ainda não possui o tabuleiro e as peças desta coleção.'}
+            sql(db,'UPDATE wallets SET theme=? WHERE player_id=?',(board,pid))
+            sql(db,'UPDATE piece_styles SET skin=? WHERE player_id=?',(skin,pid))
+            return 200,wallet_state(db,pid)
         if path.endswith('/buy') or path.endswith('/equip'):
             item=d.get('item')
             if not isinstance(item,str) or item not in SHOP_ITEMS and item not in CHAMPION_ITEMS and item not in RELIC_ITEMS:return 400,{'error':'Item inexistente.'}
@@ -1258,7 +1268,9 @@ def progress_snapshot(pid):
 def profile_inventory_state(db,pid):
     """Inventários de ambos os jogos: somente itens da conta autenticada."""
     import chess_shop
-    return dict(damas=wallet_state(db,pid),
+    row=sql(db,'SELECT p.name,a.username FROM players p LEFT JOIN accounts a ON a.player_id=p.id WHERE p.id=?',(pid,)).fetchone()
+    return dict(playerName=row[0] if row else '',account=row[1] if row else None,
+                damas=wallet_state(db,pid),
                 chess=dict(shop=chess_shop.state(db,sql,pid),catalog=chess_shop.CATALOG))
 
 def social_action(path,d,now):
@@ -1279,7 +1291,10 @@ def social_action(path,d,now):
         if not isinstance(item,str) or game not in ('damas','chess'):
             return 400,{'error':'Item de inventário inválido.'}
         if game=='damas':
-            code,data=school_action('/api/social/school/equip',{'item':item},pid,now)
+            if item.startswith('king-set-'):
+                code,data=school_action('/api/social/school/equip-set',{'path':item.removeprefix('king-set-')},pid,now)
+            else:
+                code,data=school_action('/api/social/school/equip',{'item':item},pid,now)
             if code!=200:return code,data
             with database() as db:return 200,profile_inventory_state(db,pid)
         import chess_shop

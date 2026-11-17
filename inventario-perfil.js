@@ -12,6 +12,7 @@
   ['relic-shadow','Fortaleza do Rei Caído'],['relic-divine','Catedral do Sol Eterno'],['relic-infinite','Coração do Universo'],['relic-throne','Trono do Último Rei'],
   ['skin-relic-shadow','Guardas da Forja · Rei Caído'],['skin-relic-divine','Medalhões Solares · Rei Divino'],['skin-relic-infinite','Núcleos do Éter · Rei do Infinito'],['skin-relic-throne','Medalhões do Último Rei']
  ]);
+ const kings=[['shadow','Rei Caído','Fortaleza das Sombras'],['divine','Rei Divino','Catedral do Sol Eterno'],['infinite','Rei do Infinito','Coração do Universo']];
  const categoryLabel={pieces:'Peças',board:'Tabuleiros',scene:'Cenários',effect:'Efeitos'};
  const title=id=>names[id]||String(id).replace(/^skin-/,'').replace(/-/g,' ');
  let serial=0,busy=false,view=null;
@@ -49,9 +50,29 @@
   content.append(button);article.append(content);host.append(article);
  }
  function section(host,label,description){const block=node('section','profile-inventory-section');block.append(node('h4','',label),node('p','sub',description));const grid=node('div','profile-inventory-grid');block.append(grid);host.append(block);return grid;}
+ function renderKings(host,d){
+  if(!d)return;
+  const owned=new Set(d.owned||[]),available=kings.filter(([key])=>owned.has('relic-'+key)||owned.has('skin-relic-'+key));
+  if(!available.length)return;
+  const section=node('section','profile-royal-gallery');section.append(node('h4','','♛ Os Três Reis · Suas Relíquias'),node('p','sub','Coleções reais presentes no seu inventário. Equipe as peças individualmente ou o conjunto completo.'));
+  const grid=node('div','profile-royal-grid');
+  for(const [key,king,place] of available){
+   const board='relic-'+key,skin='skin-relic-'+key,ownsBoard=owned.has(board),ownsSkin=owned.has(skin),complete=ownsBoard&&ownsSkin,equipped=complete?d.theme===board&&d.skin===skin:ownsSkin?d.skin===skin:d.theme===board;
+   const el=node('article','profile-royal-card'+(equipped?' equipped':''));el.dataset.king=key;
+   const preview=checkersPreview(ownsBoard?board:d.theme,ownsSkin?skin:d.skin);
+   const detail=node('div','profile-royal-copy');detail.append(node('strong','',king),node('small','',place),node('span','profile-royal-status',complete?'Tabuleiro + peças adquiridos':ownsSkin?'Peças adquiridas': 'Tabuleiro adquirido'));
+   const btn=node('button','primary',equipped?'Equipado':complete?'Equipar coleção':ownsSkin?'Equipar peças':'Equipar tabuleiro');btn.type='button';btn.disabled=equipped||busy;btn.onclick=()=>equip('damas',complete?'king-set-'+key:ownsSkin?skin:board);
+   detail.append(btn);el.append(preview,detail);grid.append(el);
+  }
+  section.append(grid);host.append(section);
+ }
  function render(){
   const host=$(view?.id);if(!host||!view)return;host.replaceChildren();
   if(view.notice)host.append(node('p','profile-inventory-message',view.notice));
+  const account=node('div','profile-inventory-account');
+  account.append(node('strong','',view.account?'Inventário da conta @'+view.account:'Inventário de visitante'),node('small','',view.account?(view.playerName||'Perfil autenticado')+' · recompensas sincronizadas com o servidor':'Se você adquiriu skins em outra conta, entre nela para visualizá-las.'));
+  host.append(account);
+  renderKings(host,view.damas);
   const dgrid=section(host,'♛ Damas','Pedras e tabuleiros adquiridos. As relíquias dos reis aparecem separadamente; possuir as peças não desbloqueia o tabuleiro.');
   if(view.damas){
    const d=view.damas,owned=[...new Set((d.owned||[]).filter(id=>typeof id==='string'))];
@@ -71,7 +92,7 @@
   try{
    const response=await api('profile/inventory/equip',{game,item},t);
    if(view!==before)return;
-   view.damas=response.damas;view.chess=response.chess;
+   view.damas=response.damas;view.chess=response.chess;view.account=response.account;view.playerName=response.playerName;
    if(game==='damas')window.schoolRefreshStyle?.();
    view.notice='✓ Skin equipada! A alteração foi salva no servidor.';
    window.dispatchEvent(new CustomEvent('profile-inventory-equipped',{detail:{game,item}}));
@@ -80,13 +101,13 @@
  }
  async function open(game){
   const id=game==='damas'?'profile-skins':'chess-profile-skins',host=$(id),t=token();if(!host)return;
-  const current=++serial;view={id,token:t,notice:'',damas:null,chess:null,damasError:'',chessError:''};busy=false;
+  const current=++serial;view={id,token:t,notice:'',damas:null,chess:null,damasError:'',chessError:'',account:null,playerName:''};busy=false;
   host.replaceChildren(node('p','sub',t?'Carregando skins do servidor…':'Entre na sua conta para consultar o inventário.'));
   if(!t)return;
   try{
    const result=await api('profile/inventory/state',{},t);
    if(serial!==current||t!==token()||view?.id!==id)return;
-   view.damas=result.damas;view.chess=result.chess;render();
+   view.damas=result.damas;view.chess=result.chess;view.account=result.account;view.playerName=result.playerName;render();
   }catch(e){if(serial===current&&t===token()&&view?.id===id){view.damasError=e.message;view.chessError=e.message;render()}}
  }
  window.perfilInventario={open};

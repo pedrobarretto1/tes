@@ -35,6 +35,27 @@ class ProfileInventoryTests(unittest.TestCase):
             self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM journey WHERE player_id=?',(self.pids[0],)).fetchone()[0],0)
             self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM purchases WHERE player_id=?',(self.pids[0],)).fetchone()[0],3)
             self.assertEqual(s.sql(db,'SELECT coins FROM wallets WHERE player_id=?',(self.pids[0],)).fetchone()[0],0)
+    def test_completos_tres_reis_sem_conquista_de_jornada(self):
+        with s.database() as db:
+            for path in ('shadow','divine','infinite'):
+                for item in ('relic-'+path,'skin-relic-'+path):
+                    s.sql(db,'INSERT INTO purchases(player_id,item) VALUES(?,?)',(self.pids[0],item))
+        code,inventory=self.call(0,'state')
+        self.assertEqual(code,200)
+        for path in ('shadow','divine','infinite'):
+            self.assertIn('relic-'+path,inventory['damas']['owned'])
+            self.assertIn('skin-relic-'+path,inventory['damas']['owned'])
+            code,eq=self.call(0,'equip',game='damas',item='king-set-'+path)
+            self.assertEqual(code,200,eq)
+            self.assertEqual(eq['damas']['theme'],'relic-'+path)
+            self.assertEqual(eq['damas']['skin'],'skin-relic-'+path)
+        self.assertEqual(self.call(1,'equip',game='damas',item='king-set-shadow')[0],403)
+        self.assertEqual(self.call(0,'equip',game='damas',item='king-set-invalid')[0],400)
+        with s.database() as db:
+            self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM journey WHERE player_id=?',(self.pids[0],)).fetchone()[0],0)
+            self.assertEqual(s.sql(db,'SELECT COUNT(*) FROM purchases WHERE player_id=?',(self.pids[0],)).fetchone()[0],6)
+            self.assertEqual(s.sql(db,'SELECT coins FROM wallets WHERE player_id=?',(self.pids[0],)).fetchone()[0],0)
+
     def test_xadrez_independente_e_presenca_inalterada(self):
         import chess_shop
         with s.database() as db:
