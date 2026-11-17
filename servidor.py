@@ -1438,7 +1438,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200,(BASE/'torre.html').read_bytes(),'text/html; charset=utf-8')
         elif self.path.split('?')[0]=='/royal-demo.html':
             self.reply(200,(BASE/'royal-demo.html').read_bytes(),'text/html; charset=utf-8')
-        elif self.path.split('?')[0] in ('/clans-ui.js','/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js','/xadrez.js','/xadrez.css','/mesa-texturas.css','/chess-engine.js'):
+        elif self.path.split('?')[0] in ('/clans-ui.js','/clube.js','/clube.css','/escola.js','/escola.css','/temas.js','/temas.css','/audio.js','/audio.css','/reforja.css','/jornada.js','/jornada.css','/reis.js','/reis.css','/royal-demo.js','/spectate.js','/save.js','/xadrez.js','/xadrez.css','/mesa-texturas.css','/chess-engine.js','/inventario-perfil.js','/inventario-perfil.css'):
             file=self.path.split('?')[0][1:]
             self.static_page(file,'text/javascript; charset=utf-8' if file.endswith('.js') else 'text/css; charset=utf-8')
         elif self.path.split('?')[0].startswith('/audio/classical/'):
