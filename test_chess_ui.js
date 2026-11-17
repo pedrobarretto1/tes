@@ -19,9 +19,43 @@ const server=spawn('python',['-u','-c',"import servidor as s,sys; from pathlib i
   assert(!(await page.locator('#clubmenu').isVisible()));assert(!(await page.locator('#clubwelcome').isVisible()));
   assert.equal(await page.locator('.side .panel').filter({hasText:'Em andamento'}).count(),0);
   const styleOf=e=>{let s=getComputedStyle(e);return [s.backgroundImage,s.borderRadius,s.fontSize,s.padding]};const clubStyle=await page.locator('#clubnavmenu').evaluate(styleOf);const sharedCSS=await page.locator('link[href^="/clube.css"]').getAttribute('href');assert.equal(await page.locator('link[href^="/xadrez.css"]').count(),0);
+  // Verifica a mesma textura calculada pelo navegador, não apenas o nome do CSS.
+  const skinNames=['classic','imperial','obsidian','champion-hall'];
+  const damasStyle=await page.evaluate(names=>{
+    const root=document.documentElement,old=root.dataset.theme,ans={};
+    const get=(el)=>{const s=getComputedStyle(el);return {bg:s.backgroundImage,edge:s.borderTopColor,radius:s.borderTopLeftRadius}};
+    for(const skin of names){
+      root.dataset.theme=skin;
+      const light=document.querySelector('#board .sq.light'),dark=document.querySelector('#board .sq.dark'),frame=document.querySelector('.boardframe');
+      const preview=document.createElement('div');preview.className='shop-preview';preview.dataset.theme=skin;
+      const a=document.createElement('div');a.className='shop-square light';const b=document.createElement('div');b.className='shop-square dark';preview.append(a,b);document.body.append(preview);
+      ans[skin]={light:get(light).bg,dark:get(dark).bg,frame:get(frame).bg,edge:get(frame).edge,pLight:get(a).bg,pDark:get(b).bg,pFrame:get(preview)};
+      preview.remove();
+    }
+    root.dataset.theme=old;return ans;
+  },skinNames);
   await page.locator('#clubnavmenu').click();assert(await page.locator('#clubmenu').isVisible());const damasMenuStyle=await page.locator('#menumatch').evaluate(styleOf);await page.locator('#menufriends').click();assert(await page.locator('#cluboverlay').isVisible());assert.equal(await page.locator('#clubtabs .active').getAttribute('data-tab'),'friends');await page.locator('#clubclose').click();assert(!(await page.locator('#clubmenu').isVisible()));await page.locator('#clubnavmenu').click();await page.locator('#menuprofileopen').click();const damasProfileStyle=await page.locator('#profilehero').evaluate(styleOf);const damasProfileCard=await page.locator('#myprofileoverlay .profile-card').evaluate(styleOf);const damasForm=await page.locator('#profileeditform').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length);await page.locator('#myprofileclose').click();assert(!(await page.locator('#clubmenu').isVisible()));await page.locator('#clubnavmenu').click();await page.locator('#menuthemefx').click();await page.locator('#themefxclose').click();assert(!(await page.locator('#clubmenu').isVisible()));await page.locator('#clubnavmenu').click();await page.locator('#clubsound').click();await page.locator('#audioclose').click();assert(!(await page.locator('#clubmenu').isVisible()));for(const [open,close] of [['menuescola','schoolclose'],['menujourney','journeyclose'],['menuclans','clanclose'],['menumatch','matchclose']]){await page.locator('#clubnavmenu').click();await page.locator('#'+open).click();await page.locator('#'+close).click();assert(!(await page.locator('#clubmenu').isVisible()))}
   assert(await page.locator('#enter-xadrez').isVisible());await page.locator('#enter-xadrez').click();
   await page.waitForURL('**/xadrez.html');await page.waitForFunction(()=>document.getElementById('chess-profile').textContent.startsWith('Teste Portal ·'));
+  // Damas e Xadrez têm de renderizar exatamente os mesmos CSS backgrounds.
+  const chessStyle=await page.evaluate(names=>{
+    const root=document.body,oldBoard=root.dataset.shopBoard,oldTheme=root.dataset.theme,ans={};
+    const get=(el)=>{const s=getComputedStyle(el);return {bg:s.backgroundImage,edge:s.borderTopColor,radius:s.borderTopLeftRadius}};
+    for(const skin of names){
+      root.dataset.shopBoard=skin==='champion-hall'?'champion':skin;
+      root.dataset.theme=skin;
+      const light=document.querySelector('#chess-board .chess-square.light'),dark=document.querySelector('#chess-board .chess-square.dark'),frame=document.querySelector('.chess-game .chess-frame');
+      const preview=document.createElement('div');preview.className='shop-preview chess-shop-board';preview.dataset.boardStyle=skin==='champion-hall'?'champion':skin;preview.dataset.theme=skin;preview.dataset.baseTheme='wood';
+      const a=document.createElement('div');a.className='shop-square light';const b=document.createElement('div');b.className='shop-square dark';preview.append(a,b);document.querySelector('#chess-shop').append(preview);
+      ans[skin]={light:get(light).bg,dark:get(dark).bg,frame:get(frame).bg,edge:get(frame).edge,pLight:get(a).bg,pDark:get(b).bg,pFrame:get(preview)};
+      preview.remove();
+    }
+    root.dataset.shopBoard=oldBoard;root.dataset.theme=oldTheme;return ans;
+  },skinNames);
+  for(const skin of skinNames){
+    for(const key of ['light','dark','frame','edge','pLight','pDark'])assert.equal(chessStyle[skin][key],damasStyle[skin][key],skin+' CSS '+key);
+    assert.deepEqual(chessStyle[skin].pFrame,damasStyle[skin].pFrame,skin+' preview frame');
+  }
   const checkEmblem=async(size,font)=>{const emblem=await page.locator('.chess-brand .emblem').evaluate(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect(),g=e.firstElementChild.getBoundingClientRect();return {display:s.display,place:s.placeItems,width:r.width,height:r.height,font:parseFloat(s.fontSize),dx:Math.abs((g.left+g.right-r.left-r.right)/2),dy:Math.abs((g.top+g.bottom-r.top-r.bottom)/2),glyph:e.textContent}});assert.equal(emblem.display,'grid');assert.equal(emblem.place,'center');assert.equal(emblem.width,size);assert.equal(emblem.height,size);assert.equal(emblem.font,font);assert.equal(emblem.glyph,'♞');assert(emblem.dx<1&&emblem.dy<1)};
   assert.equal(await page.locator('html').getAttribute('data-realm-arrival'),'chess');assert.equal(await page.locator('.realm-transition-name').evaluate(e=>getComputedStyle(e,'::before').content),'"Casa de Xadrez"');await page.waitForFunction(()=>getComputedStyle(document.querySelector('.realm-transition')).visibility==='hidden');
   await checkEmblem(54,29);await page.locator('#chess-live-open').click();await page.waitForFunction(()=>document.getElementById('live-status').textContent.includes('mesas públicas'));assert(await page.locator('#live-list').getByText('Nenhuma mesa pública disponível').isVisible());await page.locator('[data-close=chess-live]').click();assert(await page.locator('#chess-shop-open').isVisible());await page.locator('#chess-shop-open').click();await page.waitForFunction(()=>document.querySelectorAll('#shop-items .shop-item').length===4);await page.locator('[data-close=chess-shop]').click();

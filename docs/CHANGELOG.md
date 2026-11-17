@@ -5,6 +5,12 @@ reconstruídas a partir de commits, testes e conversas já registradas; não
 representam verificação visual retroativa. Acrescentar uma entrada para toda
 correção/alteração futura, mesmo pequena. Mais recente primeiro.
 
+## 16/11/2026 — Reuso real do CSS de Damas (textura V3.9)
+- Pedido recorrente: tabuleiro e skins do Xadrez devem ser visualmente idênticos à mesa rústica de Damas, não uma aproximação de cores. Causa: V3.9 de clube.css tinha duas camadas de grão e moldura aprovada; mesa-texturas.css copiava o estilo antigo e xadrez.css continuava desenhando skins e prévias com backgrounds de maior especificidade.
+- Alteração: clube.css tornou-se origem única dos fundos clássicos e da moldura V3.9, aplicada tanto ao #board das Damas quanto ao .chess-square; mesa-texturas.css refeito como adaptador de temas, sem texturas duplicadas. Removidos de xadrez.css os gradientes duplicados do tabuleiro principal, loja e espectador. O xadrez usa classes board/sq/boardframe e loja usa as classes shop-preview/shop-square e moldura ornamentada exatamente como escola.js/escola.css de Damas. Império, Obsidiana e Campeão herdam --shop-light/dark/frame/edge do tema original Damas; opções locais Walnut/Stone/Crowns e peças SVG preservadas.
+- Arquivos: clube.css, xadrez.css, mesa-texturas.css, xadrez.html/js, index.html, test_chess_ui.js. Cache-bust de CSS para evitar versão visual anterior. Sem modificação de dados, banco, motor, recompensas ou API.
+- Testes: validação estática de seletores e teste automatizado de CSS calculado para Damas vs Xadrez (clássico, império, obsidiana e campeão) incluído; resultado da execução depende do CI. Publicação: registrar após confirmar deploy Live no Render; rollback: reverter o commit.
+
 ## 16/11/2026 — Mesma textura de tabuleiro nas Damas e no Xadrez
 - Pedido: tabuleiro do Xadrez e skins da loja com textura e acabamento idênticos aos das Damas. Causa: xadrez.css declarava gradientes próprios (especialmente Império e Obsidiana), divergentes das variáveis oficiais --shop-* de escola.css.
 - Criado mesa-texturas.css, importado nas duas mesas. A madeira original das Damas é agora a origem única de luz, sombra, veio e moldura; a mesa das Damas usa essas variáveis sem alterar a geometria. Xadrez (partida, estudo, loja/combinação em tempo real e espectador) passa a pintar casas e molduras com as mesmas variáveis. Império e Obsidiana usam diretamente as paletas de escola.css via data-theme de cada mesa; personalização, walnut/stone, Cinco Coroas e campeão preservam identidade e recebem o mesmo tratamento de veio.
