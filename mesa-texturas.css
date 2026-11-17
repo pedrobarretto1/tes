@@ -41,7 +41,7 @@ body.chess-page[data-chess-theme="crowns"] {
 /* Estes dois temas já pertencem à loja das Damas. As variáveis --shop-*
    são herdadas diretamente de escola.css, sem copiar os gradientes. */
 body.chess-page:is([data-shop-board="imperial"],[data-shop-board="obsidian"]),
-body.chess-page #chess-shop :is([data-board-style="imperial"],[data-board-style="obsidian"]),
+body.chess-page #chess-shop .chess-shop-board:is([data-board-style="imperial"],[data-board-style="obsidian"]),
 body.chess-page .live-frame:is([data-style="imperial"],[data-style="obsidian"]) {
   --mesa-light:var(--shop-light);
   --mesa-dark:var(--shop-dark);
@@ -50,7 +50,7 @@ body.chess-page .live-frame:is([data-style="imperial"],[data-style="obsidian"]) 
 }
 /* Copa de Honra: paleta exclusiva mantida, grão/acabamento da mesma família. */
 body.chess-page[data-shop-board="champion"],
-body.chess-page #chess-shop [data-board-style="champion"],
+body.chess-page #chess-shop .chess-shop-board[data-board-style="champion"],
 body.chess-page .live-frame[data-style="champion"] {
   --mesa-light:repeating-linear-gradient(4deg,#93652a15 0 1px,transparent 1px 6px),linear-gradient(130deg,#fff1b8,#caa45e);
   --mesa-dark:repeating-linear-gradient(4deg,#210e0b25 0 1px,transparent 1px 5px),linear-gradient(135deg,#57877a,#254e52);
