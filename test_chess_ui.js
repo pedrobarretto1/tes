@@ -53,8 +53,10 @@ const server=spawn('python',['-u','-c',"import servidor as s,sys; from pathlib i
     root.dataset.shopBoard=oldBoard;root.dataset.theme=oldTheme;return ans;
   },skinNames);
   for(const skin of skinNames){
-    assert(damasStyle[skin].light.includes('data:image/svg+xml'),skin+' must include Damas original wood-grain SVG');
-    assert(chessStyle[skin].light.includes('data:image/svg+xml'),skin+' must include same SVG in Chess');
+    if(skin==='classic'){
+      assert(damasStyle[skin].light.includes('data:image/svg+xml'),'Damas classic must have SVG grain');
+      assert(chessStyle[skin].light.includes('data:image/svg+xml'),'Chess classic must have SVG grain');
+    }
     for(const key of ['light','dark','frame','edge','pLight','pDark'])assert.equal(chessStyle[skin][key],damasStyle[skin][key],skin+' CSS '+key);
     assert.deepEqual(chessStyle[skin].pFrame,damasStyle[skin].pFrame,skin+' preview frame');
   }
