@@ -39,18 +39,18 @@ const server=spawn('python',['-u','-c',"import servidor as s,sys; from pathlib i
   await page.waitForURL('**/xadrez.html');await page.waitForFunction(()=>document.getElementById('chess-profile').textContent.startsWith('Teste Portal ·'));
   // Damas e Xadrez têm de renderizar exatamente os mesmos CSS backgrounds.
   const chessStyle=await page.evaluate(names=>{
-    const root=document.body,oldBoard=root.dataset.shopBoard,oldTheme=root.dataset.theme,ans={};
+    const root=document.body,oldBoard=root.dataset.shopBoard,oldTheme=root.dataset.theme,oldHtmlTheme=document.documentElement.dataset.theme,ans={};
     const get=(el)=>{const s=getComputedStyle(el);return {bg:s.backgroundImage,edge:s.borderTopColor,radius:s.borderTopLeftRadius}};
     for(const skin of names){
       root.dataset.shopBoard=skin==='champion-hall'?'champion':skin;
-      root.dataset.theme=skin;
+      root.dataset.theme=skin;document.documentElement.dataset.theme=skin;
       const light=document.querySelector('#chess-board .chess-square.light'),dark=document.querySelector('#chess-board .chess-square.dark'),frame=document.querySelector('.chess-game .chess-frame');
       const preview=document.createElement('div');preview.className='shop-preview chess-shop-board';preview.dataset.boardStyle=skin==='champion-hall'?'champion':skin;preview.dataset.theme=skin;preview.dataset.baseTheme='wood';
       const a=document.createElement('div');a.className='shop-square light';const b=document.createElement('div');b.className='shop-square dark';preview.append(a,b);document.querySelector('#chess-shop').append(preview);
       ans[skin]={light:get(light).bg,dark:get(dark).bg,frame:get(frame).bg,edge:get(frame).edge,pLight:get(a).bg,pDark:get(b).bg,pFrame:get(preview)};
       preview.remove();
     }
-    root.dataset.shopBoard=oldBoard;root.dataset.theme=oldTheme;return ans;
+    root.dataset.shopBoard=oldBoard;root.dataset.theme=oldTheme;document.documentElement.dataset.theme=oldHtmlTheme;return ans;
   },skinNames);
   for(const skin of skinNames){
     if(skin==='classic'){

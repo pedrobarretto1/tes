@@ -31,8 +31,8 @@ html[data-theme=emerald] #board .sq.light,html[data-theme=emerald] .school-board
 [data-skin="skin-neon"]{--stone-white:radial-gradient(ellipse at 30% 22%,#ddffff,#4fe6ea,#087a93);--stone-black:radial-gradient(ellipse at 30% 22%,#ffb2fa,#d54dcc,#592073);--stone-white-border:#b9ffff;--stone-black-border:#ff9de9;--stone-white-ink:#123c55;--stone-black-ink:#fff0fe}
 [data-skin="skin-royal"]{--stone-white:radial-gradient(ellipse at 30% 22%,#fff2d1,#e7bd63,#9e6928);--stone-black:radial-gradient(ellipse at 30% 22%,#ba95e4,#7650a2,#342048);--stone-white-border:#ffe4a3;--stone-black-border:#d3b4f3;--stone-white-ink:#69431d;--stone-black-ink:#ffe5a4}
 
-html[data-theme]:not([data-theme="classic"]) :is(#board,.school-board,.replay-board) .sq.light{background:var(--shop-light)}
-html[data-theme]:not([data-theme="classic"]) :is(#board,.school-board,.replay-board) .sq.dark{background:var(--shop-dark)}
+html[data-theme]:not([data-theme="classic"]) :is(#board,.school-board,.replay-board,#chess-board,#school-board,#replay-board) .sq.light{background:var(--shop-light)}
+html[data-theme]:not([data-theme="classic"]) :is(#board,.school-board,.replay-board,#chess-board,#school-board,#replay-board) .sq.dark{background:var(--shop-dark)}
 html[data-theme]:not([data-theme="classic"]) .boardframe{background:var(--shop-frame);border-color:var(--shop-edge)}
 html[data-theme]:not([data-theme="classic"]) :is(.school-board,.replay-board){border-color:var(--shop-edge)}
 html[data-theme="marble"] :is(#board,.school-board,.replay-board) .sq.light{background:repeating-linear-gradient(116deg,transparent 0 34px,#757c8530 35px 37px,transparent 38px 60px),var(--shop-light)}
